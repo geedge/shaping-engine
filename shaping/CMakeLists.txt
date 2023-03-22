@@ -8,7 +8,7 @@ target_link_libraries(shaper PUBLIC pthread)
 target_include_directories(shaper PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
 add_executable(shaping_engine src/main.cpp)
 target_link_libraries(shaping_engine PUBLIC shaper)
-target_link_libraries(shaping_engine PUBLIC maatframe)
+target_link_libraries(shaping_engine PUBLIC maat4)
 target_link_libraries(shaping_engine PUBLIC mrzcpd)
 target_link_libraries(shaping_engine PUBLIC swarmkv)
 
