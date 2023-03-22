@@ -340,7 +340,7 @@ struct maat_options *maat_options_new(void)
     return NULL;
 }
 
-int maat_options_set_instance_name(struct maat_options *opts, const char *instance_name, size_t name_len)
+int maat_options_set_instance_name(struct maat_options *opts, const char *instance_name)
 {
     return 0;
 }

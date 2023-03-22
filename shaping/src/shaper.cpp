@@ -950,6 +950,7 @@ void shaping_engine_destroy(struct shaping_ctx *ctx)
             for (int i = 0; i < ctx->thread_num; i++) {
                 shaper_free(ctx->thread_ctx[i].sp);
                 shaper_stat_send_free(ctx->thread_ctx[i].stat);
+                session_table_destory(ctx->thread_ctx[i].session_table);
             }
             free(ctx->thread_ctx);
         }

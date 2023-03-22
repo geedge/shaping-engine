@@ -341,7 +341,7 @@ struct shaping_maat_info* shaper_maat_init(const char *instance_name)
     maat_info = (struct shaping_maat_info *)calloc(1, sizeof(struct shaping_maat_info));
 
     opts = maat_options_new();
-    maat_options_set_instance_name(opts, instance_name, strlen(instance_name));
+    maat_options_set_instance_name(opts, instance_name);
     switch (conf.input_mode) {
         case MAAT_INPUT_JSON:
             maat_options_set_json_file(opts, conf.json_cfg_file);
