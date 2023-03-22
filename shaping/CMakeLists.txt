@@ -12,4 +12,6 @@ target_link_libraries(shaping_engine PUBLIC maat4)
 target_link_libraries(shaping_engine PUBLIC mrzcpd)
 target_link_libraries(shaping_engine PUBLIC swarmkv)
 
+install(TARGETS shaping_engine RUNTIME DESTINATION bin COMPONENT Program)
+
 add_subdirectory(test)

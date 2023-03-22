@@ -56,8 +56,8 @@ add_custom_target("install-program" COMMAND ${CMAKE_COMMAND} ARGS -DCOMPONENT=Pr
 add_custom_target("install-profile" COMMAND ${CMAKE_COMMAND} ARGS -DCOMPONENT=Profile -P cmake_install.cmake)
 
 enable_testing()
-#add_subdirectory(conf)
+add_subdirectory(conf)
 add_subdirectory(vendor)
 add_subdirectory(common)
 add_subdirectory(shaping)
-#add_subdirectory(test)
+add_subdirectory(script)

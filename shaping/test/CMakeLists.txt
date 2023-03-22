@@ -23,3 +23,6 @@ target_link_libraries(gtest_shaper common shaper pthread gtest)
 
 include(GoogleTest)
 gtest_discover_tests(gtest_shaper_maat)
+gtest_discover_tests(gtest_shaper)
+
+file(COPY ./test_conf/ DESTINATION ./conf/)

@@ -1,0 +1,2 @@
+%systemd_post shaping_engine.service
+/sbin/ldconfig

@@ -1,7 +1,7 @@
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(MY_RPM_NAME_PREFIX "${lib_name}-debug")
+    set(MY_RPM_NAME_PREFIX "shaping_engine-debug")
 else()
-    set(MY_RPM_NAME_PREFIX "${lib_name}")
+    set(MY_RPM_NAME_PREFIX "shaping_engine")
 endif()
 
 message(STATUS "Package: ${MY_RPM_NAME_PREFIX}")
