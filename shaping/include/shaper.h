@@ -1,0 +1,142 @@
+#ifndef _SHAPER_H
+#define _SHAPER_H
+
+#include <sys/queue.h>
+#include <marsio.h>
+#include "uthash.h"
+#include "session_table.h"
+
+#define SHAPING_DIR_IN 0x1
+#define SHAPING_DIR_OUT 0x2
+
+#define SHAPING_RULE_NUM_MAX 8
+#define SHAPING_REF_PROFILE_NUM_MAX 8
+#define SHAPING_PRIORITY_NUM_MAX 10
+#define SHAPER_FLOW_POP_NUM_MAX 10
+#define STREAM_CLOSE 0x1
+
+#define SHAPING_WROK_THREAD_NUM_MAX 128
+
+#define SHAPING_GLOBAL_CONF_FILE "./conf/main.conf"
+
+struct shaping_global_conf {
+    char telegraf_ip[16];
+    short telegraf_port;
+    unsigned int session_queue_len_max;
+    unsigned int priority_queue_len_max;
+    int polling_node_num_max[SHAPING_PRIORITY_NUM_MAX];
+    int work_thread_num;
+    int cpu_affinity_enable;
+    int cpu_affinity_mask[SHAPING_WROK_THREAD_NUM_MAX];
+};
+
+struct shaping_thread_ctx {
+    pthread_t tid;
+    int thread_index;
+    struct shaping_ctx *ref_ctx;
+    struct shaper *sp;
+    struct shaping_stat *stat;
+    struct shaping_marsio_info *marsio_info;
+    struct swarmkv *swarmkv_db;//handle of swarmkv 
+    struct shaping_maat_info *maat_info;
+    struct session_table *session_table;
+    int session_need_reset;
+    int cpu_mask;
+    unsigned int session_queue_len_max;
+    int polling_node_num_max[SHAPING_PRIORITY_NUM_MAX];
+};
+
+struct shaping_ctx {
+    int thread_num;
+    struct swarmkv *swarmkv_db;//handle of swarmkv 
+    struct shaping_maat_info *maat_info;
+    struct shaping_marsio_info *marsio_info;
+    struct shaping_thread_ctx *thread_ctx;
+};
+
+enum shaping_packet_action {
+    SHAPING_FORWARD = 0,
+    SHAPING_QUEUED,
+    SHAPING_DROP
+};
+
+enum shaping_profile_type {
+    SHAPING_PROFILE_TYPE_PRIMARY = 0,
+    SHAPING_PROFILE_TYPE_BORROW
+};
+
+struct shaping_profile_info {
+    int id;//profile_id
+    int priority;
+    int in_deposit_token;
+    int out_deposit_token;
+    int async_ref_count;
+    unsigned long long enqueue_time_us;//to calculate max latency
+    unsigned char is_invalid;
+};
+
+struct shaping_rule_info {
+    int id;//rule_id
+    struct shaping_profile_info primary;
+    struct shaping_profile_info borrowing[SHAPING_REF_PROFILE_NUM_MAX];
+    int borrowing_num;
+};
+
+struct shaping_packet_wrapper {
+    void *pkt_buff;
+    unsigned long long income_time_ns;
+    unsigned long long enqueue_time_us;//first enqueue time
+    unsigned int length;
+    unsigned char direction;
+    unsigned char tcp_pure_contorl;
+    TAILQ_ENTRY(shaping_packet_wrapper) node;
+};
+TAILQ_HEAD(delay_queue, shaping_packet_wrapper);
+
+struct shaping_flow {
+    struct addr_tuple4 tuple4;
+    struct delay_queue packet_queue;
+    struct shaping_rule_info matched_rule_infos[SHAPING_RULE_NUM_MAX];
+    int rule_num;
+    int anchor;//rule_idx
+    int ref_count;
+    unsigned int queue_len;
+    unsigned int flag;
+};
+
+struct shaper_flow_instance {
+    struct shaping_flow *sf;
+    int priority;
+};
+
+struct shaper;//instance of shaping, thread unsafe
+
+//extern struct shaping_global_runtime_para g_rt_para;
+//extern struct shaping_global_conf g_sp_conf;
+
+struct shaping_flow* shaping_flow_new();
+void shaping_flow_free(struct shaping_flow *sf);
+struct shaper* shaper_new(unsigned int priority_queue_len_max);
+void shaper_free(struct shaper *sp);
+
+bool shaper_queue_empty(struct shaping_flow *sf);
+void shaper_packet_dequeue(struct shaping_flow *sf);
+struct shaping_packet_wrapper* shaper_first_pkt_get(struct shaping_flow *sf);
+void shaper_queue_clear(struct shaping_flow *sf, struct shaping_stat_data **stat_hashtbl, struct shaping_thread_ctx *ctx);
+/*return value: 0 for success, -1 for failed*/
+int shaper_flow_push(struct shaping_flow *sf, struct shaper *sp, struct shaping_stat_data **stat_hashtbl, unsigned long long enqueue_time);
+/*return num of sf_ins*/
+void shaper_flow_pop(struct shaper *sp, struct shaping_flow *sf, struct shaping_stat_data **stat_hashtbl);
+int shaper_flow_in_order_get(struct shaper *sp, struct shaper_flow_instance sf_ins[], int priority, int max_sf_num);
+
+enum shaping_packet_action shaper_pkt_action_decide(struct swarmkv *db, struct shaping_flow *sf, struct shaper *sp, 
+                                                    int priority, struct shaping_stat_data **stat_hashtbl, int sf_in_queue);
+
+int shaper_global_conf_init(struct shaping_global_conf *conf);
+
+void shaper_packet_recv_and_process(struct shaping_thread_ctx *ctx);
+void shaping_stream_process(struct shaping_thread_ctx *ctx, marsio_buff_t *rx_buff, struct metadata *meta, struct shaping_flow *sf);
+
+struct shaping_ctx *shaping_engine_init();
+void shaping_engine_destroy(struct shaping_ctx *ctx);
+#endif
