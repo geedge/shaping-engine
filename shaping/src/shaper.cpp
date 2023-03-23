@@ -3,7 +3,7 @@
 #include <MESA/swarmkv.h>
 #include <cstring>
 #include <marsio.h>
-#include <MESA/cJSON.h>
+#include <cjson/cJSON.h>
 #include <MESA/MESA_prof_load.h>
 
 #include <assert.h>

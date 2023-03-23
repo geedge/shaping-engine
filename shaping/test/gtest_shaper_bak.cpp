@@ -1,5 +1,5 @@
 #include <MESA/stream.h>
-#include <MESA/cJSON.h>
+#include <cjson/cJSON.h>
 #include <gtest/gtest.h>
 #include <vector>
 #include <stdlib.h>

@@ -1,6 +1,6 @@
 #include <MESA_prof_load.h>
 #include <MESA/MESA_handle_logger.h>
-#include <MESA/cJSON.h>
+#include <cjson/cJSON.h>
 
 #include "log.h"
 #include "raw_packet.h"

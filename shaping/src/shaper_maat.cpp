@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <time.h>
 
-#include <MESA/cJSON.h>
+#include <cjson/cJSON.h>
 #include <MESA/maat.h>
 #include <MESA/MESA_handle_logger.h>
 
