@@ -34,6 +34,9 @@ env | sort
 
 # Install dependency from YUM
 yum install -y libasan
+yum install -y systemd-devel
+yum install -y tsg_master-devel
+yum install -y framework_env
 yum install -y mrzcpd
 yum install -y libmaat4-devel
 yum install -y libswarmkv-devel
