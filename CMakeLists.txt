@@ -55,7 +55,7 @@ endif()
 add_custom_target("install-program" COMMAND ${CMAKE_COMMAND} ARGS -DCOMPONENT=Program -P cmake_install.cmake)
 add_custom_target("install-profile" COMMAND ${CMAKE_COMMAND} ARGS -DCOMPONENT=Profile -P cmake_install.cmake)
 
-# MESA Framework
+#MESA Framework
 set(MESA_FRAMEWORK_LIB_DIR /opt/MESA/lib)
 set(MESA_FRAMEWORK_INCLUDE_DIR /opt/MESA/include)
 
