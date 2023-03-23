@@ -3,7 +3,7 @@ variables:
   BUILD_IMAGE_CENTOS7: "git.mesalab.cn:7443/mesa_platform/build-env:master"
   BUILD_IMAGE_CENTOS8: "git.mesalab.cn:7443/mesa_platform/build-env:rockylinux"
   BUILD_PADDING_PREFIX: /tmp/padding_for_CPACK_RPM_BUILD_SOURCE_DIRS_PREFIX_PREFIX_PREFIX_PREFIX_PREFIX_PREFIX/
-  INSTALL_PREFIX: "/home/mesasoft/sapp_run/"
+  INSTALL_PREFIX: "/opt/tsg/shaping_engine"
   INSTALL_DEPENDENCY_LIBRARY: systemd-devel libMESA_handle_logger-devel  libcjson-devel tsg_master-devel sapp-devel framework_env libMESA_prof_load-devel librdkafka-devel libmaat4 libmaat4-devel libasan mrzcpd numactl-libs libibverbs libmlx5 libswarmkv-devel
 
 stages:
