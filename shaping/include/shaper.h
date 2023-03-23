@@ -51,6 +51,7 @@ struct shaping_ctx {
     struct swarmkv *swarmkv_db;//handle of swarmkv 
     struct shaping_maat_info *maat_info;
     struct shaping_marsio_info *marsio_info;
+    struct shaping_stat *stat;
     struct shaping_thread_ctx *thread_ctx;
 };
 
@@ -122,15 +123,14 @@ void shaper_free(struct shaper *sp);
 bool shaper_queue_empty(struct shaping_flow *sf);
 void shaper_packet_dequeue(struct shaping_flow *sf);
 struct shaping_packet_wrapper* shaper_first_pkt_get(struct shaping_flow *sf);
-void shaper_queue_clear(struct shaping_flow *sf, struct shaping_stat_data **stat_hashtbl, struct shaping_thread_ctx *ctx);
+void shaper_queue_clear(struct shaping_flow *sf, struct shaping_thread_ctx *ctx);
 /*return value: 0 for success, -1 for failed*/
-int shaper_flow_push(struct shaping_flow *sf, struct shaper *sp, struct shaping_stat_data **stat_hashtbl, unsigned long long enqueue_time);
+int shaper_flow_push(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, unsigned long long enqueue_time);
 /*return num of sf_ins*/
-void shaper_flow_pop(struct shaper *sp, struct shaping_flow *sf, struct shaping_stat_data **stat_hashtbl);
+void shaper_flow_pop(struct shaping_thread_ctx *ctx, struct shaping_flow *sf);
 int shaper_flow_in_order_get(struct shaper *sp, struct shaper_flow_instance sf_ins[], int priority, int max_sf_num);
 
-enum shaping_packet_action shaper_pkt_action_decide(struct swarmkv *db, struct shaping_flow *sf, struct shaper *sp, 
-                                                    int priority, struct shaping_stat_data **stat_hashtbl, int sf_in_queue);
+enum shaping_packet_action shaper_pkt_action_decide(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, int priority, int sf_in_queue);
 
 int shaper_global_conf_init(struct shaping_global_conf *conf);
 

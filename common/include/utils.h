@@ -10,6 +10,7 @@ extern "C"
 
 #define LOG_TAG_SHAPING "SHAPING"
 #define LOG_TAG_SWARMKV "SWARMKV"
+#define LOG_TAG_STAT    "STAT"
 #define LOG_TAG_MAAT    "MAAT"
 #define LOG_TAG_MARSIO  "MARSIO"
 #define LOG_TAG_UTILS "UTILS"
