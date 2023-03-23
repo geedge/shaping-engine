@@ -55,6 +55,29 @@ endif()
 add_custom_target("install-program" COMMAND ${CMAKE_COMMAND} ARGS -DCOMPONENT=Program -P cmake_install.cmake)
 add_custom_target("install-profile" COMMAND ${CMAKE_COMMAND} ARGS -DCOMPONENT=Profile -P cmake_install.cmake)
 
+# MESA Framework
+set(MESA_FRAMEWORK_LIB_DIR /opt/MESA/lib)
+set(MESA_FRAMEWORK_INCLUDE_DIR /opt/MESA/include)
+
+add_library(MESA_handle_logger SHARED IMPORTED GLOBAL)
+set_property(TARGET MESA_handle_logger PROPERTY IMPORTED_LOCATION ${MESA_FRAMEWORK_LIB_DIR}/libMESA_handle_logger.so)
+set_property(TARGET MESA_handle_logger PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${MESA_FRAMEWORK_INCLUDE_DIR})
+
+add_library(MESA_prof_load SHARED IMPORTED GLOBAL)
+set_property(TARGET MESA_prof_load PROPERTY IMPORTED_LOCATION ${MESA_FRAMEWORK_LIB_DIR}/libMESA_prof_load.so)
+set_property(TARGET MESA_prof_load PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${MESA_FRAMEWORK_INCLUDE_DIR})
+
+set(MRZCPD_LIB_DIR /opt/mrzcpd/lib)
+set(MRZCPD_INCLUDE_DIR /opt/mrzcpd/include)
+
+add_library(mrzcpd SHARED IMPORTED GLOBAL)
+set_property(TARGET mrzcpd PROPERTY IMPORTED_LOCATION ${MRZCPD_LIB_DIR}/libmarsio.so)
+set_property(TARGET mrzcpd PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${MRZCPD_INCLUDE_DIR})
+
+add_library(breakpad_mini SHARED IMPORTED GLOBAL)
+set_property(TARGET breakpad_mini PROPERTY IMPORTED_LOCATION ${MESA_FRAMEWORK_LIB_DIR}/libbreakpad_mini.so)
+set_property(TARGET breakpad_mini PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${MESA_FRAMEWORK_INCLUDE_DIR})
+
 enable_testing()
 add_subdirectory(conf)
 add_subdirectory(vendor)
