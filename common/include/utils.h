@@ -40,7 +40,7 @@ int fixed_num_array_index_elem(struct fixed_num_array *array, int index);
  * sids
  ******************************************************************************/
 
-#include <marsio.h>
+#include </opt/mrzcpd/include/marsio.h>
 
 struct sids
 {
