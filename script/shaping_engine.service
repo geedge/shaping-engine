@@ -4,4 +4,4 @@ After=network.target
 
 [Service]
 WorkingDirectory=/opt/tsg/shaping_engine/
-ExecStart=/opt/tsg/sce/bin/shaping_engine
+ExecStart=/opt/tsg/shaping_engine/bin/shaping_engine
