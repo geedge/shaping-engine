@@ -158,9 +158,9 @@ struct stub_pkt_queue* stub_get_tx_queue()
     return &tx_queue;
 }
 
-void stub_curr_time_inc()
+void stub_curr_time_inc(unsigned long long time_ns)
 {
-    curr_time += 1000;
+    curr_time += time_ns;
 
     return;
 }

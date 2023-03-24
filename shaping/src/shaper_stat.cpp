@@ -1,13 +1,21 @@
-#include <fieldstat.h>
 #include <stdio.h>
 #include <time.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <MESA/MESA_prof_load.h>
+#include <fieldstat.h>
 
 #include "log.h"
 #include "utils.h"
 #include "shaper.h"
 #include "shaper_stat.h"
+
+struct shaper_stat_conf {
+    int enable_backgroud_thread;
+    int output_interval_ms;
+    char telegraf_ip[16];
+    short telegraf_port;
+};
 
 thread_local struct fieldstat_tag tags[TAG_IDX_MAX];
 
@@ -25,10 +33,23 @@ void shaper_stat_destroy(struct shaping_stat *stat)
     return;
 }
 
-struct shaping_stat* shaper_stat_new(int thread_num)
+static int shaper_stat_conf_load(struct shaper_stat_conf *conf)
+{
+    memset(conf, 0, sizeof(struct shaper_stat_conf));
+
+    MESA_load_profile_string_def(SHAPING_GLOBAL_CONF_FILE, "METRIC", "TELEGRAF_IP", conf->telegraf_ip, sizeof(conf->telegraf_ip), "127.0.0.1");
+    MESA_load_profile_short_def(SHAPING_GLOBAL_CONF_FILE, "METRIC", "TELEGRAF_PORT", &conf->telegraf_port, 6379);
+    MESA_load_profile_int_def(SHAPING_GLOBAL_CONF_FILE, "METRIC", "FIELDSTAT_OUTPUT_INTERVAL_MS", &conf->output_interval_ms, 500);
+    MESA_load_profile_int_def(SHAPING_GLOBAL_CONF_FILE, "METRIC", "FIELDSTAT_ENABLE_BACKGRUND_THREAD", &conf->enable_backgroud_thread, 1);
+
+    return 0;
+}
+
+struct shaping_stat* shaper_stat_init(int thread_num)
 {
     struct shaping_stat *stat = NULL;
     int column_num;
+    struct shaper_stat_conf conf;
     const char *column_name[] = {"queueing_sessions", "in_max_latency_us", "in_queue_len", "out_max_latency_us", "out_queue_len", //first line is gauge, second line is counter
                                     "in_pkts", "in_bytes", "in_drop_pkts", "out_pkts", "out_bytes", "out_drop_pkts"};
     enum field_type column_type[] = {FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE, 
@@ -40,12 +61,23 @@ struct shaping_stat* shaper_stat_new(int thread_num)
         goto ERROR;
     }
 
+    if (shaper_stat_conf_load(&conf) != 0) {
+        LOG_ERROR("%s: shaping init metric conf failed", LOG_TAG_STAT);
+        goto ERROR;
+    }
+
     stat = (struct shaping_stat *)calloc(1, sizeof(struct shaping_stat));
 
     stat->instance = fieldstat_dynamic_instance_new("shaping_engine", thread_num);
     if (stat->instance == NULL) {
         LOG_ERROR("%s: shaping init fieldstat instance failed", LOG_TAG_STAT);
         goto ERROR;
+    }
+
+    fieldstat_dynamic_set_output_interval(stat->instance, conf.output_interval_ms);
+    fieldstat_dynamic_set_line_protocol_server(stat->instance, conf.telegraf_ip, conf.telegraf_port);
+    if (conf.enable_backgroud_thread == 0) {
+        fieldstat_dynamic_disable_background_thread(stat->instance);
     }
 
     stat->table_id = fieldstat_register_dynamic_table(stat->instance, "shaping_metric", column_name, column_type, column_num, stat->column_ids);
@@ -199,6 +231,13 @@ void shaper_stat_max_latency_update(struct shaping_stat *stat, int rule_id, int 
         }
     }
 #endif
+
+    shaper_stat_tags_build(rule_id, profile_id, priority, profile_type);
+    if (direction == SHAPING_DIR_IN) {
+        fieldstat_dynamic_table_metric_value_set(stat->instance, stat->table_id, stat->column_ids[IN_MAX_LATENCY_IDX], "shaping_metric_row", -1, tags, TAG_IDX_MAX, thread_id);
+    } else {
+        fieldstat_dynamic_table_metric_value_set(stat->instance, stat->table_id, stat->column_ids[OUT_MAX_LATENCY_IDX], "shaping_metric_row", -1, tags, TAG_IDX_MAX, thread_id);
+    }
     return;
 }
 

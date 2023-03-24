@@ -1,5 +1,3 @@
-#include "log.h"
-#include "session_table.h"
 #include <MESA/swarmkv.h>
 #include <marsio.h>
 #include <cjson/cJSON.h>
@@ -12,6 +10,8 @@
 extern "C" {
 #include "libavl.h"
 }
+#include "log.h"
+#include "session_table.h"
 #include "addr_tuple4.h"
 #include "raw_packet.h"
 #include "shaper.h"
@@ -913,10 +913,6 @@ int shaper_global_conf_init(struct shaping_global_conf *conf)
     }
     /*************************************************************************/
 
-
-    MESA_load_profile_string_def(SHAPING_GLOBAL_CONF_FILE, "METRIC", "TELEGRAF_IP", conf->telegraf_ip, sizeof(conf->telegraf_ip), "127.0.0.1");
-    MESA_load_profile_short_def(SHAPING_GLOBAL_CONF_FILE, "METRIC", "TELEGRAF_PORT", &conf->telegraf_port, 6379);
-
     MESA_load_profile_uint_def(SHAPING_GLOBAL_CONF_FILE, "CONFIG", "SESSION_QUEUE_LEN_MAX", &conf->session_queue_len_max, 128);
     MESA_load_profile_uint_def(SHAPING_GLOBAL_CONF_FILE, "CONFIG", "PRIORITY_QUEUE_LEN_MAX", &conf->priority_queue_len_max, 1024);
 
@@ -991,7 +987,7 @@ struct shaping_ctx *shaping_engine_init()
         goto ERROR;
     }
 
-    ctx->stat = shaper_stat_new(conf.work_thread_num);
+    ctx->stat = shaper_stat_init(conf.work_thread_num);
     if (ctx->stat == NULL) {
         goto ERROR;
     }

@@ -20,8 +20,6 @@
 #define SHAPING_GLOBAL_CONF_FILE "./conf/main.conf"
 
 struct shaping_global_conf {
-    char telegraf_ip[16];
-    short telegraf_port;
     unsigned int session_queue_len_max;
     unsigned int priority_queue_len_max;
     int polling_node_num_max[SHAPING_PRIORITY_NUM_MAX];
