@@ -35,7 +35,7 @@ struct ctrl_pkt_data
     int shaping_rule_num;
 };
 
-struct shaping_marsio_info* shaper_marsio_init(int thread_num);
+struct shaping_marsio_info* shaper_marsio_init(struct shaping_system_conf *sys_conf);
 void shaper_marsio_destroy(struct shaping_marsio_info *marsio_info);
 int shaper_marsio_pkt_metadata_get(marsio_buff_t *rx_buff, struct metadata *meta, int is_ctrl_buff, struct raw_pkt_parser *raw_parser);
 int shaper_marsio_ctrl_pkt_data_parse(struct ctrl_pkt_data *ctrl_data, const char *data, size_t length);

@@ -1,6 +1,7 @@
 #include <MESA_prof_load.h>
 #include <MESA/MESA_handle_logger.h>
 #include <cjson/cJSON.h>
+#include <marsio.h>
 
 #include "log.h"
 #include "raw_packet.h"
@@ -56,7 +57,7 @@ void shaper_marsio_destroy(struct shaping_marsio_info *marsio_info)
     return;
 }
 
-struct shaping_marsio_info* shaper_marsio_init(int thread_num)
+struct shaping_marsio_info* shaper_marsio_init(struct shaping_system_conf *sys_conf)
 {
     struct shaper_marsio_config conf;
     struct shaping_marsio_info *marsio_info;
@@ -75,10 +76,16 @@ struct shaping_marsio_info* shaper_marsio_init(int thread_num)
         goto ERROR;
     }
 
-    if (marsio_option_set(marsio_info->instance, MARSIO_OPT_EXIT_WHEN_ERR, &opt, sizeof(opt)) != 0)
-    {
+    if (marsio_option_set(marsio_info->instance, MARSIO_OPT_EXIT_WHEN_ERR, &opt, sizeof(opt)) != 0) {
         LOG_ERROR("%s: shaping marsio set MARSIO_OPT_EXIT_WHEN_ERR failed", LOG_TAG_MARSIO);
         goto ERROR;
+    }
+
+    if (sys_conf->cpu_affinity_enable) {
+        if (marsio_option_set(marsio_info->instance, MARSIO_OPT_THREAD_MASK, &sys_conf->cpu_affinity_mask, sizeof(sys_conf->cpu_affinity_mask)) != 0) {
+            LOG_ERROR("%s: shaping marsio set MARSIO_OPT_THREAD_MASK failed", LOG_TAG_MARSIO);
+            goto ERROR;
+        }
     }
 
     if (marsio_init(marsio_info->instance, conf.app_symbol) != 0) {
@@ -86,7 +93,7 @@ struct shaping_marsio_info* shaper_marsio_init(int thread_num)
         goto ERROR;
     }
 
-    marsio_info->mr_dev = marsio_open_device(marsio_info->instance, conf.dev_interface, thread_num, thread_num);
+    marsio_info->mr_dev = marsio_open_device(marsio_info->instance, conf.dev_interface, sys_conf->work_thread_num, sys_conf->work_thread_num);
     if (!marsio_info->mr_dev) {
         LOG_ERROR("%s: shaping marsio open device %s failed", LOG_TAG_MARSIO, conf.dev_interface);
         goto ERROR;

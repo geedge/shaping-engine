@@ -19,13 +19,13 @@
 
 #define SHAPING_GLOBAL_CONF_FILE "./conf/main.conf"
 
-struct shaping_global_conf {
+struct shaping_system_conf {
     unsigned int session_queue_len_max;
     unsigned int priority_queue_len_max;
     int polling_node_num_max[SHAPING_PRIORITY_NUM_MAX];
     int work_thread_num;
     int cpu_affinity_enable;
-    int cpu_affinity_mask[SHAPING_WROK_THREAD_NUM_MAX];
+    unsigned long long cpu_affinity_mask;
 };
 
 struct shaping_thread_ctx {
@@ -39,7 +39,6 @@ struct shaping_thread_ctx {
     struct shaping_maat_info *maat_info;
     struct session_table *session_table;
     int session_need_reset;
-    int cpu_mask;
     unsigned int session_queue_len_max;
     int polling_node_num_max[SHAPING_PRIORITY_NUM_MAX];
 };
@@ -110,9 +109,6 @@ struct shaper_flow_instance {
 
 struct shaper;//instance of shaping, thread unsafe
 
-//extern struct shaping_global_runtime_para g_rt_para;
-//extern struct shaping_global_conf g_sp_conf;
-
 struct shaping_flow* shaping_flow_new();
 void shaping_flow_free(struct shaping_flow *sf);
 struct shaper* shaper_new(unsigned int priority_queue_len_max);
@@ -130,7 +126,7 @@ int shaper_flow_in_order_get(struct shaper *sp, struct shaper_flow_instance sf_i
 
 enum shaping_packet_action shaper_pkt_action_decide(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, int priority, int sf_in_queue);
 
-int shaper_global_conf_init(struct shaping_global_conf *conf);
+int shaper_global_conf_init(struct shaping_system_conf *conf);
 
 void shaper_packet_recv_and_process(struct shaping_thread_ctx *ctx);
 void shaping_stream_process(struct shaping_thread_ctx *ctx, marsio_buff_t *rx_buff, struct metadata *meta, struct shaping_flow *sf);

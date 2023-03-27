@@ -830,13 +830,14 @@ void shaper_packet_recv_and_process(struct shaping_thread_ctx *ctx)
     return;
 }
 
-int shaper_global_conf_init(struct shaping_global_conf *conf)
+int shaper_global_conf_init(struct shaping_system_conf *conf)
 {
     int ret;
     int array_num;
     cJSON *json = NULL;
     cJSON *tmp_obj = NULL, *tmp_array_obj = NULL;
     char polling_node_num_max[128] = {0};
+    unsigned int cpu_mask[SHAPING_WROK_THREAD_NUM_MAX] = {0};
 
     ret = MESA_load_profile_int_nodef(SHAPING_GLOBAL_CONF_FILE, "SYSTEM", "WORK_THREAD_NUM", &conf->work_thread_num);
     if (ret < 0) {
@@ -851,10 +852,13 @@ int shaper_global_conf_init(struct shaping_global_conf *conf)
         return ret;
     }
 
-    ret = MESA_load_profile_uint_range(SHAPING_GLOBAL_CONF_FILE, "SYSTEM", "CPU_AFFINITY_MASK", SHAPING_WROK_THREAD_NUM_MAX, (unsigned int *)conf->cpu_affinity_mask);
+    ret = MESA_load_profile_uint_range(SHAPING_GLOBAL_CONF_FILE, "SYSTEM", "CPU_AFFINITY_MASK", SHAPING_WROK_THREAD_NUM_MAX, cpu_mask);
     if (ret < 0 || ret != conf->work_thread_num) {
         LOG_ERROR("%s: shaping init global conf get CPU_AFFINITY_MASK failed or incomplete config", LOG_TAG_SHAPING);
         return -1;
+    }
+    for (int i = 0; i < conf->work_thread_num; i++) {
+        conf->cpu_affinity_mask |= 1 << cpu_mask[i];
     }
 
 #if 0 //temporarily not support array config
@@ -951,7 +955,7 @@ void shaping_engine_destroy(struct shaping_ctx *ctx)
 
 struct shaping_ctx *shaping_engine_init()
 {
-    struct shaping_global_conf conf;
+    struct shaping_system_conf conf;
     struct shaping_ctx *ctx = NULL;
     int ret;
 
@@ -982,7 +986,7 @@ struct shaping_ctx *shaping_engine_init()
     }
 
     /*init marsio*/
-    ctx->marsio_info = shaper_marsio_init(conf.work_thread_num);
+    ctx->marsio_info = shaper_marsio_init(&conf);
     if (ctx->marsio_info == NULL) {
         goto ERROR;
     }
@@ -1002,7 +1006,6 @@ struct shaping_ctx *shaping_engine_init()
         ctx->thread_ctx[i].maat_info = ctx->maat_info;
         ctx->thread_ctx[i].marsio_info = ctx->marsio_info;
         ctx->thread_ctx[i].swarmkv_db = ctx->swarmkv_db;
-        ctx->thread_ctx[i].cpu_mask = conf.cpu_affinity_enable ? conf.cpu_affinity_mask[i] : -1;
         ctx->thread_ctx[i].ref_ctx = ctx;
         ctx->thread_ctx[i].session_queue_len_max = conf.session_queue_len_max;
         memcpy(ctx->thread_ctx[i].polling_node_num_max, conf.polling_node_num_max, sizeof(conf.polling_node_num_max));
