@@ -63,7 +63,7 @@ static void send_packets(struct shaping_thread_ctx *ctx, struct shaping_flow *sf
             meta.is_tcp_pure_ctrl = 1;
         }
 
-        shaping_stream_process(ctx, packet, &meta, sf);
+        shaping_packet_process(ctx, packet, &meta, sf);
 
         for (int j = 0; j < polling_times; j++) {
             polling_entry(ctx->sp, ctx->stat, ctx);
@@ -544,6 +544,86 @@ TEST(single_session, udp_borrow)
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2, borrow
     //shaping_stat_judge(line, 1, 2, 2, 100, 10000, 0, 0, 170, 0, SHAPING_DIR_OUT, profile_type_borrow);
     shaping_stat_judge(line, 1, 2, 2, 100, 10000, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_borrow);//TODO: latency
+
+    fclose(stat_file);
+    stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
+    fclose(stat_file);
+}
+
+/*session1 match rule1
+  rule1:
+      priority: 9
+      profile1: limit 0
+      profile2: limit 0
+      profile3: limit 1000*/
+TEST(single_session, udp_borrow_same_priority_9)
+{
+    struct stub_pkt_queue expec_tx_queue;
+    struct stub_pkt_queue *actual_tx_queue;
+    struct shaping_ctx *ctx = NULL;
+    struct shaping_flow *sf = NULL;
+    long long rule_id[] = {1};
+    int priority[] = {9};
+    int profile_num[] = {3};
+    int profile_id[][MAX_REF_PROFILE] = {{1, 2, 3}};
+
+    TAILQ_INIT(&expec_tx_queue);
+    stub_init();
+    ctx = shaping_engine_init();
+    ASSERT_TRUE(ctx != NULL);
+    sf = shaping_flow_new();
+    ASSERT_TRUE(sf != NULL);
+
+    stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
+    stub_set_token_bucket_avl_per_sec(1, 0, SHAPING_DIR_OUT);
+    stub_set_token_bucket_avl_per_sec(2, 0, SHAPING_DIR_OUT);
+    stub_set_token_bucket_avl_per_sec(3, 1000, SHAPING_DIR_OUT);
+    actual_tx_queue = stub_get_tx_queue();
+    shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
+
+    /*******send packets***********/
+    send_packets(&ctx->thread_ctx[0], sf, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
+
+
+    //first 10 packets
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
+
+    while (!TAILQ_EMPTY(&expec_tx_queue)) {//last 90 delay packets
+        stub_refresh_token_bucket(3);
+        for (int i = 0; i < 20; i++) {//even though invoke polling more than 10 times, there should be only 10 pkts be sent
+            polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
+            stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);
+        }
+        ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
+        ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
+    }
+
+    /***********send stat data here********************/
+    stub_curr_time_inc(STUB_TIME_INC_FOR_METRIC_SEND);//inc time to send metric
+    fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
+
+    shaping_flow_free(sf);
+    shaping_engine_destroy(ctx);
+    stub_clear_matched_shaping_rules();
+
+    /*******test statistics***********/
+    sleep(2);//wait telegraf to output
+    char line[1024];
+    FILE *stat_file;
+
+    stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
+    memset(line, 0, sizeof(line));
+    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 1, primary
+    //shaping_stat_judge(line, 1, 1, 9, 0, 0, 0, 0, 170, 0, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(line, 1, 1, 9, 0, 0, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_primary);//TODO: latency
+
+    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 1, primary
+    //shaping_stat_judge(line, 1, 1, 9, 0, 0, 0, 0, 170, 0, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(line, 1, 2, 9, 0, 0, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_borrow);//TODO: latency
+
+    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2, borrow
+    //shaping_stat_judge(line, 1, 2, 9, 100, 10000, 0, 0, 170, 0, SHAPING_DIR_OUT, profile_type_borrow);
+    shaping_stat_judge(line, 1, 3, 9, 100, 10000, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_borrow);//TODO: latency
 
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
@@ -1391,6 +1471,6 @@ TEST(statistics, udp_queueing_pkt)
 int main(int argc, char **argv) 
 {
     testing::InitGoogleTest(&argc, argv);
-    //testing::GTEST_FLAG(filter) = "statistics.udp_queueing_pkt";
+    //testing::GTEST_FLAG(filter) = "single_session.udp_borrow_same_priority_9";
     return RUN_ALL_TESTS();
 }

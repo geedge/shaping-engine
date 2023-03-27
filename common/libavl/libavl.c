@@ -1,14 +1,14 @@
+#include <assert.h>
 #include <stdlib.h>
 #include "libavl.h"
 #include "avl_tree.h"
 
-#define AVL_NODE_IN_TREE 0x01
 
 struct avl_node {
     unsigned long long unique_key;
     void *data;
     void(*free_cb) (void *);
-    unsigned int flag;
+    unsigned int ref_count;
     struct avl_tree_node node;
 };
 
@@ -131,7 +131,7 @@ int avl_node_in_tree(struct avl_node* pnode)
         return 0;
     }
 
-    if (pnode->flag & AVL_NODE_IN_TREE) {
+    if (pnode->ref_count > 0) {
         return 1;
     }
 
@@ -162,6 +162,11 @@ int avl_tree_node_insert(struct avl_tree *tree, struct avl_node* pnode)
         return -1;
     }
 
+    if (avl_node_in_tree(pnode)) {
+        pnode->ref_count++;
+        return 0;
+    }
+
     if (tree->curr_node_num == tree->max_node_num) {
         return -1;
     }
@@ -171,7 +176,7 @@ int avl_tree_node_insert(struct avl_tree *tree, struct avl_node* pnode)
         return -1;
     }
 
-    pnode->flag |= AVL_NODE_IN_TREE;
+    pnode->ref_count = 1;
     tree->curr_node_num++;
 
     return 0;
@@ -179,12 +184,18 @@ int avl_tree_node_insert(struct avl_tree *tree, struct avl_node* pnode)
 
 void avl_tree_node_remove(struct avl_tree *tree, struct avl_node* pnode)
 {
-    if (!pnode || !(pnode->flag & AVL_NODE_IN_TREE)) {
+    if (!pnode || pnode->ref_count == 0) {
+        return;
+    }
+
+    pnode->ref_count--;
+    assert(pnode->ref_count >= 0);
+
+    if (pnode->ref_count > 0) {
         return;
     }
 
     avl_tree_remove(&tree->root, &pnode->node);
-    pnode->flag &= ~AVL_NODE_IN_TREE;
     tree->curr_node_num--;
     return;
 }

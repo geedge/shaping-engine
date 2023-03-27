@@ -124,12 +124,12 @@ int shaper_flow_push(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, un
 void shaper_flow_pop(struct shaping_thread_ctx *ctx, struct shaping_flow *sf);
 int shaper_flow_in_order_get(struct shaper *sp, struct shaper_flow_instance sf_ins[], int priority, int max_sf_num);
 
-enum shaping_packet_action shaper_pkt_action_decide(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, int priority, int sf_in_queue);
+//enum shaping_packet_action shaper_pkt_action_decide(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, int priority, int sf_in_queue);
 
 int shaper_global_conf_init(struct shaping_system_conf *conf);
 
 void shaper_packet_recv_and_process(struct shaping_thread_ctx *ctx);
-void shaping_stream_process(struct shaping_thread_ctx *ctx, marsio_buff_t *rx_buff, struct metadata *meta, struct shaping_flow *sf);
+void shaping_packet_process(struct shaping_thread_ctx *ctx, marsio_buff_t *rx_buff, struct metadata *meta, struct shaping_flow *sf);
 
 struct shaping_ctx *shaping_engine_init();
 void shaping_engine_destroy(struct shaping_ctx *ctx);
