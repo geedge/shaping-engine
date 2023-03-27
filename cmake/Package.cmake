@@ -31,7 +31,8 @@ else()
 endif()
 
 # setup %config(noreplace)
-set(CPACK_RPM_USER_FILELIST "%config(noreplace) ${CMAKE_INSTALL_PREFIX}/conf/main.conf"
+set(CPACK_RPM_USER_FILELIST "%config(noreplace) ${CMAKE_INSTALL_PREFIX}/conf/shaping.conf"
+                            "%config(noreplace) ${CMAKE_INSTALL_PREFIX}/conf/shaping_maat.json"
                             "%config(noreplace) ${CMAKE_INSTALL_PREFIX}/conf/zlog.conf"
                             "%config(noreplace) ${CMAKE_INSTALL_PREFIX}/conf/table_info.json")
 
