@@ -803,29 +803,32 @@ static struct shaping_flow *shaper_raw_pkt_session_handle(struct shaping_thread_
 
 void shaper_packet_recv_and_process(struct shaping_thread_ctx *ctx)
 {
-    marsio_buff_t *rx_buff;
+    marsio_buff_t *rx_buff[SHAPER_MARSIO_RX_BRUST_MAX];
     struct shaping_flow *sf = NULL;
     struct metadata meta;
     int rx_num;
+    int i;
 
-    rx_num = marsio_recv_burst(ctx->marsio_info->mr_dev, ctx->thread_index, &rx_buff, 1);
+    rx_num = marsio_recv_burst(ctx->marsio_info->mr_dev, ctx->thread_index, rx_buff, ctx->marsio_info->rx_brust_max);
     if (rx_num <= 0) {
         polling_entry(ctx->sp, ctx->stat, ctx);
         return;
     }
 
-    if (marsio_buff_is_ctrlbuf(rx_buff)) {
-        sf = shaper_ctrl_pkt_session_handle(ctx, rx_buff, &meta);
-    } else {
-        sf = shaper_raw_pkt_session_handle(ctx, rx_buff, &meta);
-    }
+    for (i = 0; i < rx_num; i++) {
+        if (marsio_buff_is_ctrlbuf(rx_buff[i])) {
+            sf = shaper_ctrl_pkt_session_handle(ctx, rx_buff[i], &meta);
+        } else {
+            sf = shaper_raw_pkt_session_handle(ctx, rx_buff[i], &meta);
+        }
 
-    if (meta.is_ctrl_pkt || !sf) {//ctrl pkt need send directly
-        marsio_send_burst(ctx->marsio_info->mr_path, ctx->thread_index, &rx_buff, 1);
-    } else {
-        shaping_stream_process(ctx, rx_buff, &meta, sf);
+        if (meta.is_ctrl_pkt || !sf) {//ctrl pkt need send directly
+            marsio_send_burst(ctx->marsio_info->mr_path, ctx->thread_index, &rx_buff[i], 1);
+        } else {
+            shaping_stream_process(ctx, rx_buff[i], &meta, sf);
+        }
+        polling_entry(ctx->sp, ctx->stat, ctx);
     }
-    polling_entry(ctx->sp, ctx->stat, ctx);
 
     return;
 }

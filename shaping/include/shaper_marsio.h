@@ -1,11 +1,14 @@
 #include <marsio.h>
 #include "shaper.h"
 
+#define SHAPER_MARSIO_RX_BRUST_MAX 128
+
 struct shaping_marsio_info
 {
     struct mr_instance *instance;
     struct mr_vdev *mr_dev;
     struct mr_sendpath *mr_path;
+    int rx_brust_max;
 };
 
 struct metadata

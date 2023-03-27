@@ -17,7 +17,7 @@
 
 #define SHAPING_WROK_THREAD_NUM_MAX 128
 
-#define SHAPING_GLOBAL_CONF_FILE "./conf/main.conf"
+#define SHAPING_GLOBAL_CONF_FILE "./conf/shaping.conf"
 
 struct shaping_system_conf {
     unsigned int session_queue_len_max;

@@ -11,6 +11,7 @@
 
 struct shaper_marsio_config
 {
+    int rx_brust_max;
     char app_symbol[256];
     char dev_interface[256];
 };
@@ -30,6 +31,9 @@ static int shaper_marsio_config_load(struct shaper_marsio_config *conf)
         LOG_ERROR("%s: shaping load MARSIO conf APP_SYMBOL failed", LOG_TAG_MARSIO);
         return ret;
     }
+
+    ret = MESA_load_profile_int_def(SHAPING_GLOBAL_CONF_FILE, "SYSTEM", "RX_BRUST_MAX", &conf->rx_brust_max, 1);
+    conf->rx_brust_max = conf->rx_brust_max <= SHAPER_MARSIO_RX_BRUST_MAX ? conf->rx_brust_max : SHAPER_MARSIO_RX_BRUST_MAX;
     
     return 0;
 }
@@ -104,6 +108,8 @@ struct shaping_marsio_info* shaper_marsio_init(struct shaping_system_conf *sys_c
         LOG_ERROR("%s: shaping marsio sendpath create failed for %s", LOG_TAG_MARSIO, conf.dev_interface);
         goto ERROR;
     }
+
+    marsio_info->rx_brust_max = conf.rx_brust_max;
 
     return marsio_info;
 
