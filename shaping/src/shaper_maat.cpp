@@ -283,12 +283,12 @@ static void shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_ru
             goto END;
         }
 
-        if (s_rule->priority + i + 1 < SHAPING_PRIORITY_NUM_MAX) {//TODO: 优先级大于9的都按9处理
+        if (s_rule->priority + i + 1 < SHAPING_PRIORITY_NUM_MAX) {
             shaper_profile_update(&s_rule_info->borrowing[i], s_pf, s_rule->priority + i + 1);
-            s_rule_info->borrowing_num++;
         } else {
-            goto END;
+            shaper_profile_update(&s_rule_info->borrowing[i], s_pf, SHAPING_PRIORITY_NUM_MAX - 1);
         }
+        s_rule_info->borrowing_num++;
     }
 
 END:

@@ -158,9 +158,9 @@ struct stub_pkt_queue* stub_get_tx_queue()
     return &tx_queue;
 }
 
-void stub_curr_time_inc()
+void stub_curr_time_inc(unsigned long long time_ns)
 {
-    curr_time += 1000;
+    curr_time += time_ns;
 
     return;
 }
@@ -268,6 +268,11 @@ struct swarmkv *swarmkv_open(struct swarmkv_options *opts, const char * cluster_
 }
 
 int swarmkv_options_set_log_path(struct swarmkv_options *opts, const char *logpath)
+{
+    return 0;
+}
+
+int swarmkv_options_set_log_level(struct swarmkv_options *opts, int loglevel)
 {
     return 0;
 }

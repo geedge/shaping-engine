@@ -9,6 +9,9 @@
 #define STUB_MAAT_SHAPING_RULE_TABLE_ID 0
 #define STUB_MAAT_SHAPING_PROFILE_TABLE_ID 1
 
+#define STUB_TIME_INC_FOR_PACKET 1000
+#define STUB_TIME_INC_FOR_METRIC_SEND 1000000
+
 struct stub_packet {
     unsigned char direction;
     unsigned char pure_control;
@@ -37,7 +40,7 @@ struct stub_pkt_queue* stub_get_tx_queue();
 
 int stub_AQM_drop_packet(int queue_len, unsigned long long income_time);
 
-void stub_curr_time_inc();
+void stub_curr_time_inc(unsigned long long time_ns);
 unsigned long long stub_curr_time_get();
 
 void stub_init();

@@ -8,29 +8,10 @@
 #include "shaper_marsio.h"
 #include "shaper_session.h"
 
-static int thread_set_affinity(int core_id)
-{
-    int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
-    if (core_id < 0 || core_id >= num_cores)
-    {
-        return EINVAL;
-    }
-
-    cpu_set_t cpuset;
-    CPU_ZERO(&cpuset);
-    CPU_SET(core_id, &cpuset);
-
-    return pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
-}
-
 static void *shaper_thread_loop(void *data)
 {
     struct shaping_thread_ctx *ctx = (struct shaping_thread_ctx *)data;
 
-    if (ctx->cpu_mask >= 0)
-    {
-        thread_set_affinity(ctx->cpu_mask);
-    }
     marsio_thread_init(ctx->marsio_info->instance);
 
     //loop to process pkts

@@ -80,7 +80,7 @@ void shaper_session_data_free_cb(void *session_data, void *data)
     struct shaping_thread_ctx *ctx = (struct shaping_thread_ctx *)data;
 
     if (sf) {
-        shaper_queue_clear(sf, &ctx->stat->stat_hashtbl, ctx);
+        shaper_queue_clear(sf, ctx);
         shaping_flow_free(sf);
     }
 
