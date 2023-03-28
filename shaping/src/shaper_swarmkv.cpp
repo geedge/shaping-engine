@@ -106,6 +106,7 @@ struct swarmkv* shaper_swarmkv_init()
     swarmkv_options_set_health_check_port(swarmkv_opts, conf.swarmkv_health_check_port);
     swarmkv_options_set_health_check_announce_port(swarmkv_opts, conf.swarmkv_health_check_announce_port);
     swarmkv_options_set_log_path(swarmkv_opts, "log");
+    swarmkv_options_set_log_level(swarmkv_opts, 4);
 
     swarmkv_db = swarmkv_open(swarmkv_opts, conf.swarmkv_cluster_name, &err);
     if (err) {

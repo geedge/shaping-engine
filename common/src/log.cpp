@@ -6,13 +6,13 @@ void *g_default_logger = NULL;
 // return -1 : error
 int LOG_INIT(const char *profile)
 {
-    // if (0 != MESA_handle_runtime_log_creation(profile))
-    // {
-    //     fprintf(stderr, "FATAL: unable to create runtime logger\n");
-    //     return -1;
-    // }
+    if (0 != MESA_handle_runtime_log_creation(profile))
+    {
+        fprintf(stderr, "FATAL: unable to create runtime logger\n");
+        return -1;
+    }
 
-    g_default_logger = MESA_create_runtime_log_handle("./log/shaping", RLOG_LV_DEBUG);
+    g_default_logger = MESA_create_runtime_log_handle("log/shaping", RLOG_LV_DEBUG);
     if (g_default_logger == NULL)
     {
         fprintf(stderr, "FATAL: unable to create log handle\n");

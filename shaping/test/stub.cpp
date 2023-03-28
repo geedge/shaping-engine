@@ -272,6 +272,11 @@ int swarmkv_options_set_log_path(struct swarmkv_options *opts, const char *logpa
     return 0;
 }
 
+int swarmkv_options_set_log_level(struct swarmkv_options *opts, int loglevel)
+{
+    return 0;
+}
+
 void swarmkv_tconsume(struct swarmkv * db, const char * key, size_t keylen, long long tokens, swarmkv_on_reply_callback_t *cb, void *cb_arg)
 {
     int actual_tokens;
