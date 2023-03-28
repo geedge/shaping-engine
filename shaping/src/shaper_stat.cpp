@@ -213,7 +213,7 @@ void shaper_stat_queueing_pkt_dec(struct shaping_stat *stat, int rule_id, int pr
 void shaper_stat_max_latency_update(struct shaping_stat *stat, int rule_id, int profile_id, 
                                     int priority, unsigned char direction, unsigned long long latency, int profile_type, int thread_id)
 {
-    long long old_latency;
+    unsigned long long old_latency;
 
     shaper_stat_tags_build(rule_id, profile_id, priority, profile_type);
     if (direction == SHAPING_DIR_IN) {
