@@ -212,46 +212,21 @@ void shaper_stat_queueing_pkt_dec(struct shaping_stat *stat, int rule_id, int pr
 
 void shaper_stat_max_latency_update(struct shaping_stat *stat, int rule_id, int profile_id, 
                                     int priority, unsigned char direction, unsigned long long latency, int profile_type, int thread_id)
-{//TODO
-#if 0
-    struct shaping_stat_data *s_stat_data = NULL;
-
-    s_stat_data = shaper_stat_ins_get(stat_hashtbl, rule_id, profile_id, priority, profile_type);
+{
+    long long old_latency;
 
     shaper_stat_tags_build(rule_id, profile_id, priority, profile_type);
     if (direction == SHAPING_DIR_IN) {
-        if (latency > s_stat_data->incoming.max_latency) {
-            s_stat_data->incoming.max_latency = latency;
+        old_latency = fieldstat_dynamic_table_metric_value_get(stat->instance, stat->table_id, stat->column_ids[IN_MAX_LATENCY_IDX], "shaping_metric_row", tags, TAG_IDX_MAX, thread_id);
+        if (latency > old_latency) {
             fieldstat_dynamic_table_metric_value_set(stat->instance, stat->table_id, stat->column_ids[IN_MAX_LATENCY_IDX], "shaping_metric_row", latency, tags, TAG_IDX_MAX, thread_id);
         }
     } else {
-        if (latency > s_stat_data->outgoing.max_latency) {
-            s_stat_data->outgoing.max_latency = latency;
+        old_latency = fieldstat_dynamic_table_metric_value_get(stat->instance, stat->table_id, stat->column_ids[OUT_MAX_LATENCY_IDX], "shaping_metric_row", tags, TAG_IDX_MAX, thread_id);
+        if (latency > old_latency) {
             fieldstat_dynamic_table_metric_value_set(stat->instance, stat->table_id, stat->column_ids[OUT_MAX_LATENCY_IDX], "shaping_metric_row", latency, tags, TAG_IDX_MAX, thread_id);
         }
     }
-#endif
-
-    shaper_stat_tags_build(rule_id, profile_id, priority, profile_type);
-    if (direction == SHAPING_DIR_IN) {
-        fieldstat_dynamic_table_metric_value_set(stat->instance, stat->table_id, stat->column_ids[IN_MAX_LATENCY_IDX], "shaping_metric_row", -1, tags, TAG_IDX_MAX, thread_id);
-    } else {
-        fieldstat_dynamic_table_metric_value_set(stat->instance, stat->table_id, stat->column_ids[OUT_MAX_LATENCY_IDX], "shaping_metric_row", -1, tags, TAG_IDX_MAX, thread_id);
-    }
-    return;
-}
-
-#if 0
-/*********just for self test stub****************/
-void stub_shaper_stat_send(int thread_seq)
-{
-    struct shaping_stat_data *s, *tmp;
-
-    HASH_ITER(hh, g_rt_para.stat[thread_seq]->stat_hashtbl, s, tmp) {
-        shaper_stat_data_send(g_rt_para.stat[thread_seq], s);
-    }
 
     return;
 }
-/************************************************/
-#endif

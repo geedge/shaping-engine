@@ -226,8 +226,7 @@ TEST(single_session, udp_tx_in_order)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    //shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, 170, 0, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
-    shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_primary);//TODO: latency
+    shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, 170, 0, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
     fclose(stat_file);
@@ -307,8 +306,7 @@ TEST(single_session, tcp_tx_in_order)
     shaping_stat_judge(line, 0, 0, 1, 10, 1000, 0, 30, 0, 1, SHAPING_DIR_OUT, profile_type_primary);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    //shaping_stat_judge(line, 0, 0, 1, 30, 3000, 0, 0, 30 + (STUB_TIME_INC_FOR_METRIC_SEND / 1000), 0, SHAPING_DIR_OUT, profile_type_primary);
-    shaping_stat_judge(line, 0, 0, 1, 30, 3000, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_primary);//TODO: latency
+    shaping_stat_judge(line, 0, 0, 1, 30, 3000, 0, 0, 30 + (STUB_TIME_INC_FOR_METRIC_SEND / 1000), 0, SHAPING_DIR_OUT, profile_type_primary);
 
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
@@ -382,11 +380,9 @@ TEST(single_session, udp_diff_direction)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    //shaping_stat_judge(line, 0, 0, 1, 20, 2000, 0, 0, 20, 0, SHAPING_DIR_OUT, profile_type_primary);
-    shaping_stat_judge(line, 0, 0, 1, 20, 2000, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_primary);//TODO: latency
+    shaping_stat_judge(line, 0, 0, 1, 20, 2000, 0, 0, 20, 0, SHAPING_DIR_OUT, profile_type_primary);
 
-    //shaping_stat_judge(line, 0, 0, 1, 20, 2000, 0, 0, 20, 0, SHAPING_DIR_IN, profile_type_primary);
-    shaping_stat_judge(line, 0, 0, 1, 20, 2000, 0, 0, -1, 0, SHAPING_DIR_IN, profile_type_primary);//TODO: latency
+    shaping_stat_judge(line, 0, 0, 1, 20, 2000, 0, 0, 20, 0, SHAPING_DIR_IN, profile_type_primary);
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
     fclose(stat_file);
@@ -461,16 +457,13 @@ TEST(single_session, udp_multi_rules)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 0
-    //shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, 506, 0, SHAPING_DIR_OUT, profile_type_primary);
-    shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_primary);//TODO: latency
+    shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, 506, 0, SHAPING_DIR_OUT, profile_type_primary);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 1 
-    //shaping_stat_judge(line, 1, 1, 2, 100, 10000, 0, 0, 1, 0, SHAPING_DIR_OUT, profile_type_primary);//latency of every queued pkt is 1
-    shaping_stat_judge(line, 1, 1, 2, 100, 10000, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_primary);//TODO: latency
+    shaping_stat_judge(line, 1, 1, 2, 100, 10000, 0, 0, 1, 0, SHAPING_DIR_OUT, profile_type_primary);//latency of every queued pkt is 1
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2
-    //shaping_stat_judge(line, 2, 2, 3, 100, 10000, 0, 0, 90, 0, SHAPING_DIR_OUT, profile_type_primary);//max latency is first queued pkt
-    shaping_stat_judge(line, 2, 2, 3, 100, 10000, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_primary);//TODO: latency
+    shaping_stat_judge(line, 2, 2, 3, 100, 10000, 0, 0, 90, 0, SHAPING_DIR_OUT, profile_type_primary);//max latency is first queued pkt
 
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
@@ -538,12 +531,10 @@ TEST(single_session, udp_borrow)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 1, primary
-    //shaping_stat_judge(line, 1, 1, 1, 0, 0, 0, 0, 170, 0, SHAPING_DIR_OUT, profile_type_primary);
-    shaping_stat_judge(line, 1, 1, 1, 0, 0, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_primary);//TODO: latency
+    shaping_stat_judge(line, 1, 1, 1, 0, 0, 0, 0, 170, 0, SHAPING_DIR_OUT, profile_type_primary);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2, borrow
-    //shaping_stat_judge(line, 1, 2, 2, 100, 10000, 0, 0, 170, 0, SHAPING_DIR_OUT, profile_type_borrow);
-    shaping_stat_judge(line, 1, 2, 2, 100, 10000, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_borrow);//TODO: latency
+    shaping_stat_judge(line, 1, 2, 2, 100, 10000, 0, 0, 170, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
@@ -614,16 +605,13 @@ TEST(single_session, udp_borrow_same_priority_9)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 1, primary
-    //shaping_stat_judge(line, 1, 1, 9, 0, 0, 0, 0, 170, 0, SHAPING_DIR_OUT, profile_type_primary);
-    shaping_stat_judge(line, 1, 1, 9, 0, 0, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_primary);//TODO: latency
-
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 1, primary
-    //shaping_stat_judge(line, 1, 1, 9, 0, 0, 0, 0, 170, 0, SHAPING_DIR_OUT, profile_type_primary);
-    shaping_stat_judge(line, 1, 2, 9, 0, 0, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_borrow);//TODO: latency
+    shaping_stat_judge(line, 1, 1, 9, 0, 0, 0, 0, 170, 0, SHAPING_DIR_OUT, profile_type_primary);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2, borrow
-    //shaping_stat_judge(line, 1, 2, 9, 100, 10000, 0, 0, 170, 0, SHAPING_DIR_OUT, profile_type_borrow);
-    shaping_stat_judge(line, 1, 3, 9, 100, 10000, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_borrow);//TODO: latency
+    shaping_stat_judge(line, 1, 2, 9, 0, 0, 0, 0, 170, 0, SHAPING_DIR_OUT, profile_type_borrow);
+
+    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 3, borrow
+    shaping_stat_judge(line, 1, 3, 9, 100, 10000, 0, 0, 170, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
@@ -723,12 +711,10 @@ TEST(two_session_diff_priority, udp_in_order)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 0
-    //shaping_stat_judge(line, 0, 0, 2, 100, 10000, 0, 0, 280, 0, SHAPING_DIR_OUT, profile_type_primary);//max latency is every queued pkts
-    shaping_stat_judge(line, 0, 0, 2, 100, 10000, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_primary);//TODO: latency
+    shaping_stat_judge(line, 0, 0, 2, 100, 10000, 0, 0, 280, 0, SHAPING_DIR_OUT, profile_type_primary);//max latency is every queued pkts
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 1
-    //shaping_stat_judge(line, 1, 1, 1, 100, 10000, 0, 0, 90, 0, SHAPING_DIR_OUT, profile_type_primary);//max latency is every queued pkts
-    shaping_stat_judge(line, 1, 1, 1, 100, 10000, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_primary);//TODO: latency
+    shaping_stat_judge(line, 1, 1, 1, 100, 10000, 0, 0, 90, 0, SHAPING_DIR_OUT, profile_type_primary);//max latency is every queued pkts
 
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
@@ -857,20 +843,16 @@ TEST(two_session_diff_priority, udp_in_order_multi_rule)
     memset(line, 0, sizeof(line));
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    //shaping_stat_judge(line, 1, 1, 1, 20, 2000, 0, 0, 58, 0, SHAPING_DIR_OUT, profile_type_primary);//profile_id 1, max latency is last pkt
-    shaping_stat_judge(line, 1, 1, 1, 20, 2000, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_primary);//TODO: latency
+    shaping_stat_judge(line, 1, 1, 1, 20, 2000, 0, 0, 58, 0, SHAPING_DIR_OUT, profile_type_primary);//profile_id 1, max latency is last pkt
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    //shaping_stat_judge(line, 2, 2, 2, 20, 2000, 0, 0, 1, 0, SHAPING_DIR_OUT, profile_type_primary);//profile_id 2, evevy queued pkt's latency is 1
-    shaping_stat_judge(line, 2, 2, 2, 20, 2000, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_primary);//TODO: latency
+    shaping_stat_judge(line, 2, 2, 2, 20, 2000, 0, 0, 1, 0, SHAPING_DIR_OUT, profile_type_primary);//profile_id 2, evevy queued pkt's latency is 1
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    //shaping_stat_judge(line, 4, 4, 4, 20, 2000, 0, 0, 11, 0, SHAPING_DIR_OUT, profile_type_primary);//profile_id 4, max latency is first queued pkt
-    shaping_stat_judge(line, 4, 4, 4, 20, 2000, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_primary);//TODO: latency
+    shaping_stat_judge(line, 4, 4, 4, 20, 2000, 0, 0, 11, 0, SHAPING_DIR_OUT, profile_type_primary);//profile_id 4, max latency is first queued pkt
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    //shaping_stat_judge(line, 3, 3, 3, 20, 2000, 0, 0, 12, 0, SHAPING_DIR_OUT, profile_type_primary);//profile_id 3, every queued pkt's latency is 12
-    shaping_stat_judge(line, 3, 3, 3, 20, 2000, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_primary);//TODO: latency
+    shaping_stat_judge(line, 3, 3, 3, 20, 2000, 0, 0, 12, 0, SHAPING_DIR_OUT, profile_type_primary);//profile_id 3, every queued pkt's latency is 12
 
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
@@ -953,8 +935,7 @@ TEST(single_session_async, udp_tx_in_order)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    //shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, 160, 0, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
-    shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_primary);//TODO: latency
+    shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, 160, 0, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
     fclose(stat_file);
@@ -1115,16 +1096,13 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 1, primary
-    //shaping_stat_judge(line, 1, 1, 1, 0, 0, 0, 0, 470, 0, SHAPING_DIR_OUT, profile_type_primary);
-    shaping_stat_judge(line, 1, 1, 1, 0, 0, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_primary);//TODO: latency
+    shaping_stat_judge(line, 1, 1, 1, 0, 0, 0, 0, 470, 0, SHAPING_DIR_OUT, profile_type_primary);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2, borrow
-    //shaping_stat_judge(line, 1, 2, 2, 100, 10000, 0, 0, 470, 0, SHAPING_DIR_OUT, profile_type_borrow);
-    shaping_stat_judge(line, 1, 2, 2, 100, 10000, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_borrow);//TODO: latency
+    shaping_stat_judge(line, 1, 2, 2, 100, 10000, 0, 0, 470, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2, primary
-    //shaping_stat_judge(line, 2, 2, 1, 100, 10000, 0, 0, 190, 0, SHAPING_DIR_OUT, profile_type_primary);
-    shaping_stat_judge(line, 2, 2, 1, 100, 10000, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_primary);//TODO: latency
+    shaping_stat_judge(line, 2, 2, 1, 100, 10000, 0, 0, 190, 0, SHAPING_DIR_OUT, profile_type_primary);
 
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
@@ -1204,8 +1182,7 @@ TEST(two_session_same_rule, udp_tx_in_order)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    //shaping_stat_judge(line, 1, 1, 1, 200, 20000, 0, 0, 370, 0, SHAPING_DIR_OUT, profile_type_primary);
-    shaping_stat_judge(line, 1, 1, 1, 200, 20000, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_primary);//TODO: latency
+    shaping_stat_judge(line, 1, 1, 1, 200, 20000, 0, 0, 370, 0, SHAPING_DIR_OUT, profile_type_primary);
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
     fclose(stat_file);
@@ -1385,8 +1362,7 @@ TEST(statistics, udp_drop_pkt)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    //shaping_stat_judge(line, 0, 0, 1, SHAPING_SESSION_QUEUE_LEN+10, (SHAPING_SESSION_QUEUE_LEN+10)*100, 100, 0, 228, 0, SHAPING_DIR_OUT, profile_type_primary);//every queued pkt's latency is max
-    shaping_stat_judge(line, 0, 0, 1, SHAPING_SESSION_QUEUE_LEN+10, (SHAPING_SESSION_QUEUE_LEN+10)*100, 100, 0, -1, 0, SHAPING_DIR_OUT, profile_type_primary);//TODO: latency
+    shaping_stat_judge(line, 0, 0, 1, SHAPING_SESSION_QUEUE_LEN+10, (SHAPING_SESSION_QUEUE_LEN+10)*100, 100, 0, 228, 0, SHAPING_DIR_OUT, profile_type_primary);//every queued pkt's latency is max
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
     fclose(stat_file);
@@ -1456,12 +1432,10 @@ TEST(statistics, udp_queueing_pkt)
     memset(line, 0, sizeof(line));
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//stat data first sent
-    //shaping_stat_judge(line, 0, 0, 1, 10, 1000, 0, 90, 0, 1, SHAPING_DIR_OUT, profile_type_primary);
-    shaping_stat_judge(line, 0, 0, 1, 10, 1000, 0, 90, -1, 1, SHAPING_DIR_OUT, profile_type_primary);//TODO: latency
+    shaping_stat_judge(line, 0, 0, 1, 10, 1000, 0, 90, 0, 1, SHAPING_DIR_OUT, profile_type_primary);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//stat data last sent
-    //shaping_stat_judge(line, 0, 0, 1, 90, 9000, 0, 0, 90, 0, SHAPING_DIR_OUT, profile_type_primary);
-    shaping_stat_judge(line, 0, 0, 1, 90, 9000, 0, 0, -1, 0, SHAPING_DIR_OUT, profile_type_primary);//TODO: latency
+    shaping_stat_judge(line, 0, 0, 1, 90, 9000, 0, 0, 90 + (STUB_TIME_INC_FOR_METRIC_SEND / 1000), 0, SHAPING_DIR_OUT, profile_type_primary);
 
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
