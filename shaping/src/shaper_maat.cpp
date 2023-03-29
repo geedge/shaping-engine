@@ -318,7 +318,7 @@ void shaper_rules_update(struct shaping_thread_ctx *ctx, struct shaping_flow *sf
 static int shaper_maat_config_load(struct shaper_maat_config *conf)
 {
     MESA_load_profile_int_def(SHAPING_GLOBAL_CONF_FILE, "MAAT", "INPUT_MODE", (int *)&conf->input_mode, MAAT_INPUT_REDIS);
-    MESA_load_profile_string_def(SHAPING_GLOBAL_CONF_FILE, "MAAT", "TABLE_INFO", conf->table_info, sizeof(conf->table_info), "conf/table_info.conf");
+    MESA_load_profile_string_def(SHAPING_GLOBAL_CONF_FILE, "MAAT", "TABLE_INFO", conf->table_info, sizeof(conf->table_info), "conf/table_info.json");
     MESA_load_profile_string_def(SHAPING_GLOBAL_CONF_FILE, "MAAT", "JSON_FILE", conf->json_cfg_file, sizeof(conf->json_cfg_file), "conf/shaping_maat.json");
     MESA_load_profile_int_def(SHAPING_GLOBAL_CONF_FILE, "MAAT", "REDIS_DB_IDX", &conf->redis_db_idx, 0);
     MESA_load_profile_string_def(SHAPING_GLOBAL_CONF_FILE, "MAAT", "REDIS_IP", conf->redis_ip, sizeof(conf->redis_ip), "127.0.0.1");
