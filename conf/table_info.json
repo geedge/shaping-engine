@@ -6,7 +6,7 @@
         "valid_column": 8,
         "custom": {
             "key": 1,
-            "ley_type": "integer"
+            "key_type": "integer"
         }
     },
     {
@@ -16,7 +16,7 @@
         "valid_column": 7,
         "custom": {
             "key": 1,
-            "key_type": "string"
+            "key_type": "pointer"
         }
     }
 
