@@ -19,7 +19,7 @@ TEST(shaping_rule, parse)
     struct shaping_rule *s_rule = NULL;
     struct shaping_rule *s_rule_dup = NULL;
 
-    shaper_rule_ex_new(0, NULL, data, (void**)&s_rule, 0, NULL);
+    shaper_rule_ex_new("TRAFFIC_SHAPING_COMPILE", 0, NULL, data, (void**)&s_rule, 0, NULL);
     EXPECT_EQ(s_rule->id, 182);
     EXPECT_EQ(s_rule->primary_pf_id, 1);
     EXPECT_EQ(s_rule->borrow_pf_num, 2);
@@ -48,7 +48,7 @@ TEST(shaping_profile, parse)
     struct shaping_profile *s_pf = NULL;
     struct shaping_profile *s_pf_dup = NULL;
 
-    shaper_profile_ex_new(0, NULL, data, (void**)&s_pf, 0, NULL);
+    shaper_profile_ex_new("TRAFFIC_SHAPING_PROFILE", 0, NULL, data, (void**)&s_pf, 0, NULL);
     EXPECT_EQ(s_pf->id, 1);
     EXPECT_EQ(s_pf->in_limit_bandwidth, 1024);
     EXPECT_EQ(s_pf->out_limit_bandwidth, 2048);

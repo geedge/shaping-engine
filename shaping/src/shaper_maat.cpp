@@ -12,6 +12,8 @@
 #include "utils.h"
 
 #define SHAPING_STREAM_TIMEOUT 3600
+#define SHAPING_RULE_TABLE_NAME "TRAFFIC_SHAPING_COMPILE"
+#define SHAPING_PROFILE_TABLE_NAME "TRAFFIC_SHAPING_PROFILE"
 
 enum input_mode
 {
@@ -32,7 +34,7 @@ struct shaper_maat_config {
 
 struct maat *g_maat_instance = NULL;
 
-void shaper_rule_ex_new(int table_id, const char *key, const char *table_line, void **ad, long argl, void *argp)
+void shaper_rule_ex_new(const char *table_name, int table_id, const char *key, const char *table_line, void **ad, long argl, void *argp)
 {
     struct shaping_rule *s_rule;
     cJSON *json=NULL;
@@ -41,6 +43,10 @@ void shaper_rule_ex_new(int table_id, const char *key, const char *table_line, v
     cJSON *tmp_array_obj = NULL;
     int array_size;
     int i;
+
+    if (strncmp(table_name, SHAPING_RULE_TABLE_NAME, strlen(table_name)) != 0) {
+        return;
+    }
 
     s_rule = (struct shaping_rule*)calloc(1, sizeof(struct shaping_rule));
     s_rule->ref_cnt = 1;
@@ -141,7 +147,7 @@ void shaper_rule_ex_free(int table_id, void **ad, long argl, void *argp)
     return;
 }
 
-void shaper_profile_ex_new(int table_id, const char *key, const char *table_line, void **ad, long argl, void *argp)
+void shaper_profile_ex_new(const char *table_name, int table_id, const char *key, const char *table_line, void **ad, long argl, void *argp)
 {
     struct shaping_profile *s_pf;
     cJSON *json=NULL;
@@ -155,6 +161,10 @@ void shaper_profile_ex_new(int table_id, const char *key, const char *table_line
     int limit_bandwidth;
     int array_size, i;
     int ret;
+
+    if (strncmp(table_name, SHAPING_PROFILE_TABLE_NAME, strlen(table_name)) != 0) {
+        return;
+    }
 
     s_pf = (struct shaping_profile*)calloc(1, sizeof(struct shaping_profile));
     s_pf->ref_cnt = 1;
@@ -376,26 +386,26 @@ struct shaping_maat_info* shaper_maat_init(const char *instance_name)
         goto ERROR;
     }
 
-    maat_info->rule_table_id = maat_get_table_id(g_maat_instance, "TRAFFIC_SHAPING_COMPILE");
+    maat_info->rule_table_id = maat_get_table_id(g_maat_instance, SHAPING_RULE_TABLE_NAME);
     if (maat_info->rule_table_id < 0) {
-        LOG_ERROR("%s: shaping maat register table TRAFFIC_SHAPING_COMPILE failed", LOG_TAG_MAAT);
+        LOG_ERROR("%s: shaping maat register table %s failed", LOG_TAG_MAAT, SHAPING_RULE_TABLE_NAME);
         goto ERROR;
     }
-    maat_info->profile_table_id = maat_get_table_id(g_maat_instance, "TRAFFIC_SHAPING_PROFILE");
+    maat_info->profile_table_id = maat_get_table_id(g_maat_instance, SHAPING_PROFILE_TABLE_NAME);
     if (maat_info->profile_table_id < 0) {
-        LOG_ERROR("%s: shaping maat register table TRAFFIC_SHAPING_PROFILE failed", LOG_TAG_MAAT);
+        LOG_ERROR("%s: shaping maat register table %s failed", LOG_TAG_MAAT, SHAPING_PROFILE_TABLE_NAME);
         goto ERROR;
     }
 
-    ret = maat_plugin_table_ex_schema_register(g_maat_instance, maat_info->rule_table_id, shaper_rule_ex_new, shaper_rule_ex_free, shaper_rule_ex_dup, 0, NULL);
+    ret = maat_plugin_table_ex_schema_register(g_maat_instance, SHAPING_RULE_TABLE_NAME, shaper_rule_ex_new, shaper_rule_ex_free, shaper_rule_ex_dup, 0, NULL);
     if (ret < 0) {
-        LOG_ERROR("%s: shaping maat register callback funcs for table TRAFFIC_SHAPING_COMPILE failed", LOG_TAG_MAAT);
+        LOG_ERROR("%s: shaping maat register callback funcs for table %s failed", LOG_TAG_MAAT, SHAPING_RULE_TABLE_NAME);
         goto ERROR;
     }
 
-    ret = maat_plugin_table_ex_schema_register(g_maat_instance, maat_info->profile_table_id, shaper_profile_ex_new, shaper_profile_ex_free, shaper_profile_ex_dup, 0, NULL);
+    ret = maat_plugin_table_ex_schema_register(g_maat_instance, SHAPING_PROFILE_TABLE_NAME, shaper_profile_ex_new, shaper_profile_ex_free, shaper_profile_ex_dup, 0, NULL);
     if (ret < 0) {
-        LOG_ERROR("%s: shaping maat register callback funcs for table TRAFFIC_SHAPING_PROFILE failed", LOG_TAG_MAAT);
+        LOG_ERROR("%s: shaping maat register callback funcs for table %s failed", LOG_TAG_MAAT, SHAPING_PROFILE_TABLE_NAME);
         goto ERROR;
     }
 

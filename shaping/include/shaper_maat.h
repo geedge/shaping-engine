@@ -25,10 +25,10 @@ struct shaping_profile {
     int ref_cnt;
 };
 
-void shaper_rule_ex_new(int table_id, const char *key, const char *table_line, void **ad, long argl, void *argp);
+void shaper_rule_ex_new(const char *table_name, int table_id, const char *key, const char *table_line, void **ad, long argl, void *argp);
 void shaper_rule_ex_dup(int table_id, void **to, void **from, long argl, void *argp);
 void shaper_rule_ex_free(int table_id, void **ad, long argl, void *argp);
-void shaper_profile_ex_new(int table_id, const char *key, const char *table_line, void **ad, long argl, void *argp);
+void shaper_profile_ex_new(const char *table_name, int table_id, const char *key, const char *table_line, void **ad, long argl, void *argp);
 void shaper_profile_ex_dup(int table_id, void **to, void **from, long argl, void *argp);
 void shaper_profile_ex_free(int table_id, void **ad, long argl, void *argp);
 

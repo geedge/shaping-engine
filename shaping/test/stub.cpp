@@ -383,7 +383,7 @@ int maat_get_table_id(struct maat *instance, const char *table_name)
     }
 }
 
-int maat_plugin_table_ex_schema_register(struct maat *instance, int table_id,
+int maat_plugin_table_ex_schema_register(struct maat *instance, const char *table_name,
                                          maat_ex_new_func_t *new_func,
                                          maat_ex_free_func_t *free_func,
                                          maat_ex_dup_func_t *dup_func,
