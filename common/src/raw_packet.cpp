@@ -684,6 +684,8 @@ static const void *parse_ether(struct raw_pkt_parser *handler, const void *data,
     case ETH_P_MPLS_UC:
         // TESTED
         return parse_mpls(handler, data_next_layer, data_next_length, LAYER_TYPE_MPLS);
+    case ETH_MARSIO_CHECK:
+        return data_next_layer;
     default:
         LOG_ERROR("%s: pkt_trace_id: %lu, this_layer: %s, stop parse next protocol %d", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), next_proto);
         return data_next_layer;

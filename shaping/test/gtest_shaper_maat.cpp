@@ -6,14 +6,14 @@
 
 TEST(shaping_rule, parse)
 {
-	const char *data = "{\"compile_id\": 182,\
-                            \"service\": 2,\
-                            \"action\": 32,\
-                            \"do_blacklist\": 0,\
-                            \"do_log\": 1,\
-                            \"effective_rage\": 0,\
-                            \"user_region\": {\"priority\":1,\"fair_factor\":10,\"profile_chain\":[1,2,3]},\
-                            \"is_valid\": \"yes\"\
+	const char *data = "182\t\
+                        2\t\
+                        32\t\
+                        0\t\
+                        1\t\
+                        {}\t\
+                        {\"priority\":1,\"fair_factor\":10,\"profile_chain\":[1,2,3]}\t\
+                        1\t\
                         }";
 
     struct shaping_rule *s_rule = NULL;

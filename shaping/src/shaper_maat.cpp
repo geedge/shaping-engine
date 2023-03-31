@@ -39,10 +39,10 @@ void shaper_rule_ex_new(const char *table_name, int table_id, const char *key, c
     struct shaping_rule *s_rule;
     cJSON *json=NULL;
     cJSON *tmp_obj = NULL;
-    cJSON *user_region = NULL;
     cJSON *tmp_array_obj = NULL;
     int array_size;
-    int i;
+    char user_region[1024] = {0};
+    int i, ret;
 
     if (strncmp(table_name, SHAPING_RULE_TABLE_NAME, strlen(table_name)) != 0) {
         return;
@@ -51,40 +51,33 @@ void shaper_rule_ex_new(const char *table_name, int table_id, const char *key, c
     s_rule = (struct shaping_rule*)calloc(1, sizeof(struct shaping_rule));
     s_rule->ref_cnt = 1;
 
-    json = cJSON_Parse(table_line);
+    ret = sscanf(table_line, "%d\t%*d\t%*d\t%*d\t%*d\t%*s\t%s\t", &s_rule->id, user_region);
+    if (ret != 2) {
+        LOG_ERROR("%s: sscanf parse rule failed for table line %s", LOG_TAG_MAAT, table_line);
+        goto END;
+    }
+
+    json = cJSON_Parse(user_region);
     if (!json) {//required
         LOG_ERROR("%s: json parse rule failed for table line %s", LOG_TAG_MAAT, table_line);
         goto END;
     }
 
-    tmp_obj = cJSON_GetObjectItem(json, "compile_id");
-    if (!tmp_obj) {
-        LOG_ERROR("%s: json parse compile_id failed for table line %s", LOG_TAG_MAAT, table_line);
-        goto END;
-    }
-    s_rule->id = tmp_obj->valueint;
-
-    user_region = cJSON_GetObjectItem(json, "user_region");
-    if (!user_region) {
-        LOG_ERROR("%s: json parse user_region failed for table line %s", LOG_TAG_MAAT, table_line);
-        goto END;
-    }
-
-    tmp_obj = cJSON_GetObjectItem(user_region, "priority");
+    tmp_obj = cJSON_GetObjectItem(json, "priority");
     if (!tmp_obj) {
         LOG_ERROR("%s: json parse priority failed for table line %s", LOG_TAG_MAAT, table_line);
         goto END;
     }
     s_rule->priority = tmp_obj->valueint;
 
-    tmp_obj = cJSON_GetObjectItem(user_region, "fair_factor");
+    tmp_obj = cJSON_GetObjectItem(json, "fair_factor");
     if (!tmp_obj) {
         LOG_ERROR("%s: json parse fair-factor failed for table line %s", LOG_TAG_MAAT, table_line);
         goto END;
     }
     s_rule->fair_factor = tmp_obj->valueint;
 
-    tmp_obj = cJSON_GetObjectItem(user_region, "profile_chain");
+    tmp_obj = cJSON_GetObjectItem(json, "profile_chain");
     if (!tmp_obj) {//required
         LOG_ERROR("%s: json parse profile_chain failed for table line %s", LOG_TAG_MAAT, table_line);
         goto END;
