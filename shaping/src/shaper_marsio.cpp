@@ -160,7 +160,7 @@ int shaper_marsio_pkt_metadata_get(marsio_buff_t *rx_buff, struct metadata *meta
     raw_packet_parser_init(raw_parser, meta->session_id, LAYER_TYPE_ALL, 8);
     payload = raw_packet_parser_parse(raw_parser, (const void *)meta->raw_data, meta->raw_len);
     if (is_ctrl_buff) {
-        if ((char *)payload - (char *)&meta->raw_data != meta->l7_offset) {
+        if ((char *)payload - (char *)meta->raw_data != meta->l7_offset) {
             LOG_ERROR("%s: incorrect dataoffset in the control zone of session %lu", LOG_TAG_SHAPING, meta->session_id);
         }
     }
