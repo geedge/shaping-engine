@@ -1,4 +1,4 @@
-add_library(shaper src/shaper_maat.cpp src/shaper_marsio.cpp src/shaper_session.cpp src/shaper_stat.cpp src/shaper_swarmkv.cpp src/shaper.cpp)
+add_library(shaper src/shaper_maat.cpp src/shaper_marsio.cpp src/shaper_session.cpp src/shaper_stat.cpp src/shaper_swarmkv.cpp src/shaper.cpp src/shaper_global_stat.cpp)
 target_link_libraries(shaper PUBLIC common)
 target_link_libraries(shaper PUBLIC avl_tree)
 target_link_libraries(shaper PUBLIC cjson)

@@ -6,6 +6,7 @@
 #include "shaper_session.h"
 #include "shaper_maat.h"
 #include "shaper_stat.h"
+#include "shaper_global_stat.h"
 #include "shaper.h"
 
 struct shaping_flow* shaper_session_opening(struct shaping_thread_ctx *ctx, struct metadata *meta, struct ctrl_pkt_data *ctrl_data, struct raw_pkt_parser *raw_parser)
@@ -26,6 +27,8 @@ struct shaping_flow* shaper_session_opening(struct shaping_thread_ctx *ctx, stru
 
     session_table_insert(ctx->session_table, meta->session_id, &sf->tuple4, sf, NULL);
 
+    shaper_global_stat_curr_session_inc(ctx->global_stat);
+
     return sf;
 }
 
@@ -42,6 +45,8 @@ struct shaping_flow* shaper_session_close(struct shaping_thread_ctx *ctx, struct
     sf = (struct shaping_flow *)session_node->val_data;
     sf->flag |= STREAM_CLOSE;
     session_table_delete_by_id(ctx->session_table, meta->session_id);
+
+    shaper_global_stat_curr_session_dec(ctx->global_stat);
 
     return sf;
 }
@@ -83,6 +88,8 @@ void shaper_session_data_free_cb(void *session_data, void *data)
         shaper_queue_clear(sf, ctx);
         shaping_flow_free(sf);
     }
+
+    shaper_global_stat_curr_session_dec(ctx->global_stat);
 
     return;
 }

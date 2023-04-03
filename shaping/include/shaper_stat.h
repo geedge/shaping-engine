@@ -1,40 +1,6 @@
 #include <netinet/in.h>
 #include "uthash.h"
-#include <MESA/fieldstat.h>
-
-#define SHAPER_STAT_COLUMN_NUM_MAX  20
-struct shaping_stat_data_dir {
-    unsigned long long tx_pkts;
-    unsigned long long tx_bytes;
-    unsigned long long drop_pkts;
-    unsigned long long max_latency;
-    long long queue_len;//num of queueing pkts
-};
-
-struct shaping_stat_data_key {
-    int rule_id;
-    int profile_id;
-    int priority;
-    int profile_type;
-};
-
-struct shaping_stat_data {
-    struct shaping_stat_data_key key;
-    int queueing_session_num;
-    int split_num;
-    struct shaping_stat_data_dir incoming;
-    struct shaping_stat_data_dir outgoing;
-    UT_hash_handle hh;
-};
-
-#if 0
-struct shaping_stat {
-    int sock_fd;
-    struct sockaddr_in sock_addr;
-    struct timespec update_time;
-    struct shaping_stat_data *stat_hashtbl;
-};
-#endif
+#include <fieldstat.h>
 
 enum shaping_stat_tags_index {
     TAG_RULE_ID_IDX = 0,
