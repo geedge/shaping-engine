@@ -64,7 +64,11 @@ struct shaping_global_stat* shaper_global_stat_init()
 
     if (conf.enable_backgroud_thread == 0) {
         fieldstat_disable_background_thread(stat->instance);
+        fieldstat_set_local_output(stat->instance, "shaping_global_metric", "json");
     }
+
+    fieldstat_global_enable_prometheus_endpoint(9007, NULL);
+    fieldstat_enable_prometheus_output(stat->instance);
 
     fieldstat_instance_start(stat->instance);
     

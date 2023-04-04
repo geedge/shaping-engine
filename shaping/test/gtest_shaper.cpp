@@ -7,6 +7,7 @@
 #include "shaper.h"
 #include "shaper_maat.h"
 #include "shaper_stat.h"
+#include "shaper_global_stat.h"
 #include "shaper_marsio.h"
 #include "stub.h"
 
@@ -226,6 +227,7 @@ TEST(single_session, udp_tx_in_order)
     /***********send stat data here********************/
     stub_curr_time_inc(STUB_TIME_INC_FOR_METRIC_SEND);//inc time to send metric
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
+    fieldstat_passive_output(ctx->global_stat->instance);
 
     shaping_flow_free(sf);
     shaping_engine_destroy(ctx);
@@ -1459,6 +1461,6 @@ TEST(statistics, udp_queueing_pkt)
 int main(int argc, char **argv) 
 {
     testing::InitGoogleTest(&argc, argv);
-    //testing::GTEST_FLAG(filter) = "single_session.udp_borrow_same_priority_9";
+    testing::GTEST_FLAG(filter) = "single_session.udp_tx_in_order";
     return RUN_ALL_TESTS();
 }
