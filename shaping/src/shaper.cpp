@@ -904,7 +904,7 @@ void shaper_packet_recv_and_process(struct shaping_thread_ctx *ctx)
         }
         shaper_global_stat_throughput_inc(ctx->global_stat, SHAPING_GLOBAL_STAT_RX, meta.raw_len);
 
-        if (meta.is_ctrl_pkt || !sf) {//ctrl pkt need send directly
+        if (meta.is_ctrl_pkt || !sf || sf->rule_num == 0) {//ctrl pkt need send directly
             marsio_send_burst(ctx->marsio_info->mr_path, ctx->thread_index, &rx_buff[i], 1);
             shaper_global_stat_throughput_inc(ctx->global_stat, SHAPING_GLOBAL_STAT_TX, meta.raw_len);
         } else {

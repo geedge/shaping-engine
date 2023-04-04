@@ -13,6 +13,7 @@
 
 #define SHAPING_SESSION_QUEUE_LEN 128
 #define SHAPING_STAT_FILE_NAME "/tmp/shaping_metrics.json"
+#define SHAPING_GLOBAL_STAT_FILE_NAME "shaping_global_metric"
 #define FIELDSTAT_AUTO_TIME_MAX 999999000
 
 char profile_type_primary[] = "primary";
@@ -179,6 +180,38 @@ static void shaping_stat_judge(char *file_line, int rule_id, int profile_id, int
     return;
 }
 
+static int shaping_global_stat_field_get(cJSON *metrics, const char *field_name)
+{
+    int metrics_size = cJSON_GetArraySize(metrics);
+
+    for (int i = 0; i < metrics_size; i++) {
+        cJSON *tmp = cJSON_GetArrayItem(metrics, i);
+        char *column_name = cJSON_GetObjectItem(tmp, "column_name")->valuestring;
+        if (strcmp(column_name, field_name) == 0) {
+            return cJSON_GetObjectItem(tmp, "diff")->valueint;
+        }
+    }
+
+    return -1;
+}
+
+static void shaping_global_stat_judge(char *file_line, int tx_pkts, int tx_bytes, int drop_pkts, int drop_bytes, int queueing_pkts, int queueing_bytes)
+{
+    cJSON *metrics = NULL;
+    cJSON *json = cJSON_Parse(file_line);
+
+    metrics = cJSON_GetObjectItem(json, "metrics");
+
+    EXPECT_EQ(tx_pkts, shaping_global_stat_field_get(metrics, "tx_pkts"));
+    EXPECT_EQ(tx_bytes, shaping_global_stat_field_get(metrics, "tx_bytes"));
+    EXPECT_EQ(drop_pkts, shaping_global_stat_field_get(metrics, "drop_pkts"));
+    EXPECT_EQ(drop_bytes, shaping_global_stat_field_get(metrics, "drop_bytes"));
+    EXPECT_EQ(queueing_pkts, shaping_global_stat_field_get(metrics, "queueing_pkts"));
+    EXPECT_EQ(queueing_bytes, shaping_global_stat_field_get(metrics, "queueing_bytes"));
+
+    return;
+}
+
 /*session1 match rule1
   rule1:
       profile: limit 1000*/
@@ -236,15 +269,23 @@ TEST(single_session, udp_tx_in_order)
 
     /*******test statistics***********/
     sleep(2);//wait telegraf to output
-    char line[1024];
+    char line[2048];
     FILE *stat_file;
 
+    //judge shaping metric
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
     shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, 170, 0, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
+    fclose(stat_file);
+
+    //judge shaping global metric
+    stat_file = fopen(SHAPING_GLOBAL_STAT_FILE_NAME, "r");
+    memset(line, 0, sizeof(line));
+    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
+    shaping_global_stat_judge(line, 100, 10000, 0, 0, 0, 0);
     fclose(stat_file);
 }
 
@@ -1365,6 +1406,7 @@ TEST(statistics, udp_drop_pkt)
     /***********send stat data here********************/
     stub_curr_time_inc(STUB_TIME_INC_FOR_METRIC_SEND);//inc time to send metric
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
+    fieldstat_passive_output(ctx->global_stat->instance);
 
     shaping_flow_free(sf);
     shaping_engine_destroy(ctx);
@@ -1372,15 +1414,23 @@ TEST(statistics, udp_drop_pkt)
 
     /*******test statistics***********/
     sleep(2);//wait telegraf to output
-    char line[1024];
+    char line[2048];
     FILE *stat_file;
 
+    //judge shaping metric
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
     shaping_stat_judge(line, 0, 0, 1, SHAPING_SESSION_QUEUE_LEN+10, (SHAPING_SESSION_QUEUE_LEN+10)*100, 100, 0, 228, 0, SHAPING_DIR_OUT, profile_type_primary);//every queued pkt's latency is max
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
+    fclose(stat_file);
+
+    //judge shaping global metric
+    stat_file = fopen(SHAPING_GLOBAL_STAT_FILE_NAME, "r");
+    memset(line, 0, sizeof(line));
+    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
+    shaping_global_stat_judge(line, SHAPING_SESSION_QUEUE_LEN+10, (SHAPING_SESSION_QUEUE_LEN+10)*100, 100, 10000, 0, 0);
     fclose(stat_file);
 }
 
@@ -1397,6 +1447,8 @@ TEST(statistics, udp_queueing_pkt)
     int priority[] = {1};
     int profile_num[] = {1};
     int profile_id[][MAX_REF_PROFILE] = {{0}};
+    char line[2048];
+    FILE *stat_file;
 
     TAILQ_INIT(&expec_tx_queue);
     stub_init();
@@ -1418,7 +1470,15 @@ TEST(statistics, udp_queueing_pkt)
     /***********send stat data here********************/
     stub_curr_time_inc(STUB_TIME_INC_FOR_METRIC_SEND);//inc time to send metric
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
+    fieldstat_passive_output(ctx->global_stat->instance);
     sleep(2);//wait telegraf generate metric
+
+    /*******judge global metric********/
+    stat_file = fopen(SHAPING_GLOBAL_STAT_FILE_NAME, "r");
+    memset(line, 0, sizeof(line));
+    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
+    shaping_global_stat_judge(line, 10, 1000, 0, 0, 90, 9000);
+    fclose(stat_file);
 
     //first 10 packets
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
@@ -1434,6 +1494,7 @@ TEST(statistics, udp_queueing_pkt)
     /***********send stat data here********************/
     stub_curr_time_inc(STUB_TIME_INC_FOR_METRIC_SEND);//inc time to send metric
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
+    fieldstat_passive_output(ctx->global_stat->instance);
 
     shaping_flow_free(sf);
     shaping_engine_destroy(ctx);
@@ -1441,9 +1502,8 @@ TEST(statistics, udp_queueing_pkt)
 
     /*******test statistics***********/
     sleep(2);//wait telegraf to output
-    char line[1024];
-    FILE *stat_file;
 
+    //judge shaping metric
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
 
@@ -1456,11 +1516,18 @@ TEST(statistics, udp_queueing_pkt)
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
     fclose(stat_file);
+
+    //judge global metric
+    stat_file = fopen(SHAPING_GLOBAL_STAT_FILE_NAME, "r");
+    memset(line, 0, sizeof(line));
+    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
+    shaping_global_stat_judge(line, 90, 9000, 0, 0, -90, -9000);
+    fclose(stat_file);
 }
 
 int main(int argc, char **argv) 
 {
     testing::InitGoogleTest(&argc, argv);
-    testing::GTEST_FLAG(filter) = "single_session.udp_tx_in_order";
+    //testing::GTEST_FLAG(filter) = "statistics.udp_queueing_pkt";
     return RUN_ALL_TESTS();
 }
