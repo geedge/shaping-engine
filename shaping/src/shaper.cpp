@@ -879,11 +879,11 @@ static struct shaping_flow* shaper_ctrl_pkt_session_handle(struct shaping_thread
     switch (ctrl_data.state) {
         case SESSION_STATE_OPENING:
             shaper_global_stat_ctrlpkt_opening_inc(ctx->global_stat);
-            sf = shaper_session_opening(ctx, meta, &ctrl_data, &raw_parser);
+            //sf = shaper_session_opening(ctx, meta, &ctrl_data, &raw_parser);
             break;
         case SESSION_STATE_ACTIVE:
             shaper_global_stat_ctrlpkt_active_inc(ctx->global_stat);
-            sf = shaper_session_active(ctx, meta, &ctrl_data);
+            sf = shaper_session_active(ctx, meta, &ctrl_data, &raw_parser);
             break;
         case SESSION_STATE_CLOSING:
             shaper_global_stat_ctrlpkt_close_inc(ctx->global_stat);

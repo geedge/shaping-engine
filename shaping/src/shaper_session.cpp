@@ -23,7 +23,7 @@ struct shaping_flow* shaper_session_opening(struct shaping_thread_ctx *ctx, stru
 
     sf = shaping_flow_new();
     raw_packet_parser_get_most_inner_tuple4(raw_parser, &sf->tuple4);
-    shaper_rules_update(ctx, sf, ctrl_data->shaping_rule_ids, ctrl_data->shaping_rule_num);
+    //shaper_rules_update(ctx, sf, ctrl_data->shaping_rule_ids, ctrl_data->shaping_rule_num);
 
     session_table_insert(ctx->session_table, meta->session_id, &sf->tuple4, sf, NULL);
 
@@ -51,17 +51,18 @@ struct shaping_flow* shaper_session_close(struct shaping_thread_ctx *ctx, struct
     return sf;
 }
 
-struct shaping_flow* shaper_session_active(struct shaping_thread_ctx *ctx, struct metadata *meta, struct ctrl_pkt_data *ctrl_data)
+struct shaping_flow* shaper_session_active(struct shaping_thread_ctx *ctx, struct metadata *meta, struct ctrl_pkt_data *ctrl_data, struct raw_pkt_parser *raw_parser)
 {
     struct shaping_flow *sf = NULL;
     struct session_node *node = NULL;
 
     node = session_table_search_by_id(ctx->session_table, meta->session_id);
     if (!node) {
-        return NULL;
+        sf = shaper_session_opening(ctx, meta, ctrl_data, raw_parser);
+    } else {
+        sf = (struct shaping_flow *)node->val_data;
     }
-
-    sf = (struct shaping_flow *)node->val_data;
+    
     shaper_rules_update(ctx, sf, ctrl_data->shaping_rule_ids, ctrl_data->shaping_rule_num);
 
     return sf;
