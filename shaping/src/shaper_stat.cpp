@@ -76,9 +76,6 @@ struct shaping_stat* shaper_stat_init(int thread_num)
         goto ERROR;
     }
 
-    fieldstat_global_enable_prometheus_endpoint(9007, NULL);
-    //fieldstat_enable_prometheus_output();
-
     fieldstat_dynamic_set_output_interval(stat->instance, conf.output_interval_ms);
     fieldstat_dynamic_set_line_protocol_server(stat->instance, conf.telegraf_ip, conf.telegraf_port);
     if (conf.enable_backgroud_thread == 0) {
@@ -90,6 +87,8 @@ struct shaping_stat* shaper_stat_init(int thread_num)
         LOG_ERROR("%s: shaping fieldstat register table failed", LOG_TAG_STAT);
         goto ERROR;
     }
+
+    shaper_stat_tags_init();
 
     fieldstat_dynamic_instance_start(stat->instance);
 

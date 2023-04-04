@@ -21,6 +21,7 @@ extern "C" {
 #include "shaper_session.h"
 #include "shaper_swarmkv.h"
 #include "shaper_maat.h"
+#include "shaper_global_stat.h"
 
 #define NANO_SECONDS_PER_MICRO_SEC 1000
 #define MICRO_SECONDS_PER_SEC 1000000
@@ -203,6 +204,8 @@ void shaper_queue_clear(struct shaping_flow *sf, struct shaping_thread_ctx *ctx)
                                     pkt_wrapper->direction, pkt_wrapper->length, SHAPING_PROFILE_TYPE_PRIMARY, ctx->thread_index);
         shaper_stat_drop_inc(stat, rule->id, rule->primary.id, rule->primary.priority, 
                             pkt_wrapper->direction, pkt_wrapper->length, ctx->thread_index);
+        shaper_global_stat_queueing_dec(ctx->global_stat, pkt_wrapper->length);
+        shaper_global_stat_drop_inc(ctx->global_stat, pkt_wrapper->length);
 
         marsio_buff_free(ctx->marsio_info->instance, &pkt_wrapper->pkt_buff, 1, 0, ctx->thread_index);
         shaper_packet_dequeue(sf);
@@ -673,10 +676,16 @@ static int shaper_polling_first_pkt_token_get(struct shaper *sp, struct shaping_
             }
             break;
         case SHAPING_DROP:
+            shaper_global_stat_queueing_dec(ctx->global_stat, pkt_wrapper->length);
+            shaper_global_stat_drop_inc(ctx->global_stat, pkt_wrapper->length);
+
             marsio_buff_free(ctx->marsio_info->instance, &pkt_wrapper->pkt_buff, 1, 0, ctx->thread_index);
             shaper_packet_dequeue(sf);
             break;
         case SHAPING_FORWARD:
+            shaper_global_stat_queueing_dec(ctx->global_stat, pkt_wrapper->length);
+            shaper_global_stat_throughput_inc(ctx->global_stat, SHAPING_GLOBAL_STAT_TX, pkt_wrapper->length);
+
             marsio_send_burst(ctx->marsio_info->mr_path, ctx->thread_index, &pkt_wrapper->pkt_buff, 1);
             shaper_packet_dequeue(sf);
             break;
@@ -727,20 +736,24 @@ void shaping_packet_process(struct shaping_thread_ctx *ctx, marsio_buff_t *rx_bu
             shaper_stat_queueing_pkt_inc(stat, s_rule->id, 
                                         s_rule->primary.id, s_rule->primary.priority, meta->dir, meta->raw_len,
                                         SHAPING_PROFILE_TYPE_PRIMARY, ctx->thread_index);
+            shaper_global_stat_queueing_inc(ctx->global_stat, meta->raw_len);
         } else {
             shaper_stat_drop_inc(stat, s_rule->id, s_rule->primary.id, s_rule->primary.priority, meta->dir, meta->raw_len, ctx->thread_index);
+            shaper_global_stat_drop_inc(ctx->global_stat, meta->raw_len);
             marsio_buff_free(marsio_info->instance, &rx_buff, 1, 0, ctx->thread_index);
         }
         
     } else {
         if (meta->is_tcp_pure_ctrl) {
             marsio_send_burst(marsio_info->mr_path, ctx->thread_index, &rx_buff, 1);
+            shaper_global_stat_throughput_inc(ctx->global_stat, SHAPING_GLOBAL_STAT_TX, meta->raw_len);
             shaper_stat_forward_all_rule_inc(stat, sf, meta->dir, meta->raw_len, ctx->thread_index);
             goto JUDGE_CLOSE;//for tcp pure control pkt, transmit it directly
         }
 
         if (0 != shaper_packet_enqueue(ctx, sf, rx_buff, &curr_time, meta)) {
             marsio_buff_free(marsio_info->instance, &rx_buff, 1, 0, ctx->thread_index);
+            shaper_global_stat_drop_inc(ctx->global_stat, meta->raw_len);
             LOG_ERROR("%s: shaping enqueue packet failed while queue empty for session: %s", LOG_TAG_SHAPING, addr_tuple4_to_str(&sf->tuple4));
             goto JUDGE_CLOSE;
         }
@@ -750,14 +763,17 @@ void shaping_packet_process(struct shaping_thread_ctx *ctx, marsio_buff_t *rx_bu
         shaping_ret = shaper_pkt_action_decide_no_queue(ctx, sf, &sf->matched_rule_infos[sf->anchor].primary);
         switch (shaping_ret) {
             case SHAPING_QUEUED:
+                shaper_global_stat_queueing_inc(ctx->global_stat, meta->raw_len);
                 break;
             case SHAPING_DROP:
                 marsio_buff_free(marsio_info->instance, &rx_buff, 1, 0, ctx->thread_index);
                 shaper_packet_dequeue(sf);
+                shaper_global_stat_drop_inc(ctx->global_stat, meta->raw_len);
                 break;
             case SHAPING_FORWARD:
                 marsio_send_burst(marsio_info->mr_path, ctx->thread_index, &rx_buff, 1);
                 shaper_packet_dequeue(sf);
+                shaper_global_stat_throughput_inc(ctx->global_stat, SHAPING_GLOBAL_STAT_TX, meta->raw_len);
                 break;
             default:
                 assert(0);
@@ -823,15 +839,19 @@ static struct shaping_flow* shaper_ctrl_pkt_session_handle(struct shaping_thread
 
     switch (ctrl_data.state) {
         case SESSION_STATE_OPENING:
+            shaper_global_stat_ctrlpkt_opening_inc(ctx->global_stat);
             sf = shaper_session_opening(ctx, meta, &ctrl_data, &raw_parser);
             break;
         case SESSION_STATE_ACTIVE:
+            shaper_global_stat_ctrlpkt_active_inc(ctx->global_stat);
             sf = shaper_session_active(ctx, meta, &ctrl_data);
             break;
         case SESSION_STATE_CLOSING:
+            shaper_global_stat_ctrlpkt_close_inc(ctx->global_stat);
             sf = shaper_session_close(ctx, meta);
             break;
         case SESSION_STATE_RESETALL:
+            shaper_global_stat_ctrlpkt_resetall_inc(ctx->global_stat);
             sf = shaper_session_reset_all(ctx, meta);
             break;
         default:
@@ -877,13 +897,16 @@ void shaper_packet_recv_and_process(struct shaping_thread_ctx *ctx)
 
     for (i = 0; i < rx_num; i++) {
         if (marsio_buff_is_ctrlbuf(rx_buff[i])) {
+            shaper_global_stat_ctrlpkt_inc(ctx->global_stat);
             sf = shaper_ctrl_pkt_session_handle(ctx, rx_buff[i], &meta);
         } else {
             sf = shaper_raw_pkt_session_handle(ctx, rx_buff[i], &meta);
         }
+        shaper_global_stat_throughput_inc(ctx->global_stat, SHAPING_GLOBAL_STAT_RX, meta.raw_len);
 
-        if (meta.is_ctrl_pkt || !sf) {//ctrl pkt need send directly
+        if (meta.is_ctrl_pkt || !sf || sf->rule_num == 0) {//ctrl pkt need send directly
             marsio_send_burst(ctx->marsio_info->mr_path, ctx->thread_index, &rx_buff[i], 1);
+            shaper_global_stat_throughput_inc(ctx->global_stat, SHAPING_GLOBAL_STAT_TX, meta.raw_len);
         } else {
             shaping_packet_process(ctx, rx_buff[i], &meta, sf);
         }
@@ -1001,6 +1024,7 @@ void shaping_engine_destroy(struct shaping_ctx *ctx)
         shaper_maat_destroy(ctx->maat_info);
         shaper_marsio_destroy(ctx->marsio_info);
         shaper_stat_destroy(ctx->stat);
+        shaper_global_stat_destroy(ctx->global_stat);
 
         if (ctx->thread_ctx) {
             for (int i = 0; i < ctx->thread_num; i++) {
@@ -1058,6 +1082,11 @@ struct shaping_ctx *shaping_engine_init()
     if (ctx->stat == NULL) {
         goto ERROR;
     }
+
+    ctx->global_stat = shaper_global_stat_init();
+    if (ctx->global_stat == NULL) {
+        goto ERROR;
+    }
     
     ctx->thread_ctx = (struct shaping_thread_ctx *)calloc(conf.work_thread_num, sizeof(struct shaping_thread_ctx));
     ctx->thread_num = conf.work_thread_num;
@@ -1065,6 +1094,7 @@ struct shaping_ctx *shaping_engine_init()
         ctx->thread_ctx[i].thread_index = i;
         ctx->thread_ctx[i].sp = shaper_new(conf.priority_queue_len_max);
         ctx->thread_ctx[i].stat = ctx->stat;
+        ctx->thread_ctx[i].global_stat = ctx->global_stat;
         ctx->thread_ctx[i].session_table = session_table_create();
         ctx->thread_ctx[i].maat_info = ctx->maat_info;
         ctx->thread_ctx[i].marsio_info = ctx->marsio_info;
