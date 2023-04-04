@@ -2,9 +2,11 @@
 #include <MESA/swarmkv.h>
 #include <MESA/maat.h>
 
+#include <cstdio>
 #include <marsio.h>
 #include <vector>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <unistd.h>
 #include <time.h>
 #include <sys/time.h>
@@ -64,6 +66,7 @@ static int pf_async_times[MAX_STUB_PROFILE_NUM];
 vector<struct stub_token_thread_arg> pf_async_thread[MAX_STUB_PROFILE_NUM];
 struct stub_matched_rules matched_rules;
 struct shaping_profile pf_array[MAX_STUB_PROFILE_NUM];
+static int profile_priority_len[MAX_STUB_PROFILE_NUM][10] = {0};
 
 static unsigned long long curr_time = 1;
 
@@ -277,8 +280,72 @@ int swarmkv_options_set_log_level(struct swarmkv_options *opts, int loglevel)
     return 0;
 }
 
+static void swarmkv_hincrby_cmd_func(char *cmd_str, swarmkv_on_reply_callback_t * cb, void *cb_arg)
+{
+    int profile_id;
+    int priority;
+    int value;
+
+    sscanf(cmd_str, "HINCRBY tsg-shaping-%d priority-%d %d", &profile_id, &priority, &value);
+    profile_priority_len[profile_id][priority] += value;
+
+    cb(NULL, cb_arg);
+
+    return;
+}
+
+static void swarmkv_hmget_cmd_func(char *cmd_str, swarmkv_on_reply_callback_t * cb, void *cb_arg)
+{
+    int profile_id;
+    int priority[10];
+    int ret;
+    int priority_num;
+    struct swarmkv_reply *reply = (struct swarmkv_reply*)calloc(1, sizeof(struct swarmkv_reply));
+
+    ret = sscanf(cmd_str, "HMGET tsg-shaping-%d priority-%d priority-%d priority-%d priority-%d priority-%d priority-%d priority-%d priority-%d priority-%d", 
+                    &profile_id, &priority[0], &priority[1], &priority[2], &priority[3], &priority[4], &priority[5], &priority[6], &priority[7], &priority[8]);
+    priority_num = ret - 1;
+
+    reply->type = SWARMKV_REPLY_ARRAY;
+    reply->n_element = priority_num;
+    reply->elements = (struct swarmkv_reply**)calloc(priority_num, sizeof(struct swarmkv_reply*));
+    for (int i = 0; i < priority_num; i++) {
+        reply->elements[i] = (struct swarmkv_reply*)calloc(1, sizeof(struct swarmkv_reply));
+        reply->elements[i]->type = SWARMKV_REPLY_INTEGER;
+        reply->elements[i]->integer = profile_priority_len[profile_id][priority[i]];
+    }
+
+    cb(reply, cb_arg);
+
+    for(unsigned int i = 0; i < reply->n_element; i++) {
+        if (reply->elements[i]) {
+            free(reply->elements[i]);
+        }
+    }
+    free(reply->elements);
+    free(reply);
+    
+}
+
 void swarmkv_async_command(struct swarmkv *db, swarmkv_on_reply_callback_t * cb, void *cb_arg, const char *format, ...)
 {
+    char *cmd_str = NULL;
+    char cmd_keyword[32] = {0};
+
+    va_list ap;
+    va_start(ap,format);
+	vasprintf(&cmd_str, format, ap);
+    va_end(ap);
+
+    sscanf(cmd_str, "%31s %*s", cmd_keyword);
+    if (strcmp(cmd_keyword, "HINCRBY") == 0) {
+        swarmkv_hincrby_cmd_func(cmd_str, cb, cb_arg);
+    } else if (strcmp(cmd_keyword, "HMGET") == 0) {
+        swarmkv_hmget_cmd_func(cmd_str, cb, cb_arg);
+    }
+
+    free(cmd_str);
+
     return;
 }
 
