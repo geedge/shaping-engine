@@ -19,6 +19,8 @@
 char profile_type_primary[] = "primary";
 char profile_type_borrow[] = "borrow";
 
+char line[4096];
+
 static struct stub_packet* packet_new(unsigned long long income_time, unsigned int length, unsigned char dir)
 {
     struct stub_packet *packet;
@@ -269,7 +271,6 @@ TEST(single_session, udp_tx_in_order)
 
     /*******test statistics***********/
     sleep(2);//wait telegraf to output
-    char line[2048];
     FILE *stat_file;
 
     //judge shaping metric
@@ -354,7 +355,6 @@ TEST(single_session, tcp_tx_in_order)
 
     /*******test statistics***********/
     sleep(2);//wait telegraf to output
-    char line[1024];
     FILE *stat_file;
 
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
@@ -431,7 +431,6 @@ TEST(single_session, udp_diff_direction)
 
     /*******test statistics***********/
     sleep(2);//wait telegraf to output
-    char line[1024];
     FILE *stat_file;
 
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
@@ -508,7 +507,6 @@ TEST(single_session, udp_multi_rules)
 
     /*******test statistics***********/
     sleep(2);//wait telegraf to output
-    char line[1024];
     FILE *stat_file;
 
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
@@ -582,7 +580,6 @@ TEST(single_session, udp_borrow)
 
     /*******test statistics***********/
     sleep(2);//wait telegraf to output
-    char line[1024];
     FILE *stat_file;
 
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
@@ -656,7 +653,6 @@ TEST(single_session, udp_borrow_same_priority_9)
 
     /*******test statistics***********/
     sleep(2);//wait telegraf to output
-    char line[1024];
     FILE *stat_file;
 
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
@@ -762,7 +758,6 @@ TEST(two_session_diff_priority, udp_in_order)
 
     /*******test statistics***********/
     sleep(2);//wait telegraf to output
-    char line[1024];
     FILE *stat_file;
 
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
@@ -893,7 +888,6 @@ TEST(two_session_diff_priority, udp_in_order_multi_rule)
 
     /*******test statistics***********/
     sleep(2);//wait telegraf to output
-    char line[1024];
     FILE *stat_file;
 
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
@@ -986,7 +980,6 @@ TEST(single_session_async, udp_tx_in_order)
 
     /*******test statistics***********/
     sleep(2);//wait telegraf to output
-    char line[1024];
     FILE *stat_file;
 
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
@@ -1047,7 +1040,6 @@ TEST(single_session_async, udp_close_before_async_exec)
 
     /*******test statistics***********/
     sleep(2);//wait telegraf to output
-    char line[1024];
     FILE *stat_file;
 
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
@@ -1147,7 +1139,6 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
 
     /*******test statistics***********/
     sleep(2);//wait telegraf to output
-    char line[1024];
     FILE *stat_file;
 
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
@@ -1233,7 +1224,6 @@ TEST(two_session_same_rule, udp_tx_in_order)
 
     /*******test statistics***********/
     sleep(2);//wait telegraf to output
-    char line[1024];
     FILE *stat_file;
 
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
@@ -1346,7 +1336,6 @@ TEST(two_session_diff_priority_same_profile, udp_random_tx_in_order)
 
     /*******test statistics***********/
     sleep(2);//wait telegraf to output
-    char line[1024];
     FILE *stat_file;
 
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
@@ -1414,7 +1403,6 @@ TEST(statistics, udp_drop_pkt)
 
     /*******test statistics***********/
     sleep(2);//wait telegraf to output
-    char line[2048];
     FILE *stat_file;
 
     //judge shaping metric
@@ -1447,7 +1435,6 @@ TEST(statistics, udp_queueing_pkt)
     int priority[] = {1};
     int profile_num[] = {1};
     int profile_id[][MAX_REF_PROFILE] = {{0}};
-    char line[2048];
     FILE *stat_file;
 
     TAILQ_INIT(&expec_tx_queue);
