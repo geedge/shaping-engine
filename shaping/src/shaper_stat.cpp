@@ -88,6 +88,8 @@ struct shaping_stat* shaper_stat_init(int thread_num)
         goto ERROR;
     }
 
+    shaper_stat_tags_init();
+
     fieldstat_dynamic_instance_start(stat->instance);
 
     return stat;

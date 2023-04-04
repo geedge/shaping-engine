@@ -64,11 +64,23 @@ struct shaping_global_stat* shaper_global_stat_init()
 
     if (conf.enable_backgroud_thread == 0) {
         fieldstat_disable_background_thread(stat->instance);
-        fieldstat_set_local_output(stat->instance, "shaping_global_metric", "json");
+    }
+    fieldstat_set_local_output(stat->instance, "shaping_global_metric", "json");
+
+    if (fieldstat_set_output_interval(stat->instance, conf.output_interval_ms) != 0) {
+        LOG_ERROR("%s: shaping global set fieldstat output interval failed", LOG_TAG_STAT);
+        goto ERROR;
     }
 
-    fieldstat_global_enable_prometheus_endpoint(9007, NULL);
-    fieldstat_enable_prometheus_output(stat->instance);
+    if (fieldstat_global_enable_prometheus_endpoint(9007, NULL) != 0) {
+        LOG_ERROR("%s: shaping global fieldstat enable prometheus endpoint failed", LOG_TAG_STAT);
+        goto ERROR;
+    }
+    
+    if (fieldstat_enable_prometheus_output(stat->instance) != 0) {
+        LOG_ERROR("%s: shaping global fieldstat enable prometheus output failed", LOG_TAG_STAT);
+        goto ERROR;
+    }
 
     fieldstat_instance_start(stat->instance);
     
