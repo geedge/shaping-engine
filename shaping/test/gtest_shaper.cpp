@@ -211,6 +211,8 @@ static void shaping_global_stat_judge(char *file_line, int tx_pkts, int tx_bytes
     EXPECT_EQ(queueing_pkts, shaping_global_stat_field_get(metrics, "queueing_pkts"));
     EXPECT_EQ(queueing_bytes, shaping_global_stat_field_get(metrics, "queueing_bytes"));
 
+    cJSON_Delete(json);
+
     return;
 }
 
@@ -1245,6 +1247,93 @@ TEST(two_session_same_rule, udp_tx_in_order)
 
 profile_a: limit 1000
 */
+TEST(two_session_diff_priority_same_profile, two_thread_udp_tx_in_order)
+{
+    struct stub_pkt_queue expec_tx_queue1;
+    struct stub_pkt_queue expec_tx_queue2;
+    struct stub_pkt_queue *actual_tx_queue;
+    struct shaping_ctx *ctx = NULL;
+    struct shaping_flow *sf1 = NULL;
+    struct shaping_flow *sf2 = NULL;
+    long long rule_ids[] = {1, 2};
+    long long rule_id1[] = {1};
+    long long rule_id2[] = {2};
+    int profile_nums[] = {1, 1};
+    int prioritys[] = {1, 2};
+    int profile_id[][MAX_REF_PROFILE] = {{0}, {0}};
+    
+
+    TAILQ_INIT(&expec_tx_queue1);
+    TAILQ_INIT(&expec_tx_queue2);
+    stub_init();
+    
+    ctx = shaping_engine_init();
+    ASSERT_TRUE(ctx != NULL);
+    sf1 = shaping_flow_new();
+    ASSERT_TRUE(sf1 != NULL);
+    sf2 = shaping_flow_new();
+    ASSERT_TRUE(sf2 != NULL);
+
+    stub_set_matched_shaping_rules(2, rule_ids, prioritys, profile_nums, profile_id);
+
+    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT);
+    actual_tx_queue = stub_get_tx_queue();
+    shaper_rules_update(&ctx->thread_ctx[0], sf1, rule_id1, 1);
+    shaper_rules_update(&ctx->thread_ctx[1], sf2, rule_id2, 1);
+
+    /*******send packets***********/
+    for (int i = 0; i < 100; i++) {
+        send_packets(&ctx->thread_ctx[0], sf1, 1, 100, SHAPING_DIR_OUT, &expec_tx_queue1, 1, 0);
+        send_packets(&ctx->thread_ctx[1], sf2, 1, 100, SHAPING_DIR_OUT, &expec_tx_queue2, 1, 0);
+
+        if (i < 5) {
+            ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 1));
+            ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 1));
+        }
+    }
+    ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
+
+    for (int i = 0; i < 10; i++) {//线程1中的session优先级为2，被线程0中优先级为1的session阻断
+        stub_refresh_token_bucket(0);
+        polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);
+        ASSERT_EQ(-1, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 1));//优先级低，不能发出报文
+    }
+
+    while (!TAILQ_EMPTY(&expec_tx_queue1)) {
+        stub_refresh_token_bucket(0);
+        polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
+
+        ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 1));//sf1 priority 1
+    }
+
+    while (!TAILQ_EMPTY(&expec_tx_queue2)) {
+        stub_refresh_token_bucket(0);
+        polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);
+
+        ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 1));//sf2 priority 2
+    }
+
+    ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
+
+    shaping_flow_free(sf1);
+    shaping_flow_free(sf2);
+    shaping_engine_destroy(ctx);
+    stub_clear_matched_shaping_rules();
+}
+
+
+
+
+/*session1 match rule1; session2 match rule2
+  rule1:
+      priority:1
+      primary profile_a: (priority 1)
+  rule2:
+      priority:2
+      primary profile_a: (priority 2)
+
+profile_a: limit 1000
+*/
 TEST(two_session_diff_priority_same_profile, udp_random_tx_in_order)
 {
     struct stub_pkt_queue expec_tx_queue1;
@@ -1313,14 +1402,14 @@ TEST(two_session_diff_priority_same_profile, udp_random_tx_in_order)
         stub_refresh_token_bucket(0);
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
 
-        ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 1));//stream1 priority 1
+        ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 1));//sf1 priority 1
     }
 
     while (!TAILQ_EMPTY(&expec_tx_queue2)) {
         stub_refresh_token_bucket(0);
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
 
-        ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 1));//stream2 priority 2
+        ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 1));//sf2 priority 2
     }
 
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
@@ -1515,6 +1604,6 @@ TEST(statistics, udp_queueing_pkt)
 int main(int argc, char **argv) 
 {
     testing::InitGoogleTest(&argc, argv);
-    //testing::GTEST_FLAG(filter) = "statistics.udp_queueing_pkt";
+    //testing::GTEST_FLAG(filter) = "two_session_diff_priority_same_profile.udp_random_tx_in_order";
     return RUN_ALL_TESTS();
 }
