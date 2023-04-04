@@ -14,6 +14,8 @@ enum shaping_global_stat_column_index {
     QUEUEING_BYTES_IDX,
     DROP_PKTS_IDX,
     DROP_BYTES_IDX,
+    HIT_POLICY_PKTS,
+    HIT_POLICY_BYTES,
     CTRL_PKTS_IDX,
     CTRL_OPENING_PKTS_IDX,
     CTRL_ACTIVE_PKTS_IDX,
@@ -36,6 +38,7 @@ void shaper_global_stat_throughput_inc(struct shaping_global_stat *stat, enum sh
 void shaper_global_stat_drop_inc(struct shaping_global_stat *stat, int pkt_len);
 void shaper_global_stat_queueing_inc(struct shaping_global_stat *stat, int pkt_len);
 void shaper_global_stat_queueing_dec(struct shaping_global_stat *stat, int pkt_len);
+void shaper_global_stat_hit_policy_inc(struct shaping_global_stat *stat, int pkt_len);
 void shaper_global_stat_ctrlpkt_inc(struct shaping_global_stat *stat);
 void shaper_global_stat_ctrlpkt_opening_inc(struct shaping_global_stat *stat);
 void shaper_global_stat_ctrlpkt_active_inc(struct shaping_global_stat *stat);

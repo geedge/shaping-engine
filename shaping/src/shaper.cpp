@@ -876,6 +876,7 @@ static struct shaping_flow *shaper_raw_pkt_session_handle(struct shaping_thread_
     session_node = session_table_search_by_id(ctx->session_table, meta->session_id);
     if (session_node) {
         sf = (struct shaping_flow *)session_node->val_data;
+        shaper_global_stat_hit_policy_inc(ctx->global_stat, meta->raw_len);
     }
 
     return sf;

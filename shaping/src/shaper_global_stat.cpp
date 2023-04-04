@@ -28,9 +28,11 @@ struct shaping_global_stat* shaper_global_stat_init()
     struct shaping_global_stat *stat = NULL;
     int column_num;
     struct shaper_global_stat_conf conf;
-    const char *column_name[] = {"rx_pkts", "rx_bytes", "tx_pkts", "tx_bytes", "queueing_pkts", "queueing_bytes", "drop_pkts", "drop_bytes", 
+    const char *column_name[] = {"rx_pkts", "rx_bytes", "tx_pkts", "tx_bytes", "queueing_pkts", 
+                                "queueing_bytes", "drop_pkts", "drop_bytes", "hit_policy_pkts", "hit_policy_bytes",
                                 "ctrl_pkts", "ctrl_opening_pkts", "ctrl_active_pkts", "ctrl_close_pkts", "ctrl_resetall_pkts", "curr_session_num"};
-    enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER,
+    enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_GAUGE, 
+                                    FIELD_TYPE_GAUGE, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER,
                                     FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_GAUGE};
 
     column_num = sizeof(column_name)/sizeof(column_name[0]);
@@ -143,6 +145,14 @@ void shaper_global_stat_queueing_dec(struct shaping_global_stat *stat, int pkt_l
 {
     fieldstat_value_decrby(stat->instance, stat->column_ids[QUEUEING_PKTS_IDX], 1);
     fieldstat_value_decrby(stat->instance, stat->column_ids[QUEUEING_BYTES_IDX], pkt_len);
+
+    return;
+}
+
+void shaper_global_stat_hit_policy_inc(struct shaping_global_stat *stat, int pkt_len)
+{
+    fieldstat_value_incrby(stat->instance, stat->column_ids[HIT_POLICY_PKTS], 1);
+    fieldstat_value_incrby(stat->instance, stat->column_ids[HIT_POLICY_BYTES], pkt_len);
 
     return;
 }
