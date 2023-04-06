@@ -426,7 +426,7 @@ static int shaper_deposit_token_is_enough(struct shaping_profile_info *pf_info, 
     }
 }
 
-static int shaper_token_get_from_profile(struct swarmkv *db, struct shaping_flow *sf, struct shaping_profile_info *pf_info, int profile_type, int req_token, unsigned char direction)
+static int shaper_token_get_from_profile(struct swarmkv *db, struct shaping_flow *sf, struct shaping_profile_info *pf_info, int profile_type, int req_token_bits, unsigned char direction)
 {
     struct shaping_async_cb_arg *arg;
     char key[32] = {0};
@@ -440,9 +440,9 @@ static int shaper_token_get_from_profile(struct swarmkv *db, struct shaping_flow
     arg->sf = sf;
     arg->direction = direction;
 
-    swarmkv_tconsume(db, key, strlen(key), req_token, shaper_token_get_cb, arg);
+    swarmkv_tconsume(db, key, strlen(key), req_token_bits, shaper_token_get_cb, arg);
     if (__atomic_load_n(&pf_info->async_token_ref_count, __ATOMIC_SEQ_CST) != 0) {//has async operation not completed
-        shaper_deposit_token_sub(pf_info, req_token, direction);
+        shaper_deposit_token_sub(pf_info, req_token_bits, direction);
         return 0;
     }
 
@@ -454,8 +454,8 @@ static int shaper_token_get_from_profile(struct swarmkv *db, struct shaping_flow
         }
     }
 
-    if (shaper_deposit_token_is_enough(pf_info, req_token, direction)) {
-        shaper_deposit_token_sub(pf_info, req_token, direction);
+    if (shaper_deposit_token_is_enough(pf_info, req_token_bits, direction)) {
+        shaper_deposit_token_sub(pf_info, req_token_bits, direction);
         return 0;
     }
 
@@ -517,13 +517,14 @@ static int shaper_profile_is_priority_blocked(struct swarmkv *db, struct shaping
     }
 }
 
-static int shaper_token_consume(struct swarmkv *db, struct shaping_flow *sf, int req_token, 
+static int shaper_token_consume(struct swarmkv *db, struct shaping_flow *sf, int req_token_bytes,
                         struct shaping_profile_info *profile, int profile_type, unsigned char direction)
 {
     if (shaper_profile_is_priority_blocked(db, sf, profile)) {
         return -1;
     } else {
-        return shaper_token_get_from_profile(db, sf, profile, profile_type, req_token, direction);
+        int req_token_bits = req_token_bytes * 8;
+        return shaper_token_get_from_profile(db, sf, profile, profile_type, req_token_bits, direction);
     }
 }
 
