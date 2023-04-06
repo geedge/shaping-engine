@@ -84,11 +84,11 @@ void * stub_get_token_thread_func(void *data)
 void stub_set_token_bucket_avl_per_sec(int profile_id, unsigned int tokens, unsigned char direction)
 {
     if (direction == SHAPING_DIR_IN) {
-        pf_array[profile_id].in_limit_bandwidth = tokens;
-        pf_curr_avl_token[profile_id].in_limit_bandwidth = tokens;
+        pf_array[profile_id].in_limit_bandwidth = tokens * 8;
+        pf_curr_avl_token[profile_id].in_limit_bandwidth = tokens * 8;
     } else {
-        pf_array[profile_id].out_limit_bandwidth = tokens;
-        pf_curr_avl_token[profile_id].out_limit_bandwidth = tokens;
+        pf_array[profile_id].out_limit_bandwidth = tokens * 8;
+        pf_curr_avl_token[profile_id].out_limit_bandwidth = tokens * 8;
     }
 
     return;
