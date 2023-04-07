@@ -3,7 +3,10 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <assert.h>
+#include <signal.h>
 
+#include "log.h"
+#include "utils.h"
 #include "shaper.h"
 #include "shaper_stat.h"
 #include "shaper_marsio.h"
@@ -29,13 +32,36 @@ static void *shaper_thread_loop(void *data)
     return NULL;
 }
 
+static void sig_handler(int signo)
+{
+    if (signo == SIGHUP)
+    {
+        LOG_INFO("%s: recv SIGHUP, reload zlog.conf", LOG_TAG_SHAPING);
+        LOG_RELOAD();
+    }
+
+    return;
+}
+
 int main(int argc, char **argv)
 {
     struct shaping_ctx *ctx = NULL;
 
+    if (LOG_INIT("./conf/zlog.conf") == -1)
+    {
+        return -1;
+    }
+
+    if (signal(SIGHUP, sig_handler) == SIG_ERR)
+    {
+        LOG_ERROR("%s: unable to register SIGHUP signal handler, error %d: %s", LOG_TAG_SHAPING, errno, strerror(errno));
+        LOG_CLOSE();
+        return -1;
+    }
+
     ctx = shaping_engine_init();
     if (!ctx) {
-        return 0;
+        return -1;
     }
 
     for (int i = 0; i < ctx->thread_num; i++) {

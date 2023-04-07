@@ -1090,11 +1090,6 @@ struct shaping_ctx *shaping_engine_init()
     memset(&conf, 0, sizeof(conf));
     ctx = (struct shaping_ctx *)calloc(1, sizeof(struct shaping_ctx));
 
-    if (LOG_INIT("./conf/zlog.conf") == -1)
-    {
-        goto ERROR;
-    }
-
     ret = shaper_global_conf_init(&conf);
     if (ret < 0) {
         LOG_ERROR("%s: shaping init global conf failed", LOG_TAG_SHAPING);
