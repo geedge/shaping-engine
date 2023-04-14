@@ -769,6 +769,13 @@ void shaping_packet_process(struct shaping_thread_ctx *ctx, marsio_buff_t *rx_bu
     struct shaping_marsio_info *marsio_info = ctx->marsio_info;
     struct timespec curr_time;
 
+    if (meta->is_tcp_pure_ctrl) {
+        marsio_send_burst(marsio_info->mr_path, ctx->thread_index, &rx_buff, 1);
+        shaper_global_stat_throughput_inc(ctx->global_stat, SHAPING_GLOBAL_STAT_TX, meta->raw_len);
+        shaper_stat_forward_all_rule_inc(stat, sf, meta->dir, meta->raw_len, ctx->thread_index);
+        goto JUDGE_CLOSE;//for tcp pure control pkt, transmit it directly
+    }
+
     clock_gettime(CLOCK_MONOTONIC, &curr_time);
     if (!shaper_queue_empty(sf)) {//already have queueing pkt, enqueue directly
         s_rule = &sf->matched_rule_infos[0];
@@ -784,13 +791,6 @@ void shaping_packet_process(struct shaping_thread_ctx *ctx, marsio_buff_t *rx_bu
         }
         
     } else {
-        if (meta->is_tcp_pure_ctrl) {
-            marsio_send_burst(marsio_info->mr_path, ctx->thread_index, &rx_buff, 1);
-            shaper_global_stat_throughput_inc(ctx->global_stat, SHAPING_GLOBAL_STAT_TX, meta->raw_len);
-            shaper_stat_forward_all_rule_inc(stat, sf, meta->dir, meta->raw_len, ctx->thread_index);
-            goto JUDGE_CLOSE;//for tcp pure control pkt, transmit it directly
-        }
-
         if (0 != shaper_packet_enqueue(ctx, sf, rx_buff, &curr_time, meta)) {
             marsio_buff_free(marsio_info->instance, &rx_buff, 1, 0, ctx->thread_index);
             shaper_global_stat_drop_inc(ctx->global_stat, meta->raw_len);
