@@ -3,6 +3,7 @@
 #include <fieldstat.h>
 #include <gtest/gtest.h>
 #include <cjson/cJSON.h>
+#include <sys/queue.h>
 
 #include "shaper.h"
 #include "shaper_maat.h"
@@ -298,6 +299,7 @@ TEST(single_session, udp_tx_in_order)
 TEST(single_session, tcp_tx_in_order)
 {
     struct stub_pkt_queue expec_tx_queue;
+    struct stub_pkt_queue expec_pure_ctl_tx_queue;
     struct stub_pkt_queue *actual_tx_queue;
     struct shaping_ctx *ctx = NULL;
     struct shaping_flow *sf = NULL;
@@ -307,6 +309,7 @@ TEST(single_session, tcp_tx_in_order)
     int profile_id[][MAX_REF_PROFILE] = {{0}};
 
     TAILQ_INIT(&expec_tx_queue);
+    TAILQ_INIT(&expec_pure_ctl_tx_queue);
     stub_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
@@ -320,10 +323,12 @@ TEST(single_session, tcp_tx_in_order)
 
     /*******send packets***********/
     send_packets(&ctx->thread_ctx[0], sf, 20, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
-    send_packets(&ctx->thread_ctx[0], sf, 20, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 1);
+    send_packets(&ctx->thread_ctx[0], sf, 20, 100, SHAPING_DIR_OUT, &expec_pure_ctl_tx_queue, 1, 1);
 
     //first 10 packets
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
+    //20 pure ctrl pkts
+    ASSERT_EQ(0, judge_packet_eq(&expec_pure_ctl_tx_queue, actual_tx_queue, 20));
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
 
@@ -339,12 +344,6 @@ TEST(single_session, tcp_tx_in_order)
         stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);
     }
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
-
-    while (!TAILQ_EMPTY(&expec_tx_queue)) {//20 pure contorl pkts
-        polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-        ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 1));
-        stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);
-    }
 
     /***********send stat data here********************/
     stub_curr_time_inc(STUB_TIME_INC_FOR_METRIC_SEND);//inc time to send metric
@@ -362,10 +361,10 @@ TEST(single_session, tcp_tx_in_order)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 0, 0, 1, 10, 1000, 0, 30, 0, 1, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(line, 0, 0, 1, 30, 3000, 0, 10, 0, 1, SHAPING_DIR_OUT, profile_type_primary);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 0, 0, 1, 30, 3000, 0, 0, 30 + (STUB_TIME_INC_FOR_METRIC_SEND / 1000), 0, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(line, 0, 0, 1, 10, 1000, 0, 0, 30 + (STUB_TIME_INC_FOR_METRIC_SEND / 1000), 0, SHAPING_DIR_OUT, profile_type_primary);
 
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
@@ -1604,6 +1603,6 @@ TEST(statistics, udp_queueing_pkt)
 int main(int argc, char **argv) 
 {
     testing::InitGoogleTest(&argc, argv);
-    //testing::GTEST_FLAG(filter) = "two_session_diff_priority_same_profile.udp_random_tx_in_order";
+    //testing::GTEST_FLAG(filter) = "single_session.tcp_tx_in_order";
     return RUN_ALL_TESTS();
 }
