@@ -47,6 +47,7 @@ yum install -y sapp-devel # Maat_rule require MESA/stream.h
 yum install -y numactl-libs # required by mrzcpd
 yum install -y libibverbs # required by mrzcpd
 yum install -y libbreakpad_mini-devel
+yum install -y msgpack-devel
 source /etc/profile.d/framework.sh
 source /etc/profile.d/mrzcpd.sh
 
