@@ -1,6 +1,7 @@
 #include <MESA_prof_load.h>
 #include <MESA/MESA_handle_logger.h>
 #include <cjson/cJSON.h>
+#include <cstdlib>
 #include <marsio.h>
 #include "mpack.h"
 
@@ -267,4 +268,20 @@ SUCCESS:
 ERROR:
     mpack_tree_destroy(&tree);
     return -1;
+}
+
+void shaper_marsio_metadata_deep_copy(struct metadata *dst, struct metadata *src)
+{
+    dst->session_id = src->session_id;
+    if (dst->raw_data) {
+        free(dst->raw_data);
+        dst->raw_data = NULL;
+    }
+    dst->raw_data = (char *)calloc(src->raw_len + 1, sizeof(char));
+    memcpy(dst->raw_data, src->raw_data, src->raw_len);
+    dst->raw_len = src->raw_len;
+    dst->l7_offset = src->l7_offset;
+    dst->is_ctrl_pkt = src->is_ctrl_pkt;
+
+    route_ctx_copy(&dst->route_ctx, &src->route_ctx);
 }

@@ -25,6 +25,7 @@ struct shaping_system_conf {
     int polling_node_num_max[SHAPING_PRIORITY_NUM_MAX];
     int work_thread_num;
     int cpu_affinity_enable;
+    int firewall_sid;
     unsigned long long cpu_affinity_mask;
 };
 
@@ -42,6 +43,7 @@ struct shaping_thread_ctx {
     int session_need_reset;
     unsigned int session_queue_len_max;
     int polling_node_num_max[SHAPING_PRIORITY_NUM_MAX];
+    int firewall_sid;
 };
 
 struct shaping_ctx {
@@ -105,6 +107,7 @@ struct shaping_flow {
     int ref_count;
     unsigned int queue_len;
     unsigned int flag;
+    struct metadata *ctrl_meta;
 };
 
 struct shaper_flow_instance {

@@ -22,6 +22,7 @@ enum shaping_global_stat_column_index {
     CTRL_CLOSE_PKTS_IDX,
     CTRL_RESETALL_PKTS_IDX,
     CURR_SESSION_NUM_IDX,
+    SESSION_LOG_SEND_NUM,
     GLOBAL_STAT_COLUNM_IDX_MAX
 };
 
@@ -46,3 +47,4 @@ void shaper_global_stat_ctrlpkt_close_inc(struct shaping_global_stat *stat);
 void shaper_global_stat_ctrlpkt_resetall_inc(struct shaping_global_stat *stat);
 void shaper_global_stat_curr_session_inc(struct shaping_global_stat *stat);
 void shaper_global_stat_curr_session_dec(struct shaping_global_stat *stat);
+void shaper_global_stat_session_log_send_num_inc(struct shaping_global_stat *stat);

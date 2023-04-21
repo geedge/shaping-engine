@@ -30,10 +30,12 @@ struct shaping_global_stat* shaper_global_stat_init()
     struct shaper_global_stat_conf conf;
     const char *column_name[] = {"rx_pkts", "rx_bytes", "tx_pkts", "tx_bytes", "queueing_pkts", 
                                 "queueing_bytes", "drop_pkts", "drop_bytes", "hit_policy_pkts", "hit_policy_bytes",
-                                "ctrl_pkts", "ctrl_opening_pkts", "ctrl_active_pkts", "ctrl_close_pkts", "ctrl_resetall_pkts", "curr_session_num"};
+                                "ctrl_pkts", "ctrl_opening_pkts", "ctrl_active_pkts", "ctrl_close_pkts", "ctrl_resetall_pkts", 
+                                "curr_session_num", "session_log_send_num"};
     enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_GAUGE, 
                                     FIELD_TYPE_GAUGE, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER,
-                                    FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_GAUGE};
+                                    FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, 
+                                    FIELD_TYPE_GAUGE, FIELD_TYPE_COUNTER};
 
     column_num = sizeof(column_name)/sizeof(column_name[0]);
     if (column_num != GLOBAL_STAT_COLUNM_IDX_MAX) {
@@ -202,6 +204,13 @@ void shaper_global_stat_curr_session_inc(struct shaping_global_stat *stat)
 void shaper_global_stat_curr_session_dec(struct shaping_global_stat *stat)
 {
     fieldstat_value_decrby(stat->instance, stat->column_ids[CURR_SESSION_NUM_IDX], 1);
+
+    return;
+}
+
+void shaper_global_stat_session_log_send_num_inc(struct shaping_global_stat *stat)
+{
+    fieldstat_value_incrby(stat->instance, stat->column_ids[SESSION_LOG_SEND_NUM], 1);
 
     return;
 }
