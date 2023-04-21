@@ -2,6 +2,7 @@
 #include <MESA/MESA_handle_logger.h>
 #include <cjson/cJSON.h>
 #include <marsio.h>
+#include <msgpack.h>
 
 #include "log.h"
 #include "raw_packet.h"
@@ -174,42 +175,69 @@ int shaper_marsio_pkt_metadata_get(marsio_buff_t *rx_buff, struct metadata *meta
 
 int shaper_marsio_ctrl_pkt_data_parse(struct ctrl_pkt_data *ctrl_data, const char *data, size_t length)
 {
-    cJSON *json = NULL;
-    cJSON *tmp_obj = NULL;
-    cJSON *elem = NULL;
-    int i = 0;
+    msgpack_unpacked unpacked;
+    msgpack_unpack_return ret;
+    msgpack_object obj;
+    struct msgpack_object *ptr;
+    int shaping_rule_id_array_size;
+    char session_id_str[128] = {0};
 
-    memset(ctrl_data, 0, sizeof(struct ctrl_pkt_data));
-
-    json = cJSON_Parse(data);
-    if (!json) {
-        LOG_ERROR("%s: shaping marsio parse ctrl pkt json data failed, data: %s", LOG_TAG_MARSIO, data);
+    msgpack_unpacked_init(&unpacked);
+    ret = msgpack_unpack_next(&unpacked, data, length, NULL);
+    if (ret != MSGPACK_UNPACK_SUCCESS) {
+        LOG_ERROR("%s: shaping marsio msgpack_unpack_next failed, ret is %d", LOG_TAG_MARSIO, ret);
         goto ERROR;
     }
 
-    tmp_obj = cJSON_GetObjectItem(json, "session_id");
-    if (!tmp_obj || !cJSON_IsString(tmp_obj)) {
-        LOG_ERROR("%s: shaping marsio parse session_id failed from ctrl pkt json data, data: %s", LOG_TAG_MARSIO, data);
+    obj = unpacked.data;
+    if (obj.type != MSGPACK_OBJECT_ARRAY) {
+        LOG_ERROR("%s: shaping marsio msgpack obj type error, type is %d", LOG_TAG_MARSIO, obj.type);
         goto ERROR;
     }
-    ctrl_data->session_id = atoll(tmp_obj->valuestring);
-
-    tmp_obj = cJSON_GetObjectItem(json, "state");
-    if (!tmp_obj || !cJSON_IsString(tmp_obj)) {
-        LOG_ERROR("%s: shaping marsio parse session state failed from ctrl pkt json data, data: %s", LOG_TAG_MARSIO, data);
+    if (obj.via.array.size < (INDEX_STATE + 1)) {
+        LOG_ERROR("%s: shaping marsio msgpack obj array size wrong, array size is %d", LOG_TAG_MARSIO, obj.via.array.size);
         goto ERROR;
     }
 
-    if (strcasecmp(tmp_obj->valuestring, "opening") == 0) {
+    ptr = obj.via.array.ptr;
+
+    //tsync
+    if (ptr[INDEX_TSYNC].type != MSGPACK_OBJECT_STR) {
+        LOG_ERROR("%s: shaping marsio msgpack tsync type wrong, type is %d", LOG_TAG_MARSIO, ptr[INDEX_TSYNC].type);
+        goto ERROR;
+    }
+    if (strncmp(ptr[INDEX_TSYNC].via.str.ptr, "2.0", ptr[INDEX_TSYNC].via.str.size) != 0) {
+        char temp[128] = {0};
+        memcpy(temp, ptr[INDEX_TSYNC].via.str.ptr, ptr[INDEX_TSYNC].via.str.size);
+        LOG_ERROR("%s: shaping marsio msgpack tsync version wrong, version is %s", LOG_TAG_MARSIO, temp);
+        goto ERROR;
+    }
+
+    //session_id
+    if (ptr[INDEX_SESSION_ID].type != MSGPACK_OBJECT_STR) {
+        LOG_ERROR("%s: shaping marsio msgpack session_id type wrong, type is %d", LOG_TAG_MARSIO, ptr[INDEX_SESSION_ID].type);
+        goto ERROR;
+    }
+    memcpy(session_id_str, ptr[INDEX_SESSION_ID].via.str.ptr, ptr[INDEX_SESSION_ID].via.str.size);
+    ctrl_data->session_id = atoll(session_id_str);
+
+    //state
+    if (ptr[INDEX_STATE].type != MSGPACK_OBJECT_STR) {
+        LOG_ERROR("%s: shaping marsio msgpack state type wrong, type is %d", LOG_TAG_MARSIO, ptr[INDEX_STATE].type);
+        goto ERROR;
+    }
+    if (strncasecmp(ptr[INDEX_STATE].via.str.ptr, "opening", ptr[INDEX_STATE].via.str.size) == 0) {
         ctrl_data->state = SESSION_STATE_OPENING;
-    } else if (strcasecmp(tmp_obj->valuestring, "active") == 0) {
+    } else if (strncasecmp(ptr[INDEX_STATE].via.str.ptr, "active", ptr[INDEX_STATE].via.str.size) == 0) {
         ctrl_data->state = SESSION_STATE_ACTIVE;
-    } else if (strcasecmp(tmp_obj->valuestring, "closing") == 0) {
+    } else if (strncasecmp(ptr[INDEX_STATE].via.str.ptr, "closing", ptr[INDEX_STATE].via.str.size) == 0) {
         ctrl_data->state = SESSION_STATE_CLOSING;
-    } else if (strcasecmp(tmp_obj->valuestring, "resetall") == 0) {
+    } else if (strncasecmp(ptr[INDEX_STATE].via.str.ptr, "resetall", ptr[INDEX_STATE].via.str.size) == 0) {
         ctrl_data->state = SESSION_STATE_RESETALL;
     } else {
-        LOG_ERROR("%s: shaping marsio parse invalid session state from ctrl pkt json data, data: %s", LOG_TAG_MARSIO, data);
+        char temp[128] = {0};
+        memcpy(temp, ptr[INDEX_STATE].via.str.ptr, ptr[INDEX_STATE].via.str.size);
+        LOG_ERROR("%s: shaping marsio parse invalid session state %s", LOG_TAG_MARSIO, temp);
         goto ERROR;
     }
 
@@ -217,49 +245,39 @@ int shaper_marsio_ctrl_pkt_data_parse(struct ctrl_pkt_data *ctrl_data, const cha
         goto SUCCESS;
     }
 
-    tmp_obj = cJSON_GetObjectItem(json, "method");
-    if (!tmp_obj || !cJSON_IsString(tmp_obj)) {
-        LOG_ERROR("%s: shaping marsio parse method failed, data: %s", LOG_TAG_MARSIO, data);
-        goto ERROR;
-    }
-    if (strcasecmp(tmp_obj->valuestring, "policy_update") != 0)
-    {
-        LOG_ERROR("%s: shaping marsio parse invalid method, data: %s", LOG_TAG_CTRLPKT, data);
+    if (obj.via.array.size != INDEX_MAX) {
+        LOG_ERROR("%s: shaping marsio msgpack obj array size wrong, array size is %d", LOG_TAG_MARSIO, obj.via.array.size);
         goto ERROR;
     }
 
-    tmp_obj = cJSON_GetObjectItem(json, "params");
-    if (!tmp_obj || !cJSON_IsObject(tmp_obj)) {
-        LOG_ERROR("%s: shaping marsio parse params failed, data: %s", LOG_TAG_MARSIO, data);
-        goto ERROR;
-    }
-    tmp_obj = cJSON_GetObjectItem(tmp_obj, "shaping");
-    if (!tmp_obj || !cJSON_IsArray(tmp_obj) || !cJSON_GetArraySize(tmp_obj)) {
-        LOG_ERROR("%s: shaping marsio parse shaping rule failed, data: %s", LOG_TAG_MARSIO, data);
+    //policy_update shaping rule_ids
+    if (ptr[INDEX_SHAPER].type != MSGPACK_OBJECT_ARRAY) {
+        LOG_ERROR("%s: shaping marsio msgpack shaping type wrong, type is %d", LOG_TAG_MARSIO, ptr[INDEX_SHAPER].type);
         goto ERROR;
     }
 
-    ctrl_data->shaping_rule_num = MIN(cJSON_GetArraySize(tmp_obj), SHAPING_RULE_NUM_MAX);
-    cJSON_ArrayForEach(elem, tmp_obj) {
-        if (!cJSON_IsNumber(elem)) {
-            LOG_ERROR("%s: shaping marsio parse shaping rule id failed, data: %s", LOG_TAG_MARSIO, data);
+    ptr = ptr[INDEX_SHAPER].via.array.ptr;
+    if (ptr[0].type != MSGPACK_OBJECT_ARRAY) {
+        LOG_ERROR("%s: shaping marsio msgpack shaping array elem type wrong, type is %d", LOG_TAG_MARSIO, ptr[INDEX_SHAPER].type);
+        goto ERROR;
+    }
+
+    shaping_rule_id_array_size = ptr[0].via.array.size;
+    ptr = ptr[0].via.array.ptr;
+    ctrl_data->shaping_rule_num = MIN(shaping_rule_id_array_size, SHAPING_RULE_NUM_MAX);
+    for (int i = 0; i < shaping_rule_id_array_size; i++) {
+        if (ptr[i].type != MSGPACK_OBJECT_POSITIVE_INTEGER) {
+            LOG_ERROR("%s: shaping marsio msgpack shaping rule id type wrong, type is %d", LOG_TAG_MARSIO, ptr[i].type);
             goto ERROR;
         }
-        ctrl_data->shaping_rule_ids[i] = elem->valueint;
-        i++;
-        if (i == ctrl_data->shaping_rule_num) {
-            break;
-        }
+        ctrl_data->shaping_rule_ids[i] = ptr[i].via.i64;
     }
 
 SUCCESS:
-    if (json) {
-        cJSON_Delete(json);
-    }
+    msgpack_unpacked_destroy(&unpacked);
     return 0;
+
 ERROR:
-    if (json) {
-        cJSON_Delete(json);
-    }
+    msgpack_unpacked_destroy(&unpacked);
     return -1;
 }

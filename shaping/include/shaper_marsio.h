@@ -3,6 +3,17 @@
 
 #define SHAPER_MARSIO_RX_BRUST_MAX 128
 
+enum ctr_pkt_index
+{
+    INDEX_TSYNC = 0,
+    INDEX_SESSION_ID,
+    INDEX_STATE,
+    INDEX_SCE,
+    INDEX_SHAPER,
+    INDEX_PROXY,
+    INDEX_MAX
+};
+
 struct shaping_marsio_info
 {
     struct mr_instance *instance;
