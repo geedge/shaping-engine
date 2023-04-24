@@ -4,7 +4,7 @@
 
 #include "shaper_marsio.h"
 
-static int construct_shaping_cmsg(const char *tsync, const char *session_id, const char *state, long long *shaping_rule_ids, int shaping_rule_id_num, msgpack_sbuffer *sbuf)
+static int construct_shaping_cmsg(const char *tsync, unsigned long long session_id, const char *state, long long *shaping_rule_ids, int shaping_rule_id_num, msgpack_sbuffer *sbuf)
 {
 	msgpack_packer pk;
 
@@ -17,17 +17,24 @@ static int construct_shaping_cmsg(const char *tsync, const char *session_id, con
 	msgpack_pack_str_body(&pk, tsync, strlen(tsync));
 
 	//session_id
-	msgpack_pack_str(&pk, strlen(session_id));
-	msgpack_pack_str_body(&pk, session_id, strlen(session_id));
+	msgpack_pack_unsigned_long_long(&pk, session_id);
 
 	// state
 	msgpack_pack_str(&pk, strlen(state));
 	msgpack_pack_str_body(&pk, state, strlen(state));
 
+	// method: policy_update
+	msgpack_pack_str(&pk, strlen("policy_update"));
+	msgpack_pack_str_body(&pk, "policy_update", strlen("policy_update"));
+
 	// type:sce
+	msgpack_pack_str(&pk, strlen("sce"));
+	msgpack_pack_str_body(&pk, "sce", strlen("sce"));
 	msgpack_pack_nil(&pk);
 
 	// type:shaper
+	msgpack_pack_str(&pk, strlen("shaper"));
+	msgpack_pack_str_body(&pk, "shaper", strlen("shaper"));
 	msgpack_pack_array(&pk, 1);
 	msgpack_pack_array(&pk, shaping_rule_id_num);
 	for (int i = 0; i < shaping_rule_id_num; i++)
@@ -36,6 +43,8 @@ static int construct_shaping_cmsg(const char *tsync, const char *session_id, con
 	}
 
 	// type:proxy
+	msgpack_pack_str(&pk, strlen("proxy"));
+	msgpack_pack_str_body(&pk, "proxy", strlen("proxy"));
 	msgpack_pack_nil(&pk);
 
 	return 0;
@@ -45,7 +54,7 @@ static int construct_shaping_cmsg(const char *tsync, const char *session_id, con
 TEST(CTRL_PACKET, PARSE)
 {
 	const char *tsync = "2.0";
-	const char *session_id = "123456789";
+	unsigned long long session_id = 123456789;
 	const char *state = "active";
 	long long shaping_rule_ids[] = {4, 5, 6};
 	msgpack_sbuffer sbuf;

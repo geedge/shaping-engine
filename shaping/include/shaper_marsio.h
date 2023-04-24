@@ -8,8 +8,12 @@ enum ctr_pkt_index
     INDEX_TSYNC = 0,
     INDEX_SESSION_ID,
     INDEX_STATE,
+    INDEX_METHOD,
+    INDEX_KEY_SCE,
     INDEX_SCE,
+    INDEX_KEY_SHAPER,
     INDEX_SHAPER,
+    INDEX_KEY_PROXY,
     INDEX_PROXY,
     INDEX_MAX
 };

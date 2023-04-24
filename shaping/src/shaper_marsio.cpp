@@ -180,7 +180,6 @@ int shaper_marsio_ctrl_pkt_data_parse(struct ctrl_pkt_data *ctrl_data, const cha
     msgpack_object obj;
     struct msgpack_object *ptr;
     int shaping_rule_id_array_size;
-    char session_id_str[128] = {0};
 
     msgpack_unpacked_init(&unpacked);
     ret = msgpack_unpack_next(&unpacked, data, length, NULL);
@@ -214,12 +213,11 @@ int shaper_marsio_ctrl_pkt_data_parse(struct ctrl_pkt_data *ctrl_data, const cha
     }
 
     //session_id
-    if (ptr[INDEX_SESSION_ID].type != MSGPACK_OBJECT_STR) {
+    if (ptr[INDEX_SESSION_ID].type != MSGPACK_OBJECT_POSITIVE_INTEGER) {
         LOG_ERROR("%s: shaping marsio msgpack session_id type wrong, type is %d", LOG_TAG_MARSIO, ptr[INDEX_SESSION_ID].type);
         goto ERROR;
     }
-    memcpy(session_id_str, ptr[INDEX_SESSION_ID].via.str.ptr, ptr[INDEX_SESSION_ID].via.str.size);
-    ctrl_data->session_id = atoll(session_id_str);
+    ctrl_data->session_id = ptr[INDEX_SESSION_ID].via.u64;
 
     //state
     if (ptr[INDEX_STATE].type != MSGPACK_OBJECT_STR) {
