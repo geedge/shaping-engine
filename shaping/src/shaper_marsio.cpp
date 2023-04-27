@@ -157,6 +157,12 @@ int shaper_marsio_pkt_metadata_get(marsio_buff_t *rx_buff, struct metadata *meta
             LOG_ERROR("%s: shaping marsio get l7_offset failed from metadata", LOG_TAG_MARSIO);
             return -1;
         }
+
+        meta->route_ctx.len = marsio_buff_get_metadata(rx_buff, MR_BUFF_ROUTE_CTX, meta->route_ctx.data, sizeof(meta->route_ctx.data));
+        if (meta->route_ctx.len <= 0) {
+            LOG_ERROR("%s: shaping marsio get route_ctx failed from metadata", LOG_TAG_MARSIO);
+            return -1;
+        }
     }
 
     raw_packet_parser_init(raw_parser, meta->session_id, LAYER_TYPE_ALL, 8);
