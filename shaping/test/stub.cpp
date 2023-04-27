@@ -23,6 +23,7 @@ using namespace std;
 #define MAX_STUB_PROFILE_NUM 8
 
 struct shaping_rule {
+    int vsys_id;
     int id;
     int priority;
     int primary_pf_id;
@@ -66,7 +67,7 @@ static int pf_async_times[MAX_STUB_PROFILE_NUM];
 vector<struct stub_token_thread_arg> pf_async_thread[MAX_STUB_PROFILE_NUM];
 struct stub_matched_rules matched_rules;
 struct shaping_profile pf_array[MAX_STUB_PROFILE_NUM];
-static int profile_priority_len[MAX_STUB_PROFILE_NUM][10] = {0};
+static int profile_priority_len[MAX_STUB_PROFILE_NUM][10] = {{0}};
 
 static unsigned long long curr_time = 1;
 
@@ -120,6 +121,7 @@ void stub_set_matched_shaping_rules(int rule_num, long long *rule_id, const int 
         id = rule_id[i];
         assert(id < MAX_STUB_RULE_NUM);
 
+        rules[id].vsys_id = STUB_TEST_VSYS_ID;
         rules[id].id = id;
         rules[id].primary_pf_id = profile_id[i][0];
         rules[id].borrow_pf_num = profile_num[i] - 1;

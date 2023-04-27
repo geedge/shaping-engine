@@ -127,6 +127,10 @@ static void shaping_stat_judge(char *file_line, int rule_id, int profile_id, int
     tags_json = cJSON_GetObjectItem(json, "tags");
     ASSERT_TRUE(tags_json != NULL);
 
+    tmp_obj = cJSON_GetObjectItem(tags_json, "vsys_id");
+    ASSERT_TRUE(tmp_obj != NULL);
+    EXPECT_EQ(atoi(tmp_obj->valuestring), STUB_TEST_VSYS_ID);
+
     tmp_obj = cJSON_GetObjectItem(tags_json, "rule_id");
     ASSERT_TRUE(tmp_obj != NULL);
     EXPECT_EQ(rule_id, atoi(tmp_obj->valuestring));

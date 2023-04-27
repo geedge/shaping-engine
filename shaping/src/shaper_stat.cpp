@@ -108,18 +108,25 @@ void shaper_stat_tags_init()
 {
     tags[TAG_RULE_ID_IDX].key = "rule_id";
     tags[TAG_RULE_ID_IDX].value_type = 0;
+
+    tags[TAG_VSYS_ID_IDX].key = "vsys_id";
+    tags[TAG_VSYS_ID_IDX].value_type = 0;
+
     tags[TAG_PROFILE_ID_IDX].key = "profile_id";
     tags[TAG_PROFILE_ID_IDX].value_type = 0;
+
     tags[TAG_PRIORITY_IDX].key = "priority";
     tags[TAG_PRIORITY_IDX].value_type = 0;
+
     tags[TAG_PROFILE_TYPE_IDX].key = "profile_type";
     tags[TAG_PROFILE_TYPE_IDX].value_type = 2;
 
     return;
 }
 
-static void shaper_stat_tags_build(int rule_id, int profile_id, int priority, int profile_type)
+static void shaper_stat_tags_build(int vsys_id, int rule_id, int profile_id, int priority, int profile_type)
 {
+    tags[TAG_VSYS_ID_IDX].value_int = vsys_id;
 
     tags[TAG_RULE_ID_IDX].value_int = rule_id;
 
@@ -136,10 +143,10 @@ static void shaper_stat_tags_build(int rule_id, int profile_id, int priority, in
     return;
 }
 
-void shaper_stat_drop_inc(struct shaping_stat *stat, int rule_id, int profile_id, 
+void shaper_stat_drop_inc(struct shaping_stat *stat, int vsys_id, int rule_id, int profile_id, 
                             int priority, unsigned char direction, int pkt_len, int thread_id)
 {
-    shaper_stat_tags_build(rule_id, profile_id, priority, SHAPING_PROFILE_TYPE_PRIMARY);
+    shaper_stat_tags_build(vsys_id, rule_id, profile_id, priority, SHAPING_PROFILE_TYPE_PRIMARY);
 
     if (direction == SHAPING_DIR_IN) {
         fieldstat_dynamic_table_metric_value_incrby(stat->instance, stat->table_id, stat->column_ids[IN_DROP_PKTS_IDX], SHAPER_STAT_ROW_NAME, 1, tags, TAG_IDX_MAX, thread_id);
@@ -150,10 +157,10 @@ void shaper_stat_drop_inc(struct shaping_stat *stat, int rule_id, int profile_id
     return;
 }
 
-void shaper_stat_forward_inc(struct shaping_stat *stat, int rule_id, int profile_id, 
+void shaper_stat_forward_inc(struct shaping_stat *stat, int vsys_id, int rule_id, int profile_id, 
                             int priority, unsigned char direction, int pkt_len, int profile_type, int thread_id)
 {
-    shaper_stat_tags_build(rule_id, profile_id, priority, profile_type);
+    shaper_stat_tags_build(vsys_id, rule_id, profile_id, priority, profile_type);
 
     if (direction == SHAPING_DIR_IN) {
         fieldstat_dynamic_table_metric_value_incrby(stat->instance, stat->table_id, stat->column_ids[IN_PKTS_IDX], SHAPER_STAT_ROW_NAME, 1, tags, TAG_IDX_MAX, thread_id);
@@ -173,30 +180,30 @@ void shaper_stat_forward_all_rule_inc(struct shaping_stat *stat, struct shaping_
 
     for (i = 0; i < sf->rule_num; i++) {
         rule = &sf->matched_rule_infos[i];
-        shaper_stat_forward_inc(stat, rule->id, rule->primary.id, rule->primary.priority, direction, pkt_len, SHAPING_PROFILE_TYPE_PRIMARY, thread_id);
+        shaper_stat_forward_inc(stat, rule->vsys_id, rule->id, rule->primary.id, rule->primary.priority, direction, pkt_len, SHAPING_PROFILE_TYPE_PRIMARY, thread_id);
     }
 
     return;
 }
 
-void shaper_stat_queueing_session_inc(struct shaping_stat *stat, int rule_id, int profile_id, int priority, int profile_type, int thread_id)
+void shaper_stat_queueing_session_inc(struct shaping_stat *stat, int vsys_id, int rule_id, int profile_id, int priority, int profile_type, int thread_id)
 {
-    shaper_stat_tags_build(rule_id, profile_id, priority, profile_type);
+    shaper_stat_tags_build(vsys_id, rule_id, profile_id, priority, profile_type);
     fieldstat_dynamic_table_metric_value_incrby(stat->instance, stat->table_id, stat->column_ids[QUEUEING_SESSIONS_IDX], SHAPER_STAT_ROW_NAME, 1, tags, TAG_IDX_MAX, thread_id);
     return;
 }
 
-void shaper_stat_queueing_session_dec(struct shaping_stat *stat, int rule_id, int profile_id, int priority, int profile_type, int thread_id)
+void shaper_stat_queueing_session_dec(struct shaping_stat *stat, int vsys_id, int rule_id, int profile_id, int priority, int profile_type, int thread_id)
 {
-    shaper_stat_tags_build(rule_id, profile_id, priority, profile_type);
+    shaper_stat_tags_build(vsys_id, rule_id, profile_id, priority, profile_type);
     fieldstat_dynamic_table_metric_value_incrby(stat->instance, stat->table_id, stat->column_ids[QUEUEING_SESSIONS_IDX], SHAPER_STAT_ROW_NAME, -1, tags, TAG_IDX_MAX, thread_id);
     return;
 }
 
-void shaper_stat_queueing_pkt_inc(struct shaping_stat *stat, int rule_id, int profile_id, 
+void shaper_stat_queueing_pkt_inc(struct shaping_stat *stat, int vsys_id, int rule_id, int profile_id, 
                                     int priority, unsigned char direction, int pkt_len, int profile_type, int thread_id)
 {
-    shaper_stat_tags_build(rule_id, profile_id, priority, profile_type);
+    shaper_stat_tags_build(vsys_id, rule_id, profile_id, priority, profile_type);
     if (direction == SHAPING_DIR_IN) {
         fieldstat_dynamic_table_metric_value_incrby(stat->instance, stat->table_id, stat->column_ids[IN_QUEUE_LEN_IDX], SHAPER_STAT_ROW_NAME, 1, tags, TAG_IDX_MAX, thread_id);
     } else {
@@ -206,10 +213,10 @@ void shaper_stat_queueing_pkt_inc(struct shaping_stat *stat, int rule_id, int pr
     return;
 }
 
-void shaper_stat_queueing_pkt_dec(struct shaping_stat *stat, int rule_id, int profile_id, 
+void shaper_stat_queueing_pkt_dec(struct shaping_stat *stat, int vsys_id, int rule_id, int profile_id, 
                                     int priority, unsigned char direction, int pkt_len, int profile_type, int thread_id)
 {
-    shaper_stat_tags_build(rule_id, profile_id, priority, profile_type);
+    shaper_stat_tags_build(vsys_id, rule_id, profile_id, priority, profile_type);
     if (direction == SHAPING_DIR_IN) {
         fieldstat_dynamic_table_metric_value_incrby(stat->instance, stat->table_id, stat->column_ids[IN_QUEUE_LEN_IDX], SHAPER_STAT_ROW_NAME, -1, tags, TAG_IDX_MAX, thread_id);
     } else {
@@ -219,12 +226,12 @@ void shaper_stat_queueing_pkt_dec(struct shaping_stat *stat, int rule_id, int pr
     return;
 }
 
-void shaper_stat_max_latency_update(struct shaping_stat *stat, int rule_id, int profile_id, 
+void shaper_stat_max_latency_update(struct shaping_stat *stat, int vsys_id, int rule_id, int profile_id, 
                                     int priority, unsigned char direction, unsigned long long latency, int profile_type, int thread_id)
 {
     unsigned long long old_latency;
 
-    shaper_stat_tags_build(rule_id, profile_id, priority, profile_type);
+    shaper_stat_tags_build(vsys_id, rule_id, profile_id, priority, profile_type);
     if (direction == SHAPING_DIR_IN) {
         old_latency = fieldstat_dynamic_table_metric_value_get(stat->instance, stat->table_id, stat->column_ids[IN_MAX_LATENCY_IDX], SHAPER_STAT_ROW_NAME, tags, TAG_IDX_MAX, thread_id);
         if (latency > old_latency) {

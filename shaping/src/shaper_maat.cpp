@@ -63,6 +63,13 @@ void shaper_rule_ex_new(const char *table_name, int table_id, const char *key, c
         goto END;
     }
 
+    tmp_obj = cJSON_GetObjectItem(json, "vsys_id");
+    if (!tmp_obj) {
+        LOG_ERROR("%s: json parse vsys_id failed for table line %s", LOG_TAG_MAAT, table_line);
+        goto END;
+    }
+    s_rule->vsys_id = tmp_obj->valueint;
+
     tmp_obj = cJSON_GetObjectItem(json, "priority");
     if (!tmp_obj) {
         LOG_ERROR("%s: json parse priority failed for table line %s", LOG_TAG_MAAT, table_line);
@@ -265,6 +272,7 @@ static void shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_ru
         goto END;
     }
     s_rule_info->id = s_rule->id;
+    s_rule_info->vsys_id = s_rule->vsys_id;
 
     snprintf(pf_id_key, sizeof(pf_id_key), "%d", s_rule->primary_pf_id);
     s_pf = (struct shaping_profile *)maat_plugin_table_get_ex_data(g_maat_instance, ctx->maat_info->profile_table_id, pf_id_key);

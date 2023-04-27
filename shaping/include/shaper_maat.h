@@ -6,6 +6,7 @@ struct shaping_maat_info {
 };
 
 struct shaping_rule {
+    int vsys_id;
     int id;
     int priority;
     int primary_pf_id;

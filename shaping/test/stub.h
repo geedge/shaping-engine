@@ -12,6 +12,8 @@
 #define STUB_TIME_INC_FOR_PACKET 1000
 #define STUB_TIME_INC_FOR_METRIC_SEND 1000000
 
+#define STUB_TEST_VSYS_ID 2333
+
 struct stub_packet {
     unsigned char direction;
     unsigned char pure_control;

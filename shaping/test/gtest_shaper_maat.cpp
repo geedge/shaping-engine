@@ -12,7 +12,7 @@ TEST(shaping_rule, parse)
                         0\t\
                         1\t\
                         {}\t\
-                        {\"priority\":1,\"fair_factor\":10,\"profile_chain\":[1,2,3]}\t\
+                        {\"vsys_id\":2333,\"priority\":1,\"fair_factor\":10,\"profile_chain\":[1,2,3]}\t\
                         1\t\
                         }";
 
@@ -20,6 +20,7 @@ TEST(shaping_rule, parse)
     struct shaping_rule *s_rule_dup = NULL;
 
     shaper_rule_ex_new("TRAFFIC_SHAPING_COMPILE", 0, NULL, data, (void**)&s_rule, 0, NULL);
+    EXPECT_EQ(s_rule->vsys_id, 2333);
     EXPECT_EQ(s_rule->id, 182);
     EXPECT_EQ(s_rule->primary_pf_id, 1);
     EXPECT_EQ(s_rule->borrow_pf_num, 2);
