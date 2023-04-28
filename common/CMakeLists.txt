@@ -1,4 +1,4 @@
-add_library(common src/log.cpp src/session_table.cpp src/utils.cpp src/addr_tuple4.cpp src/raw_packet.cpp)
+add_library(common src/log.cpp src/session_table.cpp src/utils.cpp src/addr_tuple4.cpp src/raw_packet.cpp src/mpack.c)
 
 target_link_libraries(common PUBLIC MESA_handle_logger)
 #target_link_libraries(common PUBLIC mrzcpd)
