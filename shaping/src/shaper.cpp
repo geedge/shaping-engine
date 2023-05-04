@@ -215,9 +215,9 @@ void shaper_queue_clear(struct shaping_flow *sf, struct shaping_thread_ctx *ctx)
     while (!shaper_queue_empty(sf)) {
         pkt_wrapper = shaper_first_pkt_get(sf);
 
-        shaper_stat_queueing_pkt_dec(stat, rule->id, rule->primary.id, rule->primary.priority, 
+        shaper_stat_queueing_pkt_dec(stat, rule->vsys_id, rule->id, rule->primary.id, rule->primary.priority, 
                                     pkt_wrapper->direction, pkt_wrapper->length, SHAPING_PROFILE_TYPE_PRIMARY, ctx->thread_index);
-        shaper_stat_drop_inc(stat, rule->id, rule->primary.id, rule->primary.priority, 
+        shaper_stat_drop_inc(stat, rule->vsys_id, rule->id, rule->primary.id, rule->primary.priority, 
                             pkt_wrapper->direction, pkt_wrapper->length, ctx->thread_index);
         shaper_global_stat_queueing_dec(ctx->global_stat, pkt_wrapper->length);
         shaper_global_stat_drop_inc(ctx->global_stat, pkt_wrapper->length);
@@ -253,9 +253,9 @@ int shaper_flow_push(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, un
     if (0 == avl_tree_node_insert(sp->priority_trees[priority], s_node->avl_node[priority])) {
         ret = 0;
         swarmkv_async_command(ctx->swarmkv_db, swarmkv_reply_cb_do_nothing, NULL, "HINCRBY tsg-shaping-%d priority-%d 1", s_rule_info->primary.id, priority);
-        shaper_stat_queueing_pkt_inc(ctx->stat, s_rule_info->id, s_rule_info->primary.id, 
+        shaper_stat_queueing_pkt_inc(ctx->stat, s_rule_info->vsys_id, s_rule_info->id, s_rule_info->primary.id, 
                                     priority, pkt_wrapper->direction, pkt_wrapper->length, SHAPING_PROFILE_TYPE_PRIMARY, ctx->thread_index);
-        shaper_stat_queueing_session_inc(ctx->stat, s_rule_info->id, s_rule_info->primary.id, priority, SHAPING_PROFILE_TYPE_PRIMARY, ctx->thread_index);
+        shaper_stat_queueing_session_inc(ctx->stat, s_rule_info->vsys_id, s_rule_info->id, s_rule_info->primary.id, priority, SHAPING_PROFILE_TYPE_PRIMARY, ctx->thread_index);
         s_rule_info->primary.enqueue_time_us = enqueue_time;
     }
 
@@ -268,9 +268,9 @@ int shaper_flow_push(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, un
             if (0 == avl_tree_node_insert(sp->priority_trees[priority], s_node->avl_node[priority])) {
                 ret = 0;
                 swarmkv_async_command(ctx->swarmkv_db, swarmkv_reply_cb_do_nothing, NULL, "HINCRBY tsg-shaping-%d priority-%d 1", s_rule_info->borrowing[i].id, priority);
-                shaper_stat_queueing_pkt_inc(ctx->stat, s_rule_info->id, s_rule_info->borrowing[i].id, 
+                shaper_stat_queueing_pkt_inc(ctx->stat, s_rule_info->vsys_id, s_rule_info->id, s_rule_info->borrowing[i].id, 
                                             priority, pkt_wrapper->direction, pkt_wrapper->length, SHAPING_PROFILE_TYPE_BORROW, ctx->thread_index);
-                shaper_stat_queueing_session_inc(ctx->stat, s_rule_info->id, s_rule_info->borrowing[i].id, priority, SHAPING_PROFILE_TYPE_BORROW, ctx->thread_index);
+                shaper_stat_queueing_session_inc(ctx->stat, s_rule_info->vsys_id, s_rule_info->id, s_rule_info->borrowing[i].id, priority, SHAPING_PROFILE_TYPE_BORROW, ctx->thread_index);
                 s_rule_info->borrowing[i].enqueue_time_us = enqueue_time;
             }
         }
@@ -309,12 +309,12 @@ void shaper_flow_pop(struct shaping_thread_ctx *ctx, struct shaping_flow *sf)
         avl_tree_node_remove(sp->priority_trees[priority], s_node->avl_node[priority]);
         swarmkv_async_command(ctx->swarmkv_db, swarmkv_reply_cb_do_nothing, NULL, "HINCRBY tsg-shaping-%d priority-%d -1", s_rule_info->primary.id, priority);
 
-        shaper_stat_queueing_pkt_dec(ctx->stat, s_rule_info->id, s_rule_info->primary.id, 
+        shaper_stat_queueing_pkt_dec(ctx->stat, s_rule_info->vsys_id, s_rule_info->id, s_rule_info->primary.id, 
                                     priority, pkt_wrapper->direction, pkt_wrapper->length, SHAPING_PROFILE_TYPE_PRIMARY, ctx->thread_index);
-        shaper_stat_queueing_session_dec(ctx->stat, s_rule_info->id, s_rule_info->primary.id, priority, SHAPING_PROFILE_TYPE_PRIMARY, ctx->thread_index);
+        shaper_stat_queueing_session_dec(ctx->stat, s_rule_info->vsys_id, s_rule_info->id, s_rule_info->primary.id, priority, SHAPING_PROFILE_TYPE_PRIMARY, ctx->thread_index);
 
         latency = shaper_pkt_latency_calculate(&s_rule_info->primary, &curr_time);
-        shaper_stat_max_latency_update(ctx->stat, s_rule_info->id, s_rule_info->primary.id, 
+        shaper_stat_max_latency_update(ctx->stat, s_rule_info->vsys_id, s_rule_info->id, s_rule_info->primary.id, 
                                         priority, pkt_wrapper->direction, latency, SHAPING_PROFILE_TYPE_PRIMARY, ctx->thread_index);
     }
     
@@ -328,12 +328,12 @@ void shaper_flow_pop(struct shaping_thread_ctx *ctx, struct shaping_flow *sf)
             avl_tree_node_remove(sp->priority_trees[priority], s_node->avl_node[priority]);
             swarmkv_async_command(ctx->swarmkv_db, swarmkv_reply_cb_do_nothing, NULL, "HINCRBY tsg-shaping-%d priority-%d -1", s_rule_info->borrowing[i].id, priority);
 
-            shaper_stat_queueing_pkt_dec(ctx->stat, s_rule_info->id, s_rule_info->borrowing[i].id, 
+            shaper_stat_queueing_pkt_dec(ctx->stat, s_rule_info->vsys_id, s_rule_info->id, s_rule_info->borrowing[i].id, 
                                         priority, pkt_wrapper->direction, pkt_wrapper->length, SHAPING_PROFILE_TYPE_BORROW, ctx->thread_index);
-            shaper_stat_queueing_session_dec(ctx->stat, s_rule_info->id, s_rule_info->borrowing[i].id, priority, SHAPING_PROFILE_TYPE_BORROW, ctx->thread_index);
+            shaper_stat_queueing_session_dec(ctx->stat, s_rule_info->vsys_id, s_rule_info->id, s_rule_info->borrowing[i].id, priority, SHAPING_PROFILE_TYPE_BORROW, ctx->thread_index);
 
             latency = shaper_pkt_latency_calculate(&s_rule_info->borrowing[i], &curr_time);
-            shaper_stat_max_latency_update(ctx->stat, s_rule_info->id, s_rule_info->borrowing[i].id, 
+            shaper_stat_max_latency_update(ctx->stat, s_rule_info->vsys_id, s_rule_info->id, s_rule_info->borrowing[i].id, 
                                             priority, pkt_wrapper->direction, latency, SHAPING_PROFILE_TYPE_BORROW, ctx->thread_index);
         }
     }
@@ -606,7 +606,7 @@ static enum shaping_packet_action shaper_pkt_action_decide_queueing(struct shapi
         profile = pf_container[i].pf_info;
         profile_type = pf_container[i].pf_type;
         if (0 == shaper_token_consume(ctx->swarmkv_db, sf, pkt_wrapper->length, profile, profile_type, pkt_wrapper->direction)) {
-            shaper_stat_forward_inc(ctx->stat, rule->id, profile->id, profile->priority, 
+            shaper_stat_forward_inc(ctx->stat, rule->vsys_id, rule->id, profile->id, profile->priority, 
                                     pkt_wrapper->direction, pkt_wrapper->length, profile_type, ctx->thread_index);
             get_token_success = 1;
             break;
@@ -630,7 +630,7 @@ static enum shaping_packet_action shaper_pkt_action_decide_queueing(struct shapi
         return SHAPING_QUEUED;
     } else {
         rule = &sf->matched_rule_infos[sf->anchor];
-        shaper_stat_drop_inc(ctx->stat, rule->id, rule->primary.id, 
+        shaper_stat_drop_inc(ctx->stat, rule->vsys_id, rule->id, rule->primary.id, 
                             rule->primary.priority, pkt_wrapper->direction, pkt_wrapper->length, ctx->thread_index);
         sf->anchor = 0;
         return SHAPING_DROP;
@@ -655,7 +655,7 @@ static enum shaping_packet_action shaper_pkt_action_decide_no_queue(struct shapi
     }
 
     if (0 == shaper_token_consume(ctx->swarmkv_db, sf, pkt_wrapper->length, profile, profile_type, pkt_wrapper->direction)) {
-        shaper_stat_forward_inc(ctx->stat, rule->id, profile->id, profile->priority, 
+        shaper_stat_forward_inc(ctx->stat, rule->vsys_id, rule->id, profile->id, profile->priority, 
                                 pkt_wrapper->direction, pkt_wrapper->length, profile_type, ctx->thread_index);
 
         sf->anchor = shaper_next_anchor_get(sf, pkt_wrapper->direction);
@@ -676,7 +676,7 @@ FLOW_PUSH:
         return SHAPING_QUEUED;
     } else {
         rule = &sf->matched_rule_infos[sf->anchor];
-        shaper_stat_drop_inc(ctx->stat, rule->id, rule->primary.id, 
+        shaper_stat_drop_inc(ctx->stat, rule->vsys_id, rule->id, rule->primary.id, 
                             rule->primary.priority, pkt_wrapper->direction, pkt_wrapper->length, ctx->thread_index);
         sf->anchor = 0;
         return SHAPING_DROP;
@@ -749,7 +749,7 @@ static int shaper_polling_first_pkt_token_get(struct shaper *sp, struct shaping_
             while shaper_flow_push() here will add queueing stat to every profile of first rule,
             so need adjust queueing stat here*/
             rule = &sf->matched_rule_infos[sf->anchor];
-            shaper_stat_queueing_pkt_dec(stat, rule->id, rule->primary.id, rule->primary.priority,
+            shaper_stat_queueing_pkt_dec(stat, rule->vsys_id, rule->id, rule->primary.id, rule->primary.priority,
                                         pkt_wrapper->direction, pkt_wrapper->length, SHAPING_PROFILE_TYPE_PRIMARY, ctx->thread_index);
         } else {
             shaper_queue_clear(sf, ctx);//first packet fail, then every packet will fail
@@ -780,12 +780,12 @@ void shaping_packet_process(struct shaping_thread_ctx *ctx, marsio_buff_t *rx_bu
     if (!shaper_queue_empty(sf)) {//already have queueing pkt, enqueue directly
         s_rule = &sf->matched_rule_infos[0];
         if (0 == shaper_packet_enqueue(ctx, sf, rx_buff, &curr_time, meta)) {
-            shaper_stat_queueing_pkt_inc(stat, s_rule->id, 
+            shaper_stat_queueing_pkt_inc(stat, s_rule->vsys_id, s_rule->id, 
                                         s_rule->primary.id, s_rule->primary.priority, meta->dir, meta->raw_len,
                                         SHAPING_PROFILE_TYPE_PRIMARY, ctx->thread_index);
             shaper_global_stat_queueing_inc(ctx->global_stat, meta->raw_len);
         } else {
-            shaper_stat_drop_inc(stat, s_rule->id, s_rule->primary.id, s_rule->primary.priority, meta->dir, meta->raw_len, ctx->thread_index);
+            shaper_stat_drop_inc(stat, s_rule->vsys_id, s_rule->id, s_rule->primary.id, s_rule->primary.priority, meta->dir, meta->raw_len, ctx->thread_index);
             shaper_global_stat_drop_inc(ctx->global_stat, meta->raw_len);
             marsio_buff_free(marsio_info->instance, &rx_buff, 1, 0, ctx->thread_index);
         }

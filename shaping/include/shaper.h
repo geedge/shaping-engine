@@ -78,6 +78,7 @@ struct shaping_profile_info {
 };
 
 struct shaping_rule_info {
+    int vsys_id;
     int id;//rule_id
     struct shaping_profile_info primary;
     struct shaping_profile_info borrowing[SHAPING_REF_PROFILE_NUM_MAX];
