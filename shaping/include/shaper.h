@@ -1,10 +1,10 @@
-#ifndef _SHAPER_H
-#define _SHAPER_H
+#pragma once
 
 #include <sys/queue.h>
 #include <marsio.h>
 #include "uthash.h"
 #include "session_table.h"
+#include "utils.h"
 
 #define SHAPING_DIR_IN 0x1
 #define SHAPING_DIR_OUT 0x2
@@ -98,6 +98,19 @@ struct shaping_packet_wrapper {
 };
 TAILQ_HEAD(delay_queue, shaping_packet_wrapper);
 
+struct metadata
+{
+    uint64_t session_id;
+    char *raw_data;
+    int raw_len;
+    int dir;
+    int is_tcp_pure_ctrl;
+    int is_ctrl_pkt;
+    uint16_t l7_offset;       // only control packet set l7_offset
+    struct sids sids;
+    struct route_ctx route_ctx;
+};
+
 struct shaping_flow {
     struct addr_tuple4 tuple4;
     struct delay_queue packet_queue;
@@ -107,7 +120,7 @@ struct shaping_flow {
     int ref_count;
     unsigned int queue_len;
     unsigned int flag;
-    struct metadata *ctrl_meta;
+    struct metadata ctrl_meta;
 };
 
 struct shaper_flow_instance {
@@ -141,4 +154,3 @@ void shaping_packet_process(struct shaping_thread_ctx *ctx, marsio_buff_t *rx_bu
 
 struct shaping_ctx *shaping_engine_init();
 void shaping_engine_destroy(struct shaping_ctx *ctx);
-#endif

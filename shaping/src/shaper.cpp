@@ -113,9 +113,11 @@ static void shaping_node_free(struct shaping_node *s_node)
                 avl_tree_node_free(s_node->avl_node[i]);
             }
         }
-        if (s_node->shaping_flow.ctrl_meta) {
-            free(s_node->shaping_flow.ctrl_meta);
+
+        if (s_node->shaping_flow.ctrl_meta.raw_data) {
+            free(s_node->shaping_flow.ctrl_meta.raw_data);
         }
+
         free(s_node);
     }
 

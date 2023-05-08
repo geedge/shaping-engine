@@ -1,3 +1,5 @@
+#pragma once
+
 #include <marsio.h>
 #include "shaper.h"
 #include "utils.h"
@@ -25,19 +27,6 @@ struct shaping_marsio_info
     struct mr_vdev *mr_dev;
     struct mr_sendpath *mr_path;
     int rx_brust_max;
-};
-
-struct metadata
-{
-    uint64_t session_id;
-    char *raw_data;
-    int raw_len;
-    int dir;
-    int is_tcp_pure_ctrl;
-    int is_ctrl_pkt;
-    uint16_t l7_offset;       // only control packet set l7_offset
-    struct sids sids;
-    struct route_ctx route_ctx;
 };
 
 enum session_state
