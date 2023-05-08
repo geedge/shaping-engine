@@ -604,4 +604,24 @@ char * marsio_buff_mtod(marsio_buff_t * m)
 {
     return NULL;
 }
+
+int marsio_buff_malloc_global(struct mr_instance * instance, marsio_buff_t * marsio_buff[], unsigned int nr_mbufs, int socket_id, int thread_id)
+{
+    return 0;
+}
+
+char * marsio_buff_append(marsio_buff_t * m, uint16_t len)
+{
+    return NULL;
+}
+
+int marsio_buff_set_metadata(marsio_buff_t * m, enum mr_buff_metadata_type type, void * data, unsigned int sz_data)
+{
+    return 0;
+}
+
+int marsio_buff_set_sid_list(marsio_buff_t * m, sid_t * slist, uint8_t sz_slist)
+{
+    return 0;
+}
 /***************************************************/

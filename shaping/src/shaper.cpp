@@ -113,6 +113,11 @@ static void shaping_node_free(struct shaping_node *s_node)
                 avl_tree_node_free(s_node->avl_node[i]);
             }
         }
+
+        if (s_node->shaping_flow.ctrl_meta.raw_data) {
+            free(s_node->shaping_flow.ctrl_meta.raw_data);
+        }
+
         free(s_node);
     }
 
@@ -988,6 +993,12 @@ int shaper_global_conf_init(struct shaping_system_conf *conf)
         conf->cpu_affinity_mask |= 1 << cpu_mask[i];
     }
 
+    ret = MESA_load_profile_int_def(SHAPING_GLOBAL_CONF_FILE, "SYSTEM", "firewall_sids", &conf->firewall_sid, 1001);
+    if (ret < 0) {
+        LOG_ERROR("%s: shaping init global conf firewall_sids failed", LOG_TAG_SHAPING);
+        return ret;
+    }
+
 #if 0 //temporarily not support array config
     array_num = SHAPING_PRIORITY_NUM_MAX;
     ret = MESA_load_profile_int_array(SHAPING_GLOBAL_CONF_FILE, "SHAPING", "POLLING_NODE_NUM_MAX", &array_num, g_sp_conf.polling_node_num_max);
@@ -1138,6 +1149,7 @@ struct shaping_ctx *shaping_engine_init()
         ctx->thread_ctx[i].ref_ctx = ctx;
         ctx->thread_ctx[i].session_queue_len_max = conf.session_queue_len_max;
         memcpy(ctx->thread_ctx[i].polling_node_num_max, conf.polling_node_num_max, sizeof(conf.polling_node_num_max));
+        ctx->thread_ctx[i].firewall_sid = conf.firewall_sid;
     }
 
     return ctx;

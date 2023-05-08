@@ -1,6 +1,7 @@
 #include <MESA_prof_load.h>
 #include <MESA/MESA_handle_logger.h>
 #include <cjson/cJSON.h>
+#include <cstdlib>
 #include <marsio.h>
 #include "mpack.h"
 
@@ -156,6 +157,12 @@ int shaper_marsio_pkt_metadata_get(marsio_buff_t *rx_buff, struct metadata *meta
             LOG_ERROR("%s: shaping marsio get l7_offset failed from metadata", LOG_TAG_MARSIO);
             return -1;
         }
+
+        meta->route_ctx.len = marsio_buff_get_metadata(rx_buff, MR_BUFF_ROUTE_CTX, meta->route_ctx.data, sizeof(meta->route_ctx.data));
+        if (meta->route_ctx.len <= 0) {
+            LOG_ERROR("%s: shaping marsio get route_ctx failed from metadata", LOG_TAG_MARSIO);
+            return -1;
+        }
     }
 
     raw_packet_parser_init(raw_parser, meta->session_id, LAYER_TYPE_ALL, 8);
@@ -267,4 +274,20 @@ SUCCESS:
 ERROR:
     mpack_tree_destroy(&tree);
     return -1;
+}
+
+void shaper_marsio_metadata_deep_copy(struct metadata *dst, struct metadata *src)
+{
+    dst->session_id = src->session_id;
+    if (dst->raw_data) {
+        free(dst->raw_data);
+        dst->raw_data = NULL;
+    }
+    dst->raw_data = (char *)calloc(src->raw_len + 1, sizeof(char));
+    memcpy(dst->raw_data, src->raw_data, src->raw_len);
+    dst->raw_len = src->raw_len;
+    dst->l7_offset = src->l7_offset;
+    dst->is_ctrl_pkt = src->is_ctrl_pkt;
+
+    route_ctx_copy(&dst->route_ctx, &src->route_ctx);
 }

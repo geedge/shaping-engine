@@ -9,6 +9,15 @@ target_include_directories(gtest_shaper_maat PUBLIC ${CMAKE_SOURCE_DIR}/shaping/
 target_link_libraries(gtest_shaper_maat common shaper pthread gtest)
 
 ###############################################################################
+# gtest_shaper_maat
+###############################################################################
+
+add_executable(gtest_shaper_send_log gtest_shaper_send_log.cpp stub.cpp)
+target_include_directories(gtest_shaper_send_log PUBLIC ${CMAKE_SOURCE_DIR}/common/include)
+target_include_directories(gtest_shaper_send_log PUBLIC ${CMAKE_SOURCE_DIR}/shaping/include)
+target_link_libraries(gtest_shaper_send_log common shaper pthread gtest)
+
+###############################################################################
 # gtest_shaper
 ###############################################################################
 

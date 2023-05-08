@@ -53,6 +53,19 @@ void sids_write_once(struct sids *dst, struct sids *src);
 void sids_copy(struct sids *dst, struct sids *src);
 
 /******************************************************************************
+ * route_ctx
+ ******************************************************************************/
+
+struct route_ctx
+{
+    char data[64];
+    int len;
+};
+
+void route_ctx_write_once(struct route_ctx *dst, struct route_ctx *src);
+void route_ctx_copy(struct route_ctx *dst, struct route_ctx *src);
+
+/******************************************************************************
  * throughput_metrics
  ******************************************************************************/
 

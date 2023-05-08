@@ -8,6 +8,7 @@
 #include "shaper_stat.h"
 #include "shaper_global_stat.h"
 #include "shaper.h"
+#include "mpack.h"
 
 struct shaping_flow* shaper_session_opening(struct shaping_thread_ctx *ctx, struct metadata *meta, struct ctrl_pkt_data *ctrl_data, struct raw_pkt_parser *raw_parser)
 {
@@ -24,12 +25,115 @@ struct shaping_flow* shaper_session_opening(struct shaping_thread_ctx *ctx, stru
     sf = shaping_flow_new();
     raw_packet_parser_get_most_inner_tuple4(raw_parser, &sf->tuple4);
     //shaper_rules_update(ctx, sf, ctrl_data->shaping_rule_ids, ctrl_data->shaping_rule_num);
+    shaper_marsio_metadata_deep_copy(&sf->ctrl_meta, meta);
 
     session_table_insert(ctx->session_table, meta->session_id, &sf->tuple4, sf, NULL);
 
     shaper_global_stat_curr_session_inc(ctx->global_stat);
 
     return sf;
+}
+
+void shaper_session_log_prepare(struct shaping_flow *sf, char **mpack_data, size_t *mpack_size)
+{
+    mpack_writer_t writer;
+    struct shaping_rule_info *rule_info;
+
+	mpack_writer_init_growable(&writer, mpack_data, mpack_size);
+	mpack_build_map(&writer);
+
+    //tsync
+	mpack_write_cstr(&writer, "tsync");
+	mpack_write_cstr(&writer, "2.0");
+
+	//session_id
+	mpack_write_cstr(&writer, "session_id");
+	mpack_write_u64(&writer, sf->ctrl_meta.session_id);
+
+	//state
+	mpack_write_cstr(&writer, "state");
+	mpack_write_cstr(&writer, "active");
+
+    //method
+	mpack_write_cstr(&writer, "method");
+	mpack_write_cstr(&writer, "log_update");
+
+    //params
+	mpack_write_cstr(&writer, "params");
+	mpack_build_map(&writer);
+	mpack_write_cstr(&writer, "shaper");
+	mpack_build_array(&writer);
+    for (int i = 0; i < sf->rule_num; i++) {
+        rule_info = &sf->matched_rule_infos[i];
+
+        mpack_build_map(&writer);
+        mpack_write_cstr(&writer, "rule_id");
+        mpack_write_i64(&writer, rule_info->id);
+        mpack_write_cstr(&writer, "profile_ids");
+        mpack_build_array(&writer);
+        mpack_write_i64(&writer, rule_info->primary.id);
+        for (int j = 0; j < rule_info->borrowing_num; j++) {
+            mpack_write_i64(&writer, rule_info->borrowing[j].id);
+        }
+        mpack_complete_array(&writer);//end build array for profile_ids
+        mpack_complete_map(&writer);
+    }
+    mpack_complete_array(&writer);//end build array for shaper
+    mpack_complete_map(&writer);//end build map for params
+    mpack_complete_map(&writer);//end build map at the beginning
+
+    mpack_writer_destroy(&writer);
+    return;
+}
+
+static void shaper_session_log_send(struct shaping_thread_ctx *ctx, struct shaping_flow *sf)
+{
+    char *mpack_data = NULL;
+    size_t mpack_size = 0;
+
+    shaper_session_log_prepare(sf, &mpack_data, &mpack_size);
+
+    marsio_buff_t *tx_buff;
+    char *pkt_header_data = sf->ctrl_meta.raw_data;
+    int pkt_header_len = sf->ctrl_meta.l7_offset;
+    struct metadata *ctrl_meta = &sf->ctrl_meta;
+    struct sids sids;
+
+    marsio_buff_malloc_global(ctx->marsio_info->instance, &tx_buff, 1, 0, ctx->thread_index);
+    char *dst = marsio_buff_append(tx_buff, pkt_header_len + mpack_size);
+    memcpy(dst, pkt_header_data, pkt_header_len);
+    memcpy(dst + pkt_header_len, mpack_data, mpack_size);
+
+    if (marsio_buff_set_metadata(tx_buff, MR_BUFF_SESSION_ID, &ctrl_meta->session_id, sizeof(ctrl_meta->session_id)) != 0) {
+        LOG_ERROR("%s: marsio_buff_set_metadata MR_BUFF_SESSION_ID failed for session %s", LOG_TAG_SHAPING, addr_tuple4_to_str(&sf->tuple4));
+        goto END;
+    }
+
+    if (marsio_buff_set_metadata(tx_buff, MR_BUFF_PAYLOAD_OFFSET, &pkt_header_len, sizeof(pkt_header_len)) != 0) {
+        LOG_ERROR("%s: marsio_buff_set_metadata MR_BUFF_PAYLOAD_OFFSET failed for session %s", LOG_TAG_SHAPING, addr_tuple4_to_str(&sf->tuple4));
+        goto END;
+    }
+
+    sids.elems[0] = ctx->firewall_sid;
+    sids.num = 1;
+    if (marsio_buff_set_sid_list(tx_buff, sids.elems, sids.num) != 0) {
+        LOG_ERROR("%s: marsio_buff_set_sid_list failed for session %s", LOG_TAG_SHAPING, addr_tuple4_to_str(&sf->tuple4));
+        goto END;
+    }
+
+    if (marsio_buff_set_metadata(tx_buff, MR_BUFF_ROUTE_CTX, ctrl_meta->route_ctx.data, ctrl_meta->route_ctx.len) != 0) {
+        LOG_ERROR("%s: marsio_buff_set_metadata MR_BUFF_ROUTE_CTX failed for session %s", LOG_TAG_SHAPING, addr_tuple4_to_str(&sf->tuple4));
+        goto END;
+    }
+
+    marsio_send_burst(ctx->marsio_info->mr_path, ctx->thread_index, &tx_buff, 1);
+    shaper_global_stat_session_log_send_num_inc(ctx->global_stat);
+
+END:
+    if (mpack_data) {
+        free(mpack_data);
+    }
+    return;
 }
 
 struct shaping_flow* shaper_session_close(struct shaping_thread_ctx *ctx, struct metadata *meta)
@@ -44,8 +148,8 @@ struct shaping_flow* shaper_session_close(struct shaping_thread_ctx *ctx, struct
 
     sf = (struct shaping_flow *)session_node->val_data;
     sf->flag |= STREAM_CLOSE;
-    session_table_delete_by_id(ctx->session_table, meta->session_id);
 
+    session_table_delete_by_id(ctx->session_table, meta->session_id);
     shaper_global_stat_curr_session_dec(ctx->global_stat);
 
     return sf;
@@ -64,6 +168,7 @@ struct shaping_flow* shaper_session_active(struct shaping_thread_ctx *ctx, struc
     }
     
     shaper_rules_update(ctx, sf, ctrl_data->shaping_rule_ids, ctrl_data->shaping_rule_num);
+    shaper_session_log_send(ctx, sf);//send log of rules and profiles when receive new matched rules
 
     return sf;
 }

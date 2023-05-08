@@ -123,6 +123,27 @@ void sids_copy(struct sids *dst, struct sids *src)
 }
 
 /******************************************************************************
+ * route_ctx
+ ******************************************************************************/
+
+void route_ctx_write_once(struct route_ctx *dst, struct route_ctx *src)
+{
+    if (dst && src)
+    {
+        if (dst->len == 0)
+        {
+            route_ctx_copy(dst, src);
+        }
+    }
+}
+
+void route_ctx_copy(struct route_ctx *dst, struct route_ctx *src)
+{
+    memcpy(dst->data, src->data, src->len);
+    dst->len = src->len;
+}
+
+/******************************************************************************
  * throughput_metrics
  ******************************************************************************/
 
