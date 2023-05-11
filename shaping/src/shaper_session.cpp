@@ -58,6 +58,7 @@ void shaper_session_log_prepare(struct shaping_flow *sf, char **mpack_data, size
 	mpack_write_cstr(&writer, "method");
 	mpack_write_cstr(&writer, "log_update");
 
+    LOG_DEBUG("%s: shaper send log to sapp for session %s", LOG_TAG_SHAPING, addr_tuple4_to_str(&sf->tuple4));
     //params
 	mpack_write_cstr(&writer, "params");
 	mpack_build_map(&writer);
@@ -69,11 +70,16 @@ void shaper_session_log_prepare(struct shaping_flow *sf, char **mpack_data, size
         mpack_build_map(&writer);
         mpack_write_cstr(&writer, "rule_id");
         mpack_write_i64(&writer, rule_info->id);
+        LOG_DEBUG("%s: rule id %d", LOG_TAG_SHAPING, rule_info->id);
+
         mpack_write_cstr(&writer, "profile_ids");
         mpack_build_array(&writer);
         mpack_write_i64(&writer, rule_info->primary.id);
+        LOG_DEBUG("%s: primary_profile id %d", LOG_TAG_SHAPING, rule_info->primary.id);
+
         for (int j = 0; j < rule_info->borrowing_num; j++) {
             mpack_write_i64(&writer, rule_info->borrowing[j].id);
+            LOG_DEBUG("%s: borrow_profile id %d", LOG_TAG_SHAPING, rule_info->borrowing[j].id);
         }
         mpack_complete_array(&writer);//end build array for profile_ids
         mpack_complete_map(&writer);
