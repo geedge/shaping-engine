@@ -58,7 +58,7 @@ void shaper_session_log_prepare(struct shaping_flow *sf, char **mpack_data, size
 	mpack_write_cstr(&writer, "method");
 	mpack_write_cstr(&writer, "log_update");
 
-    LOG_DEBUG("%s: shaper send log to sapp for session %s", LOG_TAG_SHAPING, addr_tuple4_to_str(&sf->tuple4));
+    LOG_DEBUG("%s: shaper prepare log to sapp for session %s, id %lu", LOG_TAG_SHAPING, addr_tuple4_to_str(&sf->tuple4), sf->ctrl_meta.session_id);
     //params
 	mpack_write_cstr(&writer, "params");
 	mpack_build_map(&writer);
@@ -89,6 +89,8 @@ void shaper_session_log_prepare(struct shaping_flow *sf, char **mpack_data, size
     mpack_complete_map(&writer);//end build map at the beginning
 
     mpack_writer_destroy(&writer);
+
+    LOG_DEBUG("%s: log length is %lu", LOG_TAG_SHAPING, *mpack_size);
     return;
 }
 
@@ -106,6 +108,7 @@ static void shaper_session_log_send(struct shaping_thread_ctx *ctx, struct shapi
     struct sids sids;
 
     marsio_buff_malloc_global(ctx->marsio_info->instance, &tx_buff, 1, 0, ctx->thread_index);
+    marsio_buff_set_ctrlbuf(tx_buff);
     char *dst = marsio_buff_append(tx_buff, pkt_header_len + mpack_size);
     memcpy(dst, pkt_header_data, pkt_header_len);
     memcpy(dst + pkt_header_len, mpack_data, mpack_size);

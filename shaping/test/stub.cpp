@@ -562,6 +562,11 @@ int marsio_send_burst(struct mr_sendpath * sendpath, queue_id_t qid, marsio_buff
 
 }
 
+void marsio_buff_set_ctrlbuf(marsio_buff_t * m)
+{
+    return;
+}
+
 void marsio_buff_free(struct mr_instance * instance, marsio_buff_t * marsio_buff[], unsigned int nr_mbufs, int socket_id, int thread_id)
 {
     assert(nr_mbufs == 1);
