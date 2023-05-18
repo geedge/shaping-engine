@@ -52,3 +52,8 @@ void stub_shaper_stat_send(int thread_seq);
 
 void polling_entry(struct shaper *sp, struct shaping_stat *stat, struct shaping_thread_ctx *ctx);
 /*******************temporary for test******************************/
+
+
+/************************temp invoke fieldstat api, to avoid memory leak for self test*********************************/
+void fieldstat_global_disable_prometheus_endpoint();
+/**********************************************************************************************************************/

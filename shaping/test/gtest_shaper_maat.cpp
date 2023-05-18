@@ -1,6 +1,7 @@
 #include <cstring>
 #include <gtest/gtest.h>
 
+#include "shaper.h"
 #include "stub.h"
 #include "shaper_maat.h"
 
@@ -81,7 +82,9 @@ TEST(shaping_flow, update_rule)
     ctx.maat_info = (struct shaping_maat_info *)calloc(1, sizeof(struct shaping_maat_info));
     ctx.maat_info->rule_table_id = STUB_MAAT_SHAPING_RULE_TABLE_ID;
     ctx.maat_info->profile_table_id = STUB_MAAT_SHAPING_PROFILE_TABLE_ID;
+
     memset(&sf, 0, sizeof(sf));
+    sf.priority = SHAPING_PRIORITY_NUM_MAX;
     shaper_rules_update(&ctx, &sf, rule_ids, 3);
 
     EXPECT_EQ(sf.rule_num, 3);
@@ -95,20 +98,20 @@ TEST(shaping_flow, update_rule)
     rule_info = &sf.matched_rule_infos[1];
     EXPECT_EQ(rule_info->id, 2);
     EXPECT_EQ(rule_info->primary.id, 2);
-    EXPECT_EQ(rule_info->primary.priority, 2);
+    EXPECT_EQ(rule_info->primary.priority, 1);
     EXPECT_EQ(rule_info->borrowing_num, 1);
     EXPECT_EQ(rule_info->borrowing[0].id, 3);
-    EXPECT_EQ(rule_info->borrowing[0].priority, 3);
+    EXPECT_EQ(rule_info->borrowing[0].priority, 2);
 
     rule_info = &sf.matched_rule_infos[2];
     EXPECT_EQ(rule_info->id, 3);
     EXPECT_EQ(rule_info->primary.id, 4);
-    EXPECT_EQ(rule_info->primary.priority, 3);
+    EXPECT_EQ(rule_info->primary.priority, 1);
     EXPECT_EQ(rule_info->borrowing_num, 2);
     EXPECT_EQ(rule_info->borrowing[0].id, 5);
-    EXPECT_EQ(rule_info->borrowing[0].priority, 4);
+    EXPECT_EQ(rule_info->borrowing[0].priority, 2);
     EXPECT_EQ(rule_info->borrowing[1].id, 6);
-    EXPECT_EQ(rule_info->borrowing[1].priority, 5);
+    EXPECT_EQ(rule_info->borrowing[1].priority, 3);
 
     free(ctx.maat_info);
 }

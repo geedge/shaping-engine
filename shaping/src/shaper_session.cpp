@@ -201,7 +201,7 @@ void shaper_session_data_free_cb(void *session_data, void *data)
 
     if (sf) {
         shaper_queue_clear(sf, ctx);
-        shaping_flow_free(sf);
+        shaping_flow_free(ctx, sf);
     }
 
     shaper_global_stat_curr_session_dec(ctx->global_stat);

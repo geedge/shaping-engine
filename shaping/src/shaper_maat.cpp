@@ -9,6 +9,7 @@
 
 #include "log.h"
 #include "shaper_maat.h"
+#include "shaper_stat.h"
 #include "utils.h"
 
 #define SHAPING_STREAM_TIMEOUT 3600
@@ -250,17 +251,16 @@ void shaper_profile_ex_free(int table_id, void **ad, long argl, void *argp)
     return;
 }
 
-void shaper_profile_update(struct shaping_profile_info *s_pf_info, struct shaping_profile *s_pf_ex, int priority)
+void shaper_profile_update(struct shaping_profile_info *s_pf_info, struct shaping_profile *s_pf_ex)
 {
     s_pf_info->id = s_pf_ex->id;
-    s_pf_info->priority = priority;
 
     shaper_profile_ex_free(0, (void **)&s_pf_ex, 0, NULL);
 
     return;
 }
 
-static void shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_rule_info *s_rule_info, long long rule_compile_id)
+static void shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, struct shaping_rule_info *s_rule_info, long long rule_compile_id, int *priority_changed)
 {
     struct shaping_rule *s_rule = NULL;
     struct shaping_profile *s_pf = NULL;
@@ -280,7 +280,14 @@ static void shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_ru
         LOG_ERROR("%s maat_plugin_table_get_ex_data get profile failed for key %s", LOG_TAG_MAAT, pf_id_key);
         goto END;
     }
-    shaper_profile_update(&s_rule_info->primary, s_pf, s_rule->priority);
+    shaper_profile_update(&s_rule_info->primary, s_pf);
+    
+    if (sf->forwarded_pkts <= CONFIRM_PRIORITY_PKTS) {
+        if (sf->priority > s_rule->priority) {
+            sf->priority = s_rule->priority;
+            *priority_changed = 1;
+        }
+    }
 
     if (s_rule->borrow_pf_num == 0) {
         goto END;
@@ -294,11 +301,7 @@ static void shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_ru
             goto END;
         }
 
-        if (s_rule->priority + i + 1 < SHAPING_PRIORITY_NUM_MAX) {
-            shaper_profile_update(&s_rule_info->borrowing[i], s_pf, s_rule->priority + i + 1);
-        } else {
-            shaper_profile_update(&s_rule_info->borrowing[i], s_pf, SHAPING_PRIORITY_NUM_MAX - 1);
-        }
+        shaper_profile_update(&s_rule_info->borrowing[i], s_pf);
         s_rule_info->borrowing_num++;
     }
 
@@ -309,9 +312,23 @@ END:
     return;
 }
 
+static void shaper_profiles_priority_update(struct shaping_flow *sf)
+{
+    for (int i = 0; i < sf->rule_num; i++) {
+        sf->matched_rule_infos[i].primary.priority = sf->priority;
+
+        for (int j = 0; j < sf->matched_rule_infos[i].borrowing_num; j++) {
+            sf->matched_rule_infos[i].borrowing[j].priority = MIN(sf->priority + j + 1, SHAPING_PRIORITY_NUM_MAX - 1);
+        }
+    }
+
+    return;
+}
+
 void shaper_rules_update(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, long long *rule_compile_ids, int rule_num)
 {
     int i, j;
+    int priority_changed = 0;
 
     if (sf->rule_num + rule_num > SHAPING_RULE_NUM_MAX) {
         LOG_ERROR("%s: shaping exceed maat rule num limit %d for flow: %s", LOG_TAG_MAAT, SHAPING_RULE_NUM_MAX, addr_tuple4_to_str(&sf->tuple4));
@@ -319,9 +336,15 @@ void shaper_rules_update(struct shaping_thread_ctx *ctx, struct shaping_flow *sf
     }
 
     for (i = sf->rule_num, j = 0; i < sf->rule_num + rule_num; i++, j++) {
-        shaper_rule_update(ctx, &sf->matched_rule_infos[i], rule_compile_ids[j]);
+        shaper_rule_update(ctx, sf, &sf->matched_rule_infos[i], rule_compile_ids[j], &priority_changed);
     }
-    sf->rule_num += rule_num;
+
+    if (sf->rule_num > 0 && priority_changed) {
+        shaper_stat_refresh(ctx->stat, sf, ctx->thread_index, 1);
+    }
+
+    sf->rule_num += rule_num;  
+    shaper_profiles_priority_update(sf);
 
     return;
 }
