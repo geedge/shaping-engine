@@ -258,6 +258,7 @@ int shaper_flow_push(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, un
     if (0 == avl_tree_node_insert(sp->priority_trees[priority], s_node->avl_node[priority])) {
         ret = 0;
         swarmkv_async_command(ctx->swarmkv_db, swarmkv_reply_cb_do_nothing, NULL, "HINCRBY tsg-shaping-%d priority-%d 1", s_rule_info->primary.id, priority);
+
         shaper_stat_queueing_pkt_inc(ctx->stat, s_rule_info->vsys_id, s_rule_info->id, s_rule_info->primary.id, 
                                     priority, pkt_wrapper->direction, pkt_wrapper->length, SHAPING_PROFILE_TYPE_PRIMARY, ctx->thread_index);
         shaper_stat_queueing_session_inc(ctx->stat, s_rule_info->vsys_id, s_rule_info->id, s_rule_info->primary.id, priority, SHAPING_PROFILE_TYPE_PRIMARY, ctx->thread_index);
@@ -480,9 +481,13 @@ static void shaper_queue_len_get_cb(const struct swarmkv_reply *reply, void * cb
     }
 
     for (unsigned int i = 0; i < reply->n_element; i++) {
-        if (reply->elements[i] && reply->elements[i]->integer > 0) {
-            s_pf_info->is_priority_blocked = 1;
-            break;
+        if (reply->elements[i]->type == SWARMKV_REPLY_STRING) {
+            char tmp_str[32] = {0};
+            memcpy(tmp_str, reply->elements[i]->str, reply->elements[i]->len);
+            if (strtoll(tmp_str, NULL, 10) > 0) {
+                s_pf_info->is_priority_blocked = 1;
+                break;
+            }
         }
     }
 
