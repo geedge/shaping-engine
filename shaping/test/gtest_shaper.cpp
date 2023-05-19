@@ -1310,6 +1310,10 @@ TEST(two_session_diff_priority_same_profile, two_thread_udp_tx_in_order)
     }
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
+    stub_refresh_token_bucket(0);
+    polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 1));//优先级高的session发出一个报文，将优先级信息更新到swarmkv中
+
     for (int i = 0; i < 10; i++) {//线程1中的session优先级为2，被线程0中优先级为1的session阻断
         stub_refresh_token_bucket(0);
         polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);
