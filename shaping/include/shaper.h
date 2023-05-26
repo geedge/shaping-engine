@@ -5,6 +5,7 @@
 #include "uthash.h"
 #include "session_table.h"
 #include "utils.h"
+#include "shaper_stat.h"
 
 #define SHAPING_DIR_IN 0x1
 #define SHAPING_DIR_OUT 0x2
@@ -13,7 +14,11 @@
 #define SHAPING_REF_PROFILE_NUM_MAX 8
 #define SHAPING_PRIORITY_NUM_MAX 10
 #define SHAPER_FLOW_POP_NUM_MAX 10
-#define STREAM_CLOSE 0x1
+
+#define SESSION_CLOSE 0x1
+#define SESSION_UPDATE_PF_PRIO_LEN 0x2
+
+#define CONFIRM_PRIORITY_PKTS 20
 
 #define SHAPING_WROK_THREAD_NUM_MAX 128
 
@@ -77,6 +82,7 @@ struct shaping_profile_info {
     unsigned long long enqueue_time_us;//to calculate max latency
     unsigned char is_priority_blocked;
     unsigned char is_invalid;
+    struct shaping_stat_for_profile stat;
 };
 
 struct shaping_rule_info {
@@ -115,12 +121,15 @@ struct shaping_flow {
     struct addr_tuple4 tuple4;
     struct delay_queue packet_queue;
     struct shaping_rule_info matched_rule_infos[SHAPING_RULE_NUM_MAX];
+    int priority;
     int rule_num;
     int anchor;//rule_idx
     int ref_count;
     unsigned int queue_len;
     unsigned int flag;
     struct metadata ctrl_meta;
+    unsigned long long processed_pkts;
+    struct timespec stat_update_time;
 };
 
 struct shaper_flow_instance {
@@ -131,7 +140,7 @@ struct shaper_flow_instance {
 struct shaper;//instance of shaping, thread unsafe
 
 struct shaping_flow* shaping_flow_new();
-void shaping_flow_free(struct shaping_flow *sf);
+void shaping_flow_free(struct shaping_thread_ctx *ctx, struct shaping_flow *sf);
 struct shaper* shaper_new(unsigned int priority_queue_len_max);
 void shaper_free(struct shaper *sp);
 

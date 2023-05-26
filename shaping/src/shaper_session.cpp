@@ -156,7 +156,7 @@ struct shaping_flow* shaper_session_close(struct shaping_thread_ctx *ctx, struct
     }
 
     sf = (struct shaping_flow *)session_node->val_data;
-    sf->flag |= STREAM_CLOSE;
+    sf->flag |= SESSION_CLOSE;
 
     session_table_delete_by_id(ctx->session_table, meta->session_id);
     shaper_global_stat_curr_session_dec(ctx->global_stat);
@@ -201,7 +201,7 @@ void shaper_session_data_free_cb(void *session_data, void *data)
 
     if (sf) {
         shaper_queue_clear(sf, ctx);
-        shaping_flow_free(sf);
+        shaping_flow_free(ctx, sf);
     }
 
     shaper_global_stat_curr_session_dec(ctx->global_stat);

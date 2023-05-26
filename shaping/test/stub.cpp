@@ -105,6 +105,13 @@ void stub_refresh_token_bucket(int profile_id)
 void stub_set_async_token_get_times(int profile_id, int times)
 {
     pf_async_times[profile_id] = times;
+    
+    if (pf_async_times[profile_id] == 0) {
+        for (unsigned int i = 0; i < pf_async_thread[profile_id].size(); i++) {
+            stub_get_token_thread_func(&pf_async_thread[profile_id][i]);
+        }
+        pf_async_thread[profile_id].clear();
+    }
 
     return;
 }
