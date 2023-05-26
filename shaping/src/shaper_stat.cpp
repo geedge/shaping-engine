@@ -210,7 +210,7 @@ void shaper_stat_refresh(struct shaping_stat *stat, struct shaping_flow *sf, int
         return;
     }
 
-    int need_update_guage = sf->forwarded_pkts > CONFIRM_PRIORITY_PKTS ? 1 : 0;
+    int need_update_guage = sf->processed_pkts > CONFIRM_PRIORITY_PKTS ? 1 : 0;
 
     for (int i = 0; i < sf->rule_num; i++) {
         rule = &sf->matched_rule_infos[i];

@@ -128,7 +128,7 @@ struct shaping_flow {
     unsigned int queue_len;
     unsigned int flag;
     struct metadata ctrl_meta;
-    unsigned long long forwarded_pkts;
+    unsigned long long processed_pkts;
     struct timespec stat_update_time;
 };
 

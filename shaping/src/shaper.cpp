@@ -254,7 +254,7 @@ int shaper_flow_push(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, un
     assert(pkt_wrapper != NULL);
 
     if ((sf->flag & SESSION_UPDATE_PF_PRIO_LEN) == 0) {
-        if (sf->forwarded_pkts > CONFIRM_PRIORITY_PKTS) {
+        if (sf->processed_pkts > CONFIRM_PRIORITY_PKTS) {
             sf->flag |= SESSION_UPDATE_PF_PRIO_LEN;
         }
     }
@@ -774,7 +774,7 @@ void shaping_packet_process(struct shaping_thread_ctx *ctx, marsio_buff_t *rx_bu
     struct shaping_marsio_info *marsio_info = ctx->marsio_info;
     struct timespec curr_time;
 
-    sf->forwarded_pkts++;
+    sf->processed_pkts++;
     
     if (meta->is_tcp_pure_ctrl) {
         marsio_send_burst(marsio_info->mr_path, ctx->thread_index, &rx_buff, 1);

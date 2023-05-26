@@ -282,7 +282,7 @@ static void shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_fl
     }
     shaper_profile_update(&s_rule_info->primary, s_pf);
     
-    if (sf->forwarded_pkts <= CONFIRM_PRIORITY_PKTS) {
+    if (sf->processed_pkts <= CONFIRM_PRIORITY_PKTS) {
         if (sf->priority > s_rule->priority) {
             sf->priority = s_rule->priority;
             *priority_changed = 1;
