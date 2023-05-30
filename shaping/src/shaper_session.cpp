@@ -1,3 +1,4 @@
+#include "addr_tuple4.h"
 #include "session_table.h"
 #include "raw_packet.h"
 #include "utils.h"
@@ -18,12 +19,22 @@ struct shaping_flow* shaper_session_opening(struct shaping_thread_ctx *ctx, stru
     node  = session_table_search_by_id(ctx->session_table, meta->session_id);
     if (node) {
         sf = (struct shaping_flow *)node->val_data;
-        LOG_ERROR("%s: session id %lu for %s has already exist", LOG_TAG_SHAPING, meta->session_id, addr_tuple4_to_str(&sf->tuple4));
+
+        char *addr_str = addr_tuple4_to_str(&sf->tuple4);
+        LOG_ERROR("%s: session id %lu for %s has already exist", LOG_TAG_SHAPING, meta->session_id, addr_str);
+
+        if (addr_str) {
+            free(addr_str);
+        }
+
         return NULL;
     }
 
     sf = shaping_flow_new();
     raw_packet_parser_get_most_inner_tuple4(raw_parser, &sf->tuple4);
+    sf->src_ip_str = addr_src_ip_to_str(&sf->tuple4);
+    sf->src_ip_str_len = strlen(sf->src_ip_str);
+
     //shaper_rules_update(ctx, sf, ctrl_data->shaping_rule_ids, ctrl_data->shaping_rule_num);
     shaper_marsio_metadata_deep_copy(&sf->ctrl_meta, meta);
 

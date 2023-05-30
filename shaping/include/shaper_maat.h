@@ -18,8 +18,7 @@ struct shaping_rule {
 
 struct shaping_profile {
     int id;
-    int split;
-    int host_fairness;
+    enum shaping_profile_type type;
     int in_limit_bandwidth;
     int out_limit_bandwidth;
     int valid;

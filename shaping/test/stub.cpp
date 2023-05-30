@@ -14,6 +14,7 @@
 #include <assert.h>
 #include <pthread.h>
 #include "stub.h"
+#include "shaper_maat.h"
 
 using namespace std;
 
@@ -21,27 +22,6 @@ using namespace std;
 #define MAX_STUB_TEST_SESSION_NUM 2
 #define MAX_STUB_RULE_NUM 8
 #define MAX_STUB_PROFILE_NUM 8
-
-struct shaping_rule {
-    int vsys_id;
-    int id;
-    int priority;
-    int primary_pf_id;
-    int borrow_pf_id_array[MAX_STUB_PROFILE_NUM];
-    int borrow_pf_num;
-    int fair_factor;
-    int ref_cnt;
-};
-
-struct shaping_profile {
-    int id;
-    int split;
-    int host_fairness;
-    int in_limit_bandwidth;
-    int out_limit_bandwidth;
-    int valid;
-    int ref_cnt;
-};
 
 struct stub_matched_rules {
     struct shaping_rule rules[MAX_STUB_RULE_NUM];

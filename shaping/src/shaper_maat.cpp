@@ -8,6 +8,7 @@
 #include <MESA/MESA_handle_logger.h>
 
 #include "log.h"
+#include "shaper.h"
 #include "shaper_maat.h"
 #include "shaper_stat.h"
 #include "utils.h"
@@ -154,7 +155,8 @@ void shaper_profile_ex_new(const char *table_name, int table_id, const char *key
     cJSON *json=NULL;
     cJSON *tmp_array_obj = NULL;
     cJSON *tmp_obj = NULL;
-    char split_by[64] = {0};
+    char profile_type[64] = {0};
+    char type_arg[64] = {0};
     char limits[128] = {0};
     char aqm_options[64] = {0};
     char dscp_marking[64] = {0};
@@ -170,17 +172,41 @@ void shaper_profile_ex_new(const char *table_name, int table_id, const char *key
     s_pf = (struct shaping_profile*)calloc(1, sizeof(struct shaping_profile));
     s_pf->ref_cnt = 1;
 
-    ret = sscanf(table_line, "%d\t%63s\t%127s\t%63s\t%63s\t%63s\t%d",
-            &s_pf->id, split_by, limits, aqm_options, dscp_marking, volume_based_shaping, &s_pf->valid);
-    if (ret != 7) {
+    ret = sscanf(table_line, "%d\t%63s\t%63s\t%127s\t%63s\t%63s\t%63s\t%d",
+            &s_pf->id, profile_type, type_arg, limits, aqm_options, dscp_marking, volume_based_shaping, &s_pf->valid);
+    if (ret != 8) {
         LOG_ERROR("%s: sscanf parse failed for profile line %s", LOG_TAG_MAAT, table_line);
         goto END;
     }
+
+    if (strcmp(profile_type, "generic") == 0) {
+        s_pf->type = PROFILE_TYPE_GENERIC;
+    } else if (strcmp(profile_type, "fair_share") == 0) {
+        if (strcmp(type_arg, "host_fairness") == 0) {
+            s_pf->type = PROFILE_TYPE_HOST_FARINESS;
+        } else if (strcmp(type_arg, "max_min_host_fairness") == 0) {
+            s_pf->type = PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS;
+        } else {
+            LOG_ERROR("%s: profile type argument wrong for profile line %s", LOG_TAG_MAAT, table_line);
+            goto END;
+        }
+    } else if (strcmp(profile_type, "split_by") == 0) {
+        if (strcmp(type_arg, "local_host") == 0) {
+            s_pf->type = PROFILE_TYPE_SPLIT_BY_LOCAL_HOST;
+        } else {
+            LOG_ERROR("%s: profile type argument wrong for profile line %s", LOG_TAG_MAAT, table_line);
+            goto END;
+        }
+    } else {
+        LOG_ERROR("%s: profile type wrong for profile line %s", LOG_TAG_MAAT, table_line);
+        goto END;
+    }
+
     
     //parse limits of profile
     json = cJSON_Parse(limits);
     if (!json) {
-        LOG_ERROR("%s: json parse profile failed for profile id %d, line %s", LOG_TAG_MAAT, s_pf->id, table_line);
+        LOG_ERROR("%s: json parse profile limits failed for profile id %d, line %s", LOG_TAG_MAAT, s_pf->id, table_line);
         goto END;
     }
 
@@ -205,12 +231,6 @@ void shaper_profile_ex_new(const char *table_name, int table_id, const char *key
             s_pf->out_limit_bandwidth = limit_bandwidth;
         }
     }
-
-    cJSON_Delete(json);
-    json = NULL;
-
-
-    //TODO:parse other argumens of profile
 
 END:
     *ad = s_pf;
@@ -254,6 +274,7 @@ void shaper_profile_ex_free(int table_id, void **ad, long argl, void *argp)
 void shaper_profile_update(struct shaping_profile_info *s_pf_info, struct shaping_profile *s_pf_ex)
 {
     s_pf_info->id = s_pf_ex->id;
+    s_pf_info->type = s_pf_ex->type;
 
     shaper_profile_ex_free(0, (void **)&s_pf_ex, 0, NULL);
 
@@ -272,6 +293,7 @@ static void shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_fl
         goto END;
     }
     s_rule_info->id = s_rule->id;
+    s_rule_info->fair_factor = s_rule->fair_factor;
     s_rule_info->vsys_id = s_rule->vsys_id;
 
     snprintf(pf_id_key, sizeof(pf_id_key), "%d", s_rule->primary_pf_id);
@@ -331,7 +353,11 @@ void shaper_rules_update(struct shaping_thread_ctx *ctx, struct shaping_flow *sf
     int priority_changed = 0;
 
     if (sf->rule_num + rule_num > SHAPING_RULE_NUM_MAX) {
-        LOG_ERROR("%s: shaping exceed maat rule num limit %d for flow: %s", LOG_TAG_MAAT, SHAPING_RULE_NUM_MAX, addr_tuple4_to_str(&sf->tuple4));
+        char *addr_str = addr_tuple4_to_str(&sf->tuple4);
+        LOG_ERROR("%s: shaping exceed maat rule num limit %d for flow: %s", LOG_TAG_MAAT, SHAPING_RULE_NUM_MAX, addr_str);
+        if (addr_str) {
+            free(addr_str);
+        }
         return;
     }
 
