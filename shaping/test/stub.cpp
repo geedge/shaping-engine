@@ -294,11 +294,15 @@ static void swarmkv_hincrby_cmd_func(char *cmd_str, swarmkv_on_reply_callback_t 
     int profile_id;
     int priority;
     int value;
+    struct swarmkv_reply *reply = (struct swarmkv_reply*)calloc(1, sizeof(struct swarmkv_reply));
 
     sscanf(cmd_str, "HINCRBY tsg-shaping-%d priority-%d %d", &profile_id, &priority, &value);
     profile_priority_len[profile_id][priority] += value;
 
-    cb(NULL, cb_arg);
+    reply->type = SWARMKV_REPLY_INTEGER;
+    cb(reply, cb_arg);
+
+    free(reply);
 
     return;
 }
@@ -320,14 +324,20 @@ static void swarmkv_hmget_cmd_func(char *cmd_str, swarmkv_on_reply_callback_t * 
     reply->elements = (struct swarmkv_reply**)calloc(priority_num, sizeof(struct swarmkv_reply*));
     for (int i = 0; i < priority_num; i++) {
         reply->elements[i] = (struct swarmkv_reply*)calloc(1, sizeof(struct swarmkv_reply));
-        reply->elements[i]->type = SWARMKV_REPLY_INTEGER;
-        reply->elements[i]->integer = profile_priority_len[profile_id][priority[i]];
+        reply->elements[i]->type = SWARMKV_REPLY_STRING;
+
+        char tmp_str[128] = {0};
+        sprintf(tmp_str, "%d", profile_priority_len[profile_id][priority[i]]);
+        reply->elements[i]->str = (char *)calloc(1, strlen(tmp_str));
+        memcpy(reply->elements[i]->str, tmp_str, strlen(tmp_str));
+        reply->elements[i]->len = strlen(tmp_str);
     }
 
     cb(reply, cb_arg);
 
     for(unsigned int i = 0; i < reply->n_element; i++) {
         if (reply->elements[i]) {
+            free(reply->elements[i]->str);
             free(reply->elements[i]);
         }
     }

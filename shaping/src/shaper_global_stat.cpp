@@ -8,13 +8,17 @@
 #include "shaper.h"
 #include "shaper_global_stat.h"
 
-static int shaper_global_stat_conf_load(struct shaping_global_stat *stat)
+struct shaping_global_stat_conf {
+    int is_self_test;
+};
+
+static int shaper_global_stat_conf_load(struct shaping_global_stat *stat, struct shaping_global_stat_conf *conf)
 {
     MESA_load_profile_int_def(SHAPING_GLOBAL_CONF_FILE, "METRIC", "GLOBAL_STAT_OUTPUT_INTERVAL_S", &stat->output_interval_s, 1);
+    MESA_load_profile_int_def(SHAPING_GLOBAL_CONF_FILE, "METRIC", "SELF_TEST", &conf->is_self_test, 0);
 
     return 0;
 }
-
 
 static void shaper_global_stat_fieldstat_reg(struct shaping_global_stat *stat)
 {
@@ -29,25 +33,25 @@ static void shaper_global_stat_fieldstat_reg(struct shaping_global_stat *stat)
     stat->column_ids[CTRL_RESETALL_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "ctrl_resetall", NULL, 0);
     stat->column_ids[SESSION_LOG_SEND_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "session_log_send", NULL, 0);
 
-    stat->column_ids[ASYNC_INVOKE_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "swarmkv_async_invoke", NULL, 0);
-    stat->column_ids[ASYNC_CALLBACK_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "swarmkv_async_callback", NULL, 0);
-    stat->column_ids[ASYNC_TCONSUME_FAILED] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "swarmkv_tconsume_failed", NULL, 0);
-    stat->column_ids[ASYNC_HINCRBY_FAILED] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "swarmkv_hincrby_failed", NULL, 0);
-    stat->column_ids[ASYNC_HMGET_FAILED] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "swarmkv_hmget_failed", NULL, 0);
+    stat->column_ids[ASYNC_INVOKE_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "async_invoke", NULL, 0);
+    stat->column_ids[ASYNC_CALLBACK_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "async_callback", NULL, 0);
+    stat->column_ids[ASYNC_TCONSUME_FAILED] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "tconsume_failed", NULL, 0);
+    stat->column_ids[ASYNC_HINCRBY_FAILED] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "hincrby_failed", NULL, 0);
+    stat->column_ids[ASYNC_HMGET_FAILED] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "hmget_failed", NULL, 0);
 
-    stat->column_ids[RX_PKTS_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "rx_pkts", NULL, 0);
-    stat->column_ids[RX_BYTES_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "rx_bytes", NULL, 0);
-    stat->column_ids[TX_PKTS_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "tx_pkts", NULL, 0);
-    stat->column_ids[TX_BYTES_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "tx_bytes", NULL, 0);
-    stat->column_ids[DROP_PKTS_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "drop_pkts", NULL, 0);
-    stat->column_ids[DROP_BYTES_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "drop_bytes", NULL, 0);
+    stat->column_ids[RX_PKTS_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "all_rx_pkts", NULL, 0);
+    stat->column_ids[RX_BYTES_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "all_rx_bytes", NULL, 0);
+    stat->column_ids[TX_PKTS_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "all_tx_pkts", NULL, 0);
+    stat->column_ids[TX_BYTES_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "all_tx_bytes", NULL, 0);
+    stat->column_ids[DROP_PKTS_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "all_drop_pkts", NULL, 0);
+    stat->column_ids[DROP_BYTES_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "all_drop_bytes", NULL, 0);
 
-    stat->column_ids[HIT_POLICY_RX_PKTS_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "hit_policy_rx_pkts", NULL, 0);
-    stat->column_ids[HIT_POLICY_RX_BYTES_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "hit_policy_rx_bytes", NULL, 0);
-    stat->column_ids[HIT_POLICY_TX_PKTS_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "hit_policy_tx_pkts", NULL, 0);
-    stat->column_ids[HIT_POLICY_TX_BYTES_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "hit_policy_tx_bytes", NULL, 0);
-    stat->column_ids[HIT_POLICY_DROP_PKTS_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "hit_policy_drop_pkts", NULL, 0);
-    stat->column_ids[HIT_POLICY_DROP_BYTES_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "hit_policy_drop_bytes", NULL, 0);
+    stat->column_ids[HIT_POLICY_RX_PKTS_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "shape_rx_pkts", NULL, 0);
+    stat->column_ids[HIT_POLICY_RX_BYTES_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "shape_rx_bytes", NULL, 0);
+    stat->column_ids[HIT_POLICY_TX_PKTS_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "shape_tx_pkts", NULL, 0);
+    stat->column_ids[HIT_POLICY_TX_BYTES_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "shape_tx_bytes", NULL, 0);
+    stat->column_ids[HIT_POLICY_DROP_PKTS_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "shape_drop_pkts", NULL, 0);
+    stat->column_ids[HIT_POLICY_DROP_BYTES_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "shape_drop_bytes", NULL, 0);
 
     return;
 }
@@ -55,11 +59,12 @@ static void shaper_global_stat_fieldstat_reg(struct shaping_global_stat *stat)
 struct shaping_global_stat* shaper_global_stat_init()
 {
     struct shaping_global_stat *stat = NULL;
+    struct shaping_global_stat_conf conf;
     int column_num;
 
     stat = (struct shaping_global_stat*)calloc(1, sizeof(struct shaping_global_stat));
 
-    if (shaper_global_stat_conf_load(stat) != 0) {
+    if (shaper_global_stat_conf_load(stat, &conf) != 0) {
         LOG_ERROR("%s: shaping init metric conf failed", LOG_TAG_STAT);
         goto ERROR;
     }
@@ -73,7 +78,11 @@ struct shaping_global_stat* shaper_global_stat_init()
     shaper_global_stat_fieldstat_reg(stat);
 
     fieldstat_disable_background_thread(stat->instance);
-    fieldstat_set_local_output(stat->instance, "shaping_global_metric", "json");
+    if (conf.is_self_test) {
+        fieldstat_set_local_output(stat->instance, "shaping_global_metric", "json");
+    } else {
+        fieldstat_set_local_output(stat->instance, "shaping_global_metric", "default");
+    }
 
     if (fieldstat_global_enable_prometheus_endpoint(9007, NULL) != 0) {
         LOG_ERROR("%s: shaping global fieldstat enable prometheus endpoint failed", LOG_TAG_STAT);
@@ -327,7 +336,7 @@ void shaper_global_stat_refresh(struct shaping_global_stat *stat)
     fieldstat_value_set(stat->instance, stat->column_ids[TX_PKTS_IDX], all_traffic_data->tx_pkts);
     fieldstat_value_set(stat->instance, stat->column_ids[TX_BYTES_IDX], all_traffic_data->tx_bytes);
     fieldstat_value_set(stat->instance, stat->column_ids[DROP_PKTS_IDX], all_traffic_data->drop_pkts);
-    fieldstat_value_set(stat->instance, stat->column_ids[DROP_BYTES_IDX], all_traffic_data->drop_pkts);
+    fieldstat_value_set(stat->instance, stat->column_ids[DROP_BYTES_IDX], all_traffic_data->drop_bytes);
 
     fieldstat_value_set(stat->instance, stat->column_ids[HIT_POLICY_RX_PKTS_IDX], hit_policy_traffic_data->rx_pkts);
     fieldstat_value_set(stat->instance, stat->column_ids[HIT_POLICY_RX_BYTES_IDX], hit_policy_traffic_data->rx_bytes);
