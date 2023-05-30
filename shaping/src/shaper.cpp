@@ -498,8 +498,12 @@ static void shaper_queue_len_get_cb(const struct swarmkv_reply *reply, void * cb
 
     s_pf_info->is_priority_blocked = 0;
 
-    if (!reply || reply->type != SWARMKV_REPLY_ARRAY) {
+    if (!reply || (reply->type != SWARMKV_REPLY_NIL && reply->type != SWARMKV_REPLY_ARRAY)) {
         shaper_global_stat_async_hmget_failed_inc(arg->ctx->global_stat);
+        goto END;
+    }
+
+    if (reply->type != SWARMKV_REPLY_ARRAY) {
         goto END;
     }
 
