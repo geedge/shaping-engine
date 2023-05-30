@@ -391,6 +391,16 @@ void swarmkv_tconsume(struct swarmkv * db, const char * key, size_t keylen, long
     return;
 }
 
+void swarmkv_ftconsume(struct swarmkv * db, const char * key, size_t keylen, const char * member, size_t member_len, long long weight, long long tokens, swarmkv_on_reply_callback_t *cb, void *cb_arg)
+{
+    return;
+}
+
+void swarmkv_btconsume(struct swarmkv * db, const char * key, size_t keylen, const char * member, size_t member_len, long long tokens, swarmkv_on_reply_callback_t *cb, void *cb_arg)
+{
+    return;
+}
+
 void swarmkv_close(struct swarmkv * db)
 {
     if (db) {
