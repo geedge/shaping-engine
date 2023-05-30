@@ -33,6 +33,27 @@ char *addr_tuple4_to_str(const struct addr_tuple4 *addr)
     return str_ret;
 }
 
+char *addr_src_ip_to_str(const struct addr_tuple4 *addr)//TODO: self test
+{
+    char *str_ret = NULL;
+
+    if (addr->addr_type == ADDR_TUPLE4_TYPE_V4)
+    {
+        char src_addr[INET_ADDRSTRLEN] = {0};
+        inet_ntop(AF_INET, &addr->addr_v4.src_addr, src_addr, sizeof(src_addr));
+        asprintf(&str_ret, "%s", src_addr);
+    }
+
+    if (addr->addr_type == ADDR_TUPLE4_TYPE_V6)
+    {
+        char src_addr[INET6_ADDRSTRLEN] = {0};
+        inet_ntop(AF_INET6, &addr->addr_v6.src_addr, src_addr, sizeof(src_addr));
+        asprintf(&str_ret, "%s", src_addr);
+    }
+
+    return str_ret;
+}
+
 void addr_tuple4_reverse(const struct addr_tuple4 *orin, struct addr_tuple4 *out)
 {
     memset(out, 0, sizeof(struct addr_tuple4));

@@ -67,13 +67,21 @@ enum shaping_packet_action {
     SHAPING_DROP
 };
 
+enum shaping_profile_type_in_rule {
+    PROFILE_IN_RULE_TYPE_PRIMARY = 0,
+    PROFILE_IN_RULE_TYPE_BORROW
+};
+
 enum shaping_profile_type {
-    SHAPING_PROFILE_TYPE_PRIMARY = 0,
-    SHAPING_PROFILE_TYPE_BORROW
+    PROFILE_TYPE_GENERIC,
+    PROFILE_TYPE_HOST_FARINESS,
+    PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS,
+    PROFILE_TYPE_SPLIT_BY_LOCAL_HOST
 };
 
 struct shaping_profile_info {
     int id;//profile_id
+    enum shaping_profile_type type;
     int priority;
     int in_deposit_token;
     int out_deposit_token;
@@ -88,6 +96,7 @@ struct shaping_profile_info {
 struct shaping_rule_info {
     int vsys_id;
     int id;//rule_id
+    int fair_factor;
     struct shaping_profile_info primary;
     struct shaping_profile_info borrowing[SHAPING_REF_PROFILE_NUM_MAX];
     int borrowing_num;
@@ -119,6 +128,8 @@ struct metadata
 
 struct shaping_flow {
     struct addr_tuple4 tuple4;
+    char *src_ip_str;
+    size_t src_ip_str_len;
     struct delay_queue packet_queue;
     struct shaping_rule_info matched_rule_infos[SHAPING_RULE_NUM_MAX];
     int priority;

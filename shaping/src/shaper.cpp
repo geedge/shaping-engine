@@ -115,6 +115,10 @@ static void shaping_node_free(struct shaping_node *s_node)
             }
         }
 
+        if (s_node->shaping_flow.src_ip_str) {
+            free(s_node->shaping_flow.src_ip_str);
+        }
+
         if (s_node->shaping_flow.ctrl_meta.raw_data) {
             free(s_node->shaping_flow.ctrl_meta.raw_data);
         }
@@ -434,7 +438,7 @@ static int shaper_deposit_token_is_enough(struct shaping_profile_info *pf_info, 
 
 static int shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, struct shaping_profile_info *pf_info, int profile_type, int req_token_bits, unsigned char direction)
 {
-    struct shaping_async_cb_arg *arg;
+    struct shaping_async_cb_arg *arg = NULL;
     char key[32] = {0};
 
     __atomic_add_fetch(&pf_info->async_token_ref_count, 1, __ATOMIC_SEQ_CST);
@@ -447,14 +451,31 @@ static int shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct 
     arg->sf = sf;
     arg->direction = direction;
 
-    swarmkv_tconsume(ctx->swarmkv_db, key, strlen(key), req_token_bits, shaper_token_get_cb, arg);
+    switch (pf_info->type) {
+        case PROFILE_TYPE_GENERIC:
+            swarmkv_tconsume(ctx->swarmkv_db, key, strlen(key), req_token_bits, shaper_token_get_cb, arg);
+            break;
+        case PROFILE_TYPE_HOST_FARINESS:
+        case PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS:
+            swarmkv_ftconsume(ctx->swarmkv_db, key, strlen(key), sf->src_ip_str, sf->src_ip_str_len, sf->matched_rule_infos[sf->anchor].fair_factor, req_token_bits, shaper_token_get_cb, arg);
+            break;
+        case PROFILE_TYPE_SPLIT_BY_LOCAL_HOST:
+            swarmkv_btconsume(ctx->swarmkv_db, key, strlen(key), sf->src_ip_str, sf->src_ip_str_len, req_token_bits, shaper_token_get_cb, arg);
+            break;
+        default:
+            if (arg) {
+                free(arg);
+            }
+            break;
+    }
+
     if (__atomic_load_n(&pf_info->async_token_ref_count, __ATOMIC_SEQ_CST) != 0) {//has async operation not completed
         shaper_deposit_token_sub(pf_info, req_token_bits, direction);
         return 0;
     }
 
     if (pf_info->is_invalid) {
-        if (profile_type == SHAPING_PROFILE_TYPE_PRIMARY) {//for primary, means this rule don't need get token
+        if (profile_type == PROFILE_IN_RULE_TYPE_PRIMARY) {//for primary, means this rule don't need get token
             return 0;
         } else {//for borrowing, means this profile has no token to borrow
             return -1;
@@ -546,14 +567,14 @@ int shaper_profile_get(struct shaping_rule_info *s_rule_info, int priority, stru
 
     if (priority == SHAPING_PRIORITY_NUM_MAX - 1) {//priority 9 allow multi profiles for one priority
         if (s_rule_info->primary.priority == priority) {
-            pf_container[num].pf_type = SHAPING_PROFILE_TYPE_PRIMARY;
+            pf_container[num].pf_type = PROFILE_IN_RULE_TYPE_PRIMARY;
             pf_container[num].pf_info = &s_rule_info->primary;
             num++;
         }
 
         for (int i = 0; i < s_rule_info->borrowing_num; i++) {
             if (s_rule_info->borrowing[i].priority == priority) {
-                pf_container[num].pf_type = SHAPING_PROFILE_TYPE_BORROW;
+                pf_container[num].pf_type = PROFILE_IN_RULE_TYPE_BORROW;
                 pf_container[num].pf_info = &s_rule_info->borrowing[i];
                 num++;
             }
@@ -562,14 +583,14 @@ int shaper_profile_get(struct shaping_rule_info *s_rule_info, int priority, stru
         return num;
     } else {
         if (s_rule_info->primary.priority == priority) {
-            pf_container[0].pf_type = SHAPING_PROFILE_TYPE_PRIMARY;
+            pf_container[0].pf_type = PROFILE_IN_RULE_TYPE_PRIMARY;
             pf_container[0].pf_info = &s_rule_info->primary;
             return 1;
         }
 
         for (int i = 0; i < s_rule_info->borrowing_num; i++) {
             if (s_rule_info->borrowing[i].priority == priority) {
-                pf_container[0].pf_type = SHAPING_PROFILE_TYPE_BORROW;
+                pf_container[0].pf_type = PROFILE_IN_RULE_TYPE_BORROW;
                 pf_container[0].pf_info = &s_rule_info->borrowing[i];
                 return 1;
             }
@@ -649,7 +670,7 @@ static enum shaping_packet_action shaper_pkt_action_decide_queueing(struct shapi
 
 static enum shaping_packet_action shaper_pkt_action_decide_no_queue(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, struct shaping_profile_info *profile)
 {
-    int profile_type = SHAPING_PROFILE_TYPE_PRIMARY;
+    int profile_type = PROFILE_IN_RULE_TYPE_PRIMARY;
     struct shaping_rule_info *rule = NULL;
     struct shaping_packet_wrapper *pkt_wrapper = NULL;
     struct timespec curr_time;
@@ -803,7 +824,12 @@ void shaping_packet_process(struct shaping_thread_ctx *ctx, marsio_buff_t *rx_bu
         if (0 != shaper_packet_enqueue(ctx, sf, rx_buff, &curr_time, meta)) {
             marsio_buff_free(marsio_info->instance, &rx_buff, 1, 0, ctx->thread_index);
             shaper_global_stat_drop_inc(ctx->global_stat, meta->raw_len);
-            LOG_ERROR("%s: shaping enqueue packet failed while queue empty for session: %s", LOG_TAG_SHAPING, addr_tuple4_to_str(&sf->tuple4));
+            char *addr_str = addr_tuple4_to_str(&sf->tuple4);
+            LOG_ERROR("%s: shaping enqueue packet failed while queue empty for session: %s", LOG_TAG_SHAPING, addr_str);
+            if (addr_str) {
+                free(addr_str);
+            }
+
             goto END;
         }
 
@@ -834,8 +860,14 @@ END:
     shaper_stat_refresh(ctx->stat, sf, ctx->thread_index, 0);
     if(sf->flag & SESSION_CLOSE) {
         if (shaper_queue_empty(sf)) {
+            char *addr_str = addr_tuple4_to_str(&sf->tuple4);
+            LOG_DEBUG("%s: shaping free a shaping_flow for session: %s", LOG_TAG_SHAPING, addr_str);
+
             shaping_flow_free(ctx, sf);
-            LOG_DEBUG("%s: shaping free a shaping_flow for session: %s", LOG_TAG_SHAPING, addr_tuple4_to_str(&sf->tuple4));
+
+            if (addr_str) {
+                free(addr_str);
+            }
         }
     }
 

@@ -41,6 +41,30 @@ TEST(ADDR_TUPLE4, IPV6)
 	free(ret_str);
 }
 
+TEST(ADDR_TUPLE4, SRC_IPV4_TO_STRING)
+{
+	char *ret_str = NULL;
+
+	INIT_ADDR_V4(orin_addr, "1.2.3.4", 12345, "4.3.2.1", 23456)
+
+	ret_str = addr_src_ip_to_str(&orin_addr);
+	EXPECT_TRUE(ret_str != nullptr);
+	EXPECT_STREQ(ret_str, "1.2.3.4");
+	free(ret_str);
+}
+
+TEST(ADDR_TUPLE4, SRC_IPV6_TO_STRING)
+{
+	char *ret_str = NULL;
+
+	INIT_ADDR_V6(orin_addr, "1:2::3", 12345, "a:b::c", 23456);
+
+	ret_str = addr_src_ip_to_str(&orin_addr);
+	EXPECT_TRUE(ret_str != nullptr);
+	EXPECT_STREQ(ret_str, "1:2::3");
+	free(ret_str);
+}
+
 int main(int argc, char **argv)
 {
 	::testing::InitGoogleTest(&argc, argv);

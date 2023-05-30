@@ -41,7 +41,8 @@ TEST(shaping_rule, parse)
 
 TEST(shaping_profile, parse)
 {   const char *data = "1\t\
-                        {\"value\":\"local_host\",\"host_fairness\":1}\t\
+                        fair_share\t\
+                        max_min_host_fairness\t\
                         [{\"direction\":\"incoming\",\"bandwidth\":1024},{\"direction\":\"outgoing\",\"bandwidth\":2048}]\t\
                         {\"enabled\":1,\"algorithm\":\"codel\"}\t\
                         null\t\
@@ -54,6 +55,7 @@ TEST(shaping_profile, parse)
     EXPECT_EQ(s_pf->id, 1);
     EXPECT_EQ(s_pf->in_limit_bandwidth, 1024);
     EXPECT_EQ(s_pf->out_limit_bandwidth, 2048);
+    EXPECT_EQ(s_pf->type, PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS);
     EXPECT_EQ(s_pf->ref_cnt, 1);
 
     shaper_profile_ex_dup(0, (void**)&s_pf_dup, (void**)&s_pf, 0, NULL);
