@@ -11,6 +11,7 @@
 #include "shaper_stat.h"
 #include "shaper_marsio.h"
 #include "shaper_session.h"
+#include "shaper_global_stat.h"
 
 static void *shaper_thread_loop(void *data)
 {
@@ -46,6 +47,7 @@ static void sig_handler(int signo)
 int main(int argc, char **argv)
 {
     struct shaping_ctx *ctx = NULL;
+    time_t last_update_time = time(NULL);
 
     if (LOG_INIT("./conf/zlog.conf") == -1)
     {
@@ -68,9 +70,13 @@ int main(int argc, char **argv)
         pthread_create(&ctx->thread_ctx[i].tid, NULL, shaper_thread_loop, &ctx->thread_ctx[i]);
     }
 
-    //TODO:主线程保留？
     while(1) {
-        sleep(1);
+        time_t curr_time = time(NULL);
+        if (curr_time - last_update_time >= ctx->global_stat->output_interval_s) {
+            shaper_global_stat_refresh(ctx->global_stat);
+            last_update_time = curr_time;
+        }
+        sleep(ctx->global_stat->output_interval_s);
     }
 
     return 0;

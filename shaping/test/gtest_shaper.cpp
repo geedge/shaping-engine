@@ -189,7 +189,7 @@ static int shaping_global_stat_field_get(cJSON *metrics, const char *field_name)
 
     for (int i = 0; i < metrics_size; i++) {
         cJSON *tmp = cJSON_GetArrayItem(metrics, i);
-        char *column_name = cJSON_GetObjectItem(tmp, "column_name")->valuestring;
+        char *column_name = cJSON_GetObjectItem(tmp, "name")->valuestring;
         if (strcmp(column_name, field_name) == 0) {
             return cJSON_GetObjectItem(tmp, "diff")->valueint;
         }
@@ -205,12 +205,16 @@ static void shaping_global_stat_judge(char *file_line, int tx_pkts, int tx_bytes
 
     metrics = cJSON_GetObjectItem(json, "metrics");
 
-    EXPECT_EQ(tx_pkts, shaping_global_stat_field_get(metrics, "tx_pkts"));
-    EXPECT_EQ(tx_bytes, shaping_global_stat_field_get(metrics, "tx_bytes"));
-    EXPECT_EQ(drop_pkts, shaping_global_stat_field_get(metrics, "drop_pkts"));
-    EXPECT_EQ(drop_bytes, shaping_global_stat_field_get(metrics, "drop_bytes"));
-    EXPECT_EQ(queueing_pkts, shaping_global_stat_field_get(metrics, "queueing_pkts"));
-    EXPECT_EQ(queueing_bytes, shaping_global_stat_field_get(metrics, "queueing_bytes"));
+    EXPECT_EQ(tx_pkts, shaping_global_stat_field_get(metrics, "all_tx_pkts"));
+    EXPECT_EQ(tx_bytes, shaping_global_stat_field_get(metrics, "all_tx_bytes"));
+    EXPECT_EQ(tx_pkts, shaping_global_stat_field_get(metrics, "shape_tx_pkts"));
+    EXPECT_EQ(tx_bytes, shaping_global_stat_field_get(metrics, "shape_tx_bytes"));
+    EXPECT_EQ(drop_pkts, shaping_global_stat_field_get(metrics, "all_drop_pkts"));
+    EXPECT_EQ(drop_bytes, shaping_global_stat_field_get(metrics, "all_drop_bytes"));
+    EXPECT_EQ(drop_pkts, shaping_global_stat_field_get(metrics, "shape_drop_pkts"));
+    EXPECT_EQ(drop_bytes, shaping_global_stat_field_get(metrics, "shape_drop_bytes"));
+    EXPECT_EQ(queueing_pkts, shaping_global_stat_field_get(metrics, "curr_queueing_pkts"));
+    EXPECT_EQ(queueing_bytes, shaping_global_stat_field_get(metrics, "curr_queueing_bytes"));
 
     cJSON_Delete(json);
 
@@ -268,7 +272,7 @@ TEST(single_session, udp_tx_in_order)
     /***********send stat data here********************/
     stub_curr_time_inc(STUB_TIME_INC_FOR_METRIC_SEND);//inc time to send metric
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
-    fieldstat_passive_output(ctx->global_stat->instance);
+    shaper_global_stat_refresh(ctx->global_stat);
 
 
     shaping_engine_destroy(ctx);
@@ -1512,7 +1516,7 @@ TEST(statistics, udp_drop_pkt)
     /***********send stat data here********************/
     stub_curr_time_inc(STUB_TIME_INC_FOR_METRIC_SEND);//inc time to send metric
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
-    fieldstat_passive_output(ctx->global_stat->instance);
+    shaper_global_stat_refresh(ctx->global_stat);
 
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
@@ -1574,7 +1578,7 @@ TEST(statistics, udp_queueing_pkt)
     stub_curr_time_inc(STUB_TIME_INC_FOR_METRIC_SEND);//inc time to send metric
     shaper_stat_refresh(ctx->thread_ctx[0].stat, sf, ctx->thread_ctx[0].thread_index, 1);
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
-    fieldstat_passive_output(ctx->global_stat->instance);
+    shaper_global_stat_refresh(ctx->global_stat);
     sleep(2);//wait telegraf generate metric
 
     /*******judge global metric********/
@@ -1601,7 +1605,7 @@ TEST(statistics, udp_queueing_pkt)
     /***********send stat data here********************/
     stub_curr_time_inc(STUB_TIME_INC_FOR_METRIC_SEND);//inc time to send metric
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
-    fieldstat_passive_output(ctx->global_stat->instance);
+    shaper_global_stat_refresh(ctx->global_stat);
 
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
@@ -1634,6 +1638,6 @@ TEST(statistics, udp_queueing_pkt)
 int main(int argc, char **argv) 
 {
     testing::InitGoogleTest(&argc, argv);
-    //testing::GTEST_FLAG(filter) = "two_session_diff_priority.udp_in_order_multi_rule";
+    //testing::GTEST_FLAG(filter) = "statistics.udp_queueing_pkt";
     return RUN_ALL_TESTS();
 }
