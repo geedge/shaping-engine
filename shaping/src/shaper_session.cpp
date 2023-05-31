@@ -69,7 +69,12 @@ void shaper_session_log_prepare(struct shaping_flow *sf, char **mpack_data, size
 	mpack_write_cstr(&writer, "method");
 	mpack_write_cstr(&writer, "log_update");
 
-    LOG_DEBUG("%s: shaper prepare log to sapp for session %s, id %lu", LOG_TAG_SHAPING, addr_tuple4_to_str(&sf->tuple4), sf->ctrl_meta.session_id);
+    char *addr_str = addr_tuple4_to_str(&sf->tuple4);
+    LOG_DEBUG("%s: shaper prepare log to sapp for session %s, id %lu", LOG_TAG_SHAPING, addr_str, sf->ctrl_meta.session_id);
+    if (addr_str) {
+        free(addr_str);
+    }
+
     //params
 	mpack_write_cstr(&writer, "params");
 	mpack_build_map(&writer);
@@ -117,6 +122,7 @@ static void shaper_session_log_send(struct shaping_thread_ctx *ctx, struct shapi
     int pkt_header_len = sf->ctrl_meta.l7_offset;
     struct metadata *ctrl_meta = &sf->ctrl_meta;
     struct sids sids;
+    char *addr_str = addr_tuple4_to_str(&sf->tuple4);
 
     marsio_buff_malloc_global(ctx->marsio_info->instance, &tx_buff, 1, 0, ctx->thread_index);
     marsio_buff_set_ctrlbuf(tx_buff);
@@ -125,24 +131,24 @@ static void shaper_session_log_send(struct shaping_thread_ctx *ctx, struct shapi
     memcpy(dst + pkt_header_len, mpack_data, mpack_size);
 
     if (marsio_buff_set_metadata(tx_buff, MR_BUFF_SESSION_ID, &ctrl_meta->session_id, sizeof(ctrl_meta->session_id)) != 0) {
-        LOG_ERROR("%s: marsio_buff_set_metadata MR_BUFF_SESSION_ID failed for session %s", LOG_TAG_SHAPING, addr_tuple4_to_str(&sf->tuple4));
+        LOG_ERROR("%s: marsio_buff_set_metadata MR_BUFF_SESSION_ID failed for session %s", LOG_TAG_SHAPING, addr_str);
         goto END;
     }
 
     if (marsio_buff_set_metadata(tx_buff, MR_BUFF_PAYLOAD_OFFSET, &pkt_header_len, sizeof(pkt_header_len)) != 0) {
-        LOG_ERROR("%s: marsio_buff_set_metadata MR_BUFF_PAYLOAD_OFFSET failed for session %s", LOG_TAG_SHAPING, addr_tuple4_to_str(&sf->tuple4));
+        LOG_ERROR("%s: marsio_buff_set_metadata MR_BUFF_PAYLOAD_OFFSET failed for session %s", LOG_TAG_SHAPING, addr_str);
         goto END;
     }
 
     sids.elems[0] = ctx->firewall_sid;
     sids.num = 1;
     if (marsio_buff_set_sid_list(tx_buff, sids.elems, sids.num) != 0) {
-        LOG_ERROR("%s: marsio_buff_set_sid_list failed for session %s", LOG_TAG_SHAPING, addr_tuple4_to_str(&sf->tuple4));
+        LOG_ERROR("%s: marsio_buff_set_sid_list failed for session %s", LOG_TAG_SHAPING, addr_str);
         goto END;
     }
 
     if (marsio_buff_set_metadata(tx_buff, MR_BUFF_ROUTE_CTX, ctrl_meta->route_ctx.data, ctrl_meta->route_ctx.len) != 0) {
-        LOG_ERROR("%s: marsio_buff_set_metadata MR_BUFF_ROUTE_CTX failed for session %s", LOG_TAG_SHAPING, addr_tuple4_to_str(&sf->tuple4));
+        LOG_ERROR("%s: marsio_buff_set_metadata MR_BUFF_ROUTE_CTX failed for session %s", LOG_TAG_SHAPING, addr_str);
         goto END;
     }
 
@@ -150,6 +156,10 @@ static void shaper_session_log_send(struct shaping_thread_ctx *ctx, struct shapi
     shaper_global_stat_session_log_send_num_inc(ctx->global_stat);
 
 END:
+    if (addr_str) {
+        free(addr_str);
+    }
+
     if (mpack_data) {
         free(mpack_data);
     }
