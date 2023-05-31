@@ -58,6 +58,7 @@ extern "C"
 
     char *addr_tuple4_to_str(const struct addr_tuple4 *addr);
     void addr_tuple4_reverse(const struct addr_tuple4 *orin, struct addr_tuple4 *out);
+    char *addr_src_ip_to_str(const struct addr_tuple4 *addr);
 
 #ifdef __cpluscplus
 }

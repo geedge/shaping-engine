@@ -137,7 +137,7 @@ static void shaper_stat_tags_build(int vsys_id, int rule_id, int profile_id, int
 
     tags[TAG_PRIORITY_IDX].value_int = priority;
 
-    if (profile_type == SHAPING_PROFILE_TYPE_PRIMARY) {
+    if (profile_type == PROFILE_IN_RULE_TYPE_PRIMARY) {
         tags[TAG_PROFILE_TYPE_IDX].value_str = "primary";
     } else {
         tags[TAG_PROFILE_TYPE_IDX].value_str = "borrow";
@@ -214,10 +214,10 @@ void shaper_stat_refresh(struct shaping_stat *stat, struct shaping_flow *sf, int
 
     for (int i = 0; i < sf->rule_num; i++) {
         rule = &sf->matched_rule_infos[i];
-        shaper_stat_profile_metirc_refresh(stat, rule->vsys_id, thread_id, rule->id, &rule->primary, SHAPING_PROFILE_TYPE_PRIMARY, need_update_guage);
+        shaper_stat_profile_metirc_refresh(stat, rule->vsys_id, thread_id, rule->id, &rule->primary, PROFILE_IN_RULE_TYPE_PRIMARY, need_update_guage);
 
         for (int j = 0; j < rule->borrowing_num; j++) {
-            shaper_stat_profile_metirc_refresh(stat, rule->vsys_id, thread_id, rule->id, &rule->borrowing[j], SHAPING_PROFILE_TYPE_BORROW, need_update_guage);
+            shaper_stat_profile_metirc_refresh(stat, rule->vsys_id, thread_id, rule->id, &rule->borrowing[j], PROFILE_IN_RULE_TYPE_BORROW, need_update_guage);
         }
     }
 
