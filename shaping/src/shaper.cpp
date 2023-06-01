@@ -421,9 +421,10 @@ static void shaper_token_get_cb(const struct swarmkv_reply *reply, void * cb_arg
     shaper_deposit_token_add(s_pf_info, reply->integer, arg->direction);//deposit tokens to profile
 
 END:
-    free(cb_arg);
     __atomic_sub_fetch(&s_pf_info->async_token_ref_count, 1, __ATOMIC_SEQ_CST);
     shaping_flow_free(arg->ctx, sf);//sub ref count and decide if need to free
+    free(cb_arg);
+    cb_arg = NULL;
 
     return;
 }
@@ -540,9 +541,10 @@ static void shaper_queue_len_get_cb(const struct swarmkv_reply *reply, void * cb
     }
 
 END:
-    free(cb_arg);
     __atomic_sub_fetch(&s_pf_info->async_queue_len_ref_count, 1, __ATOMIC_SEQ_CST);
     shaping_flow_free(arg->ctx, sf);//sub ref count and decide if need to free
+    free(cb_arg);
+    cb_arg = NULL;
 }
 
 static int shaper_profile_is_priority_blocked(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, struct shaping_profile_info *profile)
