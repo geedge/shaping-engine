@@ -60,7 +60,6 @@ struct shaping_global_stat* shaper_global_stat_init()
 {
     struct shaping_global_stat *stat = NULL;
     struct shaping_global_stat_conf conf;
-    int column_num;
 
     stat = (struct shaping_global_stat*)calloc(1, sizeof(struct shaping_global_stat));
 

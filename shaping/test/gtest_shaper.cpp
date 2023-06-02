@@ -607,7 +607,7 @@ TEST(single_session, udp_borrow)
     shaping_stat_judge(line, 1, 1, 1, 0, 0, 0, 0, 170, SHAPING_DIR_OUT, profile_type_primary);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2, borrow
-    shaping_stat_judge(line, 1, 2, 2, 100, 10000, 0, 0, 170, SHAPING_DIR_OUT, profile_type_borrow);
+    shaping_stat_judge(line, 1, 2, 2, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
@@ -681,11 +681,13 @@ TEST(single_session, udp_borrow_same_priority_9)
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 1, primary
     shaping_stat_judge(line, 1, 1, 9, 0, 0, 0, 0, 170, SHAPING_DIR_OUT, profile_type_primary);
 
+#if 0 //fieldstat don't output a row when all values is zero
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2, borrow
-    shaping_stat_judge(line, 1, 2, 9, 0, 0, 0, 0, 170, SHAPING_DIR_OUT, profile_type_borrow);
+    shaping_stat_judge(line, 1, 2, 9, 0, 0, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
+#endif
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 3, borrow
-    shaping_stat_judge(line, 1, 3, 9, 100, 10000, 0, 0, 170, SHAPING_DIR_OUT, profile_type_borrow);
+    shaping_stat_judge(line, 1, 3, 9, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
@@ -1168,7 +1170,7 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
     shaping_stat_judge(line, 1, 1, 1, 0, 0, 0, 0, 470, SHAPING_DIR_OUT, profile_type_primary);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2, borrow
-    shaping_stat_judge(line, 1, 2, 2, 100, 10000, 0, 0, 470, SHAPING_DIR_OUT, profile_type_borrow);
+    shaping_stat_judge(line, 1, 2, 2, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2, primary
     shaping_stat_judge(line, 2, 2, 1, 100, 10000, 0, 0, 190, SHAPING_DIR_OUT, profile_type_primary);
@@ -1638,6 +1640,6 @@ TEST(statistics, udp_queueing_pkt)
 int main(int argc, char **argv) 
 {
     testing::InitGoogleTest(&argc, argv);
-    //testing::GTEST_FLAG(filter) = "statistics.udp_queueing_pkt";
+    //testing::GTEST_FLAG(filter) = "single_session.udp_borrow_same_priority_9";
     return RUN_ALL_TESTS();
 }

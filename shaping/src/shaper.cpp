@@ -281,11 +281,10 @@ int shaper_flow_push(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, un
             swarmkv_async_command(ctx->swarmkv_db, swarmkv_reply_cb_do_nothing, ctx->global_stat, "HINCRBY tsg-shaping-%d priority-%d 1", s_rule_info->primary.id, priority);
         }
         shaper_stat_queueing_pkt_inc(&s_rule_info->primary.stat, pkt_wrapper->direction, ctx->thread_index);
-        s_rule_info->primary.enqueue_time_us = enqueue_time;
     }
 
     if (s_rule_info->borrowing_num == 0) {// no borrow profile
-        return ret;
+        goto END;
     }
 
     for (i = 0; i < s_rule_info->borrowing_num; i++) {
@@ -297,8 +296,12 @@ int shaper_flow_push(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, un
                 shaper_global_stat_async_invoke_inc(ctx->global_stat);
                 swarmkv_async_command(ctx->swarmkv_db, swarmkv_reply_cb_do_nothing, ctx->global_stat, "HINCRBY tsg-shaping-%d priority-%d 1", s_rule_info->borrowing[i].id, priority);
             }
-            s_rule_info->borrowing[i].enqueue_time_us = enqueue_time;
         }
+    }
+
+END:
+    if (ret == 0) {//all avl tree success
+        s_rule_info->primary.enqueue_time_us = enqueue_time;
     }
 
     return ret;
@@ -338,13 +341,10 @@ void shaper_flow_pop(struct shaping_thread_ctx *ctx, struct shaping_flow *sf)
         }
 
         shaper_stat_queueing_pkt_dec(&s_rule_info->primary.stat, pkt_wrapper->direction, ctx->thread_index);
-
-        latency = shaper_pkt_latency_calculate(&s_rule_info->primary, &curr_time);
-        shaper_stat_max_latency_update(&s_rule_info->primary.stat, pkt_wrapper->direction, latency, ctx->thread_index);
     }
     
     if (s_rule_info->borrowing_num == 0) {
-        return;
+        goto END;
     }
 
     for (i = 0; i < s_rule_info->borrowing_num; i++) {
@@ -355,11 +355,12 @@ void shaper_flow_pop(struct shaping_thread_ctx *ctx, struct shaping_flow *sf)
                 shaper_global_stat_async_invoke_inc(ctx->global_stat);
                 swarmkv_async_command(ctx->swarmkv_db, swarmkv_reply_cb_do_nothing, ctx->global_stat, "HINCRBY tsg-shaping-%d priority-%d -1", s_rule_info->borrowing[i].id, priority);
             }
-
-            latency = shaper_pkt_latency_calculate(&s_rule_info->borrowing[i], &curr_time);
-            shaper_stat_max_latency_update(&s_rule_info->borrowing[i].stat, pkt_wrapper->direction, latency, ctx->thread_index);
         }
     }
+
+END:
+    latency = shaper_pkt_latency_calculate(&s_rule_info->primary, &curr_time);
+    shaper_stat_max_latency_update(&s_rule_info->primary.stat, pkt_wrapper->direction, latency, ctx->thread_index);
 
     return;
 }
