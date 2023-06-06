@@ -30,6 +30,7 @@ static void shaper_global_stat_fieldstat_reg(struct shaping_global_stat *stat)
     stat->column_ids[CTRL_OPENING_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "ctrl_opening", NULL, 0);
     stat->column_ids[CTRL_ACTIVE_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "ctrl_active", NULL, 0);
     stat->column_ids[CTRL_CLOSE_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "ctrl_close", NULL, 0);
+    stat->column_ids[CTRL_ACTIVE_CLOSE_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "ctrl_active_close", NULL, 0);
     stat->column_ids[CTRL_RESETALL_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "ctrl_resetall", NULL, 0);
     stat->column_ids[SESSION_LOG_SEND_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "session_log_send", NULL, 0);
 
@@ -195,6 +196,15 @@ void shaper_global_stat_ctrlpkt_close_inc(struct shaping_global_stat *stat)
     return;
 }
 
+void shaper_global_stat_ctrlpkt_active_close_inc(struct shaping_global_stat *stat)
+{
+    struct shaping_global_stat_data *local_stat_data = &stat->local_stat_data;
+
+    __atomic_add_fetch(&local_stat_data->ctrl_active_close, 1, __ATOMIC_RELAXED);
+
+    return;
+}
+
 void shaper_global_stat_ctrlpkt_resetall_inc(struct shaping_global_stat *stat)
 {
     struct shaping_global_stat_data *local_stat_data = &stat->local_stat_data;
@@ -321,6 +331,7 @@ void shaper_global_stat_refresh(struct shaping_global_stat *stat)
     fieldstat_value_set(stat->instance, stat->column_ids[CTRL_OPENING_IDX], local_stat_data->ctrl_opening);
     fieldstat_value_set(stat->instance, stat->column_ids[CTRL_ACTIVE_IDX], local_stat_data->ctrl_active);
     fieldstat_value_set(stat->instance, stat->column_ids[CTRL_CLOSE_IDX], local_stat_data->ctrl_close);
+    fieldstat_value_set(stat->instance, stat->column_ids[CTRL_ACTIVE_CLOSE_IDX], local_stat_data->ctrl_active_close);
     fieldstat_value_set(stat->instance, stat->column_ids[CTRL_RESETALL_IDX], local_stat_data->ctrl_resetall);
     fieldstat_value_set(stat->instance, stat->column_ids[SESSION_LOG_SEND_IDX], local_stat_data->session_log_send);
 

@@ -179,6 +179,8 @@ struct shaping_flow* shaper_session_close(struct shaping_thread_ctx *ctx, struct
     sf = (struct shaping_flow *)session_node->val_data;
     sf->flag |= SESSION_CLOSE;
 
+    shaper_global_stat_ctrlpkt_active_close_inc(ctx->global_stat);
+
     session_table_delete_by_id(ctx->session_table, meta->session_id);
     shaper_global_stat_curr_session_dec(ctx->global_stat);
 
