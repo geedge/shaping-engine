@@ -800,6 +800,7 @@ static int shaper_polling_first_pkt_token_get(struct shaper *sp, struct shaping_
     if (shaper_queue_empty(sf)) {
         if (sf->flag & SESSION_CLOSE) {
             shaping_flow_free(ctx, sf);
+            sf->flag &= (~SESSION_CLOSE);
         }
         return 0;
     } else {
@@ -817,6 +818,7 @@ static int shaper_polling_first_pkt_token_get(struct shaper *sp, struct shaping_
             shaper_queue_clear(sf, ctx);//first packet fail, then every packet will fail
             if (sf->flag & SESSION_CLOSE) {
                 shaping_flow_free(ctx, sf);
+                sf->flag &= (~SESSION_CLOSE);
             }
         }
         return 0;
@@ -902,6 +904,7 @@ END:
             LOG_DEBUG("%s: shaping free a shaping_flow for session: %s", LOG_TAG_SHAPING, addr_str);
 
             shaping_flow_free(ctx, sf);
+            sf->flag &= (~SESSION_CLOSE);
 
             if (addr_str) {
                 free(addr_str);

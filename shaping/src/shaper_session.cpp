@@ -177,7 +177,12 @@ struct shaping_flow* shaper_session_close(struct shaping_thread_ctx *ctx, struct
     }
 
     sf = (struct shaping_flow *)session_node->val_data;
-    sf->flag |= SESSION_CLOSE;
+
+    if (shaper_queue_empty(sf)) {
+        shaping_flow_free(ctx, sf);
+    } else {
+        sf->flag |= SESSION_CLOSE;
+    }
 
     shaper_global_stat_ctrlpkt_active_close_inc(ctx->global_stat);
 
