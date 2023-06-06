@@ -14,6 +14,7 @@ enum shaping_global_stat_column_index {
     CTRL_OPENING_IDX,
     CTRL_ACTIVE_IDX,
     CTRL_CLOSE_IDX,
+    CTRL_ACTIVE_CLOSE_IDX,
     CTRL_RESETALL_IDX,
     SESSION_LOG_SEND_IDX,
 
@@ -57,6 +58,7 @@ struct shaping_global_stat_data {
     long long ctrl_opening;
     long long ctrl_active;
     long long ctrl_close;
+    long long ctrl_active_close;
     long long ctrl_resetall;
     long long session_log_send;
     long long async_invoke;
@@ -87,6 +89,7 @@ void shaper_global_stat_ctrlpkt_err_inc(struct shaping_global_stat *stat);
 void shaper_global_stat_ctrlpkt_opening_inc(struct shaping_global_stat *stat);
 void shaper_global_stat_ctrlpkt_active_inc(struct shaping_global_stat *stat);
 void shaper_global_stat_ctrlpkt_close_inc(struct shaping_global_stat *stat);
+void shaper_global_stat_ctrlpkt_active_close_inc(struct shaping_global_stat *stat);
 void shaper_global_stat_ctrlpkt_resetall_inc(struct shaping_global_stat *stat);
 void shaper_global_stat_session_log_send_num_inc(struct shaping_global_stat *stat);
 
