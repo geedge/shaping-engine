@@ -148,7 +148,7 @@ struct shaping_flow* shaping_flow_new()
 
     TAILQ_INIT(&s_node->shaping_flow.packet_queue);
     s_node->shaping_flow.ref_count = 1;
-    s_node->shaping_flow.priority = SHAPING_PRIORITY_NUM_MAX;
+    s_node->shaping_flow.priority = SHAPING_PRIORITY_NUM_MAX - 1;
 
     return &s_node->shaping_flow;
 
