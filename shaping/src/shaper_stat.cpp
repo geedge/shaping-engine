@@ -22,7 +22,14 @@ struct shaper_stat_conf {
     short telegraf_port;
 };
 
-thread_local struct fieldstat_tag tags[TAG_IDX_MAX];
+thread_local struct fieldstat_tag tags[TAG_IDX_MAX] = 
+{
+    [TAG_VSYS_ID_IDX] = {.key = "vsys_id", .value_type = 0},
+    [TAG_RULE_ID_IDX] = {.key = "rule_id", .value_type = 0},
+    [TAG_PROFILE_ID_IDX] = {.key = "profile_id", .value_type = 0},
+    [TAG_PRIORITY_IDX] = {.key = "priority", .value_type = 0},
+    [TAG_PROFILE_TYPE_IDX] = {.key = "profile_type", .value_type = 2}
+};
 
 void shaper_stat_destroy(struct shaping_stat *stat)
 {
@@ -91,8 +98,6 @@ struct shaping_stat* shaper_stat_init(int thread_num)
         goto ERROR;
     }
 
-    shaper_stat_tags_init();
-
     fieldstat_dynamic_instance_start(stat->instance);
 
     return stat;
@@ -105,26 +110,6 @@ ERROR:
         free(stat);
     }
     return NULL;
-}
-
-void shaper_stat_tags_init()
-{
-    tags[TAG_RULE_ID_IDX].key = "rule_id";
-    tags[TAG_RULE_ID_IDX].value_type = 0;
-
-    tags[TAG_VSYS_ID_IDX].key = "vsys_id";
-    tags[TAG_VSYS_ID_IDX].value_type = 0;
-
-    tags[TAG_PROFILE_ID_IDX].key = "profile_id";
-    tags[TAG_PROFILE_ID_IDX].value_type = 0;
-
-    tags[TAG_PRIORITY_IDX].key = "priority";
-    tags[TAG_PRIORITY_IDX].value_type = 0;
-
-    tags[TAG_PROFILE_TYPE_IDX].key = "profile_type";
-    tags[TAG_PROFILE_TYPE_IDX].value_type = 2;
-
-    return;
 }
 
 static void shaper_stat_tags_build(int vsys_id, int rule_id, int profile_id, int priority, int profile_type)
