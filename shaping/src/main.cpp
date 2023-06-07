@@ -18,7 +18,6 @@ static void *shaper_thread_loop(void *data)
     struct shaping_thread_ctx *ctx = (struct shaping_thread_ctx *)data;
 
     marsio_thread_init(ctx->marsio_info->instance);
-    shaper_stat_tags_init();
 
     //loop to process pkts
     while(1) {

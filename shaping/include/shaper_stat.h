@@ -47,7 +47,6 @@ struct shaping_stat {
 
 void shaper_stat_destroy(struct shaping_stat *stat);
 struct shaping_stat* shaper_stat_init(int thread_num);
-void shaper_stat_tags_init();
 
 void shaper_stat_queueing_pkt_inc(struct shaping_stat_for_profile *profile_stat, unsigned char direction, int thread_id);
 void shaper_stat_queueing_pkt_dec(struct shaping_stat_for_profile *profile_stat, unsigned char direction, int thread_id);
