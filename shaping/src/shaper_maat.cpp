@@ -287,7 +287,7 @@ static void shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_fl
     struct shaping_profile *s_pf = NULL;
     char pf_id_key[8] = {0};
 
-    s_rule = (struct shaping_rule*)maat_plugin_table_get_ex_data(g_maat_instance, ctx->maat_info->rule_table_id, (char *)&rule_compile_id);
+    s_rule = (struct shaping_rule*)maat_plugin_table_get_ex_data(g_maat_instance, ctx->maat_info->rule_table_id, (char *)&rule_compile_id, sizeof(rule_compile_id));
     if (!s_rule) {
         LOG_ERROR("%s maat_plugin_table_get_ex_data get rule failed for compile id %lld", LOG_TAG_MAAT, rule_compile_id);
         goto END;
@@ -297,7 +297,7 @@ static void shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_fl
     s_rule_info->vsys_id = s_rule->vsys_id;
 
     snprintf(pf_id_key, sizeof(pf_id_key), "%d", s_rule->primary_pf_id);
-    s_pf = (struct shaping_profile *)maat_plugin_table_get_ex_data(g_maat_instance, ctx->maat_info->profile_table_id, pf_id_key);
+    s_pf = (struct shaping_profile *)maat_plugin_table_get_ex_data(g_maat_instance, ctx->maat_info->profile_table_id, pf_id_key, strlen(pf_id_key));
     if (!s_pf) {
         LOG_ERROR("%s maat_plugin_table_get_ex_data get profile failed for key %s", LOG_TAG_MAAT, pf_id_key);
         goto END;
@@ -316,8 +316,9 @@ static void shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_fl
     }
 
     for (int i = 0; i < s_rule->borrow_pf_num; i++) {
+        memset(pf_id_key, 0, sizeof(pf_id_key));
         snprintf(pf_id_key, sizeof(pf_id_key), "%d", s_rule->borrow_pf_id_array[i]);
-        s_pf = (struct shaping_profile *)maat_plugin_table_get_ex_data(g_maat_instance, ctx->maat_info->profile_table_id, pf_id_key);
+        s_pf = (struct shaping_profile *)maat_plugin_table_get_ex_data(g_maat_instance, ctx->maat_info->profile_table_id, pf_id_key, strlen(pf_id_key));
         if (!s_pf) {
             LOG_ERROR("%s maat_plugin_table_get_ex_data get profile failed for key %s", LOG_TAG_MAAT, pf_id_key);
             goto END;

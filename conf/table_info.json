@@ -6,7 +6,8 @@
         "valid_column": 8,
         "custom": {
             "key": 1,
-            "key_type": "integer"
+            "key_type": "integer",
+            "key_len": 4
         }
     },
     {
