@@ -481,7 +481,7 @@ void maat_free(struct maat *instance)
     return;
 }
 
-void *maat_plugin_table_get_ex_data(struct maat *instance, int table_id, const char *key)
+void *maat_plugin_table_get_ex_data(struct maat *instance, int table_id, const char *key, size_t key_len)
 {
     int rule_id;
     int profile_id;
