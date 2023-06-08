@@ -13,6 +13,8 @@
 #include "shaper_session.h"
 #include "shaper_global_stat.h"
 
+static int quit = 0;
+
 static void *shaper_thread_loop(void *data)
 {
     struct shaping_thread_ctx *ctx = (struct shaping_thread_ctx *)data;
@@ -20,7 +22,7 @@ static void *shaper_thread_loop(void *data)
     marsio_thread_init(ctx->marsio_info->instance);
 
     //loop to process pkts
-    while(1) {
+    while(!quit) {
         shaper_packet_recv_and_process(ctx);
         if (__atomic_load_n(&ctx->session_need_reset, __ATOMIC_SEQ_CST) > 0) {
             session_table_reset_with_callback(ctx->session_table, shaper_session_data_free_cb, ctx);
@@ -38,6 +40,10 @@ static void sig_handler(int signo)
     {
         LOG_INFO("%s: recv SIGHUP, reload zlog.conf", LOG_TAG_SHAPING);
         LOG_RELOAD();
+    }
+
+    if (signo == SIGQUIT) {
+        quit = 1;
     }
 
     return;
@@ -60,6 +66,13 @@ int main(int argc, char **argv)
         return -1;
     }
 
+    if (signal(SIGQUIT, sig_handler) == SIG_ERR)
+    {
+        LOG_ERROR("%s: unable to register SIGQUIT signal handler, error %d: %s", LOG_TAG_SHAPING, errno, strerror(errno));
+        LOG_CLOSE();
+        return -1;
+    }
+
     ctx = shaping_engine_init();
     if (!ctx) {
         return -1;
@@ -69,7 +82,7 @@ int main(int argc, char **argv)
         pthread_create(&ctx->thread_ctx[i].tid, NULL, shaper_thread_loop, &ctx->thread_ctx[i]);
     }
 
-    while(1) {
+    while(!quit) {
         time_t curr_time = time(NULL);
         if (curr_time - last_update_time >= ctx->global_stat->output_interval_s) {
             shaper_global_stat_refresh(ctx->global_stat);
@@ -77,6 +90,11 @@ int main(int argc, char **argv)
         }
         sleep(ctx->global_stat->output_interval_s);
     }
+
+    for (int i = 0; i < ctx->thread_num; i++) {
+        pthread_join(ctx->thread_ctx[i].tid, NULL);
+    }
+    shaping_engine_destroy(ctx);
 
     return 0;
 }
