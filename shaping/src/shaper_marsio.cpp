@@ -194,6 +194,11 @@ int shaper_marsio_ctrl_pkt_data_parse(struct ctrl_pkt_data *ctrl_data, const cha
     mpack_tree_parse(&tree);
     root = mpack_tree_root(&tree);
 
+    if (mpack_node_type(root) == mpack_type_nil) {
+        LOG_ERROR("%s: shaping marsio msgpack root type wrong, type is %d", LOG_TAG_MARSIO, mpack_node_type(root) );
+        goto ERROR;
+    }
+
     //tsync
     tmp_node = mpack_node_map_cstr(root, "tsync");
     if (mpack_type_str != mpack_node_type(tmp_node)) {
@@ -253,7 +258,7 @@ int shaper_marsio_ctrl_pkt_data_parse(struct ctrl_pkt_data *ctrl_data, const cha
     }
     tmp_node = mpack_node_map_cstr(shaper, "rule_ids");
     if (mpack_type_array != mpack_node_type(tmp_node)) {
-        LOG_ERROR("%s: shaping marsio msgpack shaper type wrong, type is %d", LOG_TAG_MARSIO, mpack_node_type(tmp_node));
+        LOG_ERROR("%s: shaping marsio msgpack rule_ids type wrong, type is %d", LOG_TAG_MARSIO, mpack_node_type(tmp_node));
         goto ERROR;
     }
 
