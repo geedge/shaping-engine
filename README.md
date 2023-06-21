@@ -1,4 +1,4 @@
-# shaping_master
+# shaping_engine
 
 ## introduction
 TSG provides Quality of Service (QoS) by applying traffic shaping and DSCP marking. You can define shaping rules to allocate resources for different traffic types, align network performance to business priorities, and ensure that your network serves the business first.
