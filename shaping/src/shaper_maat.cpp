@@ -348,6 +348,18 @@ static void shaper_profiles_priority_update(struct shaping_flow *sf)
     return;
 }
 
+int shaper_rule_is_enabled(struct shaping_thread_ctx *ctx, long long rule_id)
+{
+    struct shaping_rule *s_rule = (struct shaping_rule*)maat_plugin_table_get_ex_data(g_maat_instance, ctx->maat_info->rule_table_id, (char *)&rule_id, sizeof(rule_id));
+
+    if (s_rule) {
+        shaper_rule_ex_free(ctx->maat_info->rule_table_id, (void **)&s_rule, 0, NULL);
+        return 1;
+    }
+
+    return 0;
+}
+
 void shaper_rules_update(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, long long *rule_compile_ids, int rule_num)
 {
     int i, j;

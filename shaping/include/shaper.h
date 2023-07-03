@@ -32,6 +32,7 @@ struct shaping_system_conf {
     int cpu_affinity_enable;
     int firewall_sid;
     unsigned long long cpu_affinity_mask;
+    int check_rule_enable_interval_sec;
 };
 
 struct shaping_thread_ctx {
@@ -46,9 +47,7 @@ struct shaping_thread_ctx {
     struct shaping_maat_info *maat_info;
     struct session_table *session_table;
     int session_need_reset;
-    unsigned int session_queue_len_max;
-    int polling_node_num_max[SHAPING_PRIORITY_NUM_MAX];
-    int firewall_sid;
+    struct shaping_system_conf conf;
 };
 
 struct shaping_ctx {
@@ -141,6 +140,7 @@ struct shaping_flow {
     struct metadata ctrl_meta;
     unsigned long long processed_pkts;
     struct timespec stat_update_time;
+    time_t check_rule_time;
 };
 
 struct shaper_flow_instance {
