@@ -296,6 +296,8 @@ static void shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_fl
     s_rule_info->fair_factor = s_rule->fair_factor;
     s_rule_info->vsys_id = s_rule->vsys_id;
 
+    s_rule_info->is_enabled = 1;
+
     snprintf(pf_id_key, sizeof(pf_id_key), "%d", s_rule->primary_pf_id);
     s_pf = (struct shaping_profile *)maat_plugin_table_get_ex_data(g_maat_instance, ctx->maat_info->profile_table_id, pf_id_key, strlen(pf_id_key));
     if (!s_pf) {

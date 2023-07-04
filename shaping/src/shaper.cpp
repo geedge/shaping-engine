@@ -588,13 +588,21 @@ static int shaper_profile_is_priority_blocked(struct shaping_thread_ctx *ctx, st
 static int shaper_token_consume(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, int req_token_bytes,
                         struct shaping_profile_info *profile, int profile_type, unsigned char direction)
 {
+    struct shaping_rule_info *rule = &sf->matched_rule_infos[sf->anchor];
     time_t curr_time = time(NULL);
     
     if (curr_time - sf->check_rule_time >= ctx->conf.check_rule_enable_interval_sec) {
         sf->check_rule_time = curr_time;
-        if (shaper_rule_is_enabled(ctx, sf->matched_rule_infos[sf->anchor].id) != 1) {
+        if (shaper_rule_is_enabled(ctx, rule->id) != 1) {
+            rule->is_enabled = 0;
             return 0;//rule is disabled, don't need to get token and forward packet
+        } else {
+            rule->is_enabled = 1;
         }
+    }
+
+    if (rule->is_enabled != 1) {
+        return 0;
     }
 
     if (shaper_profile_is_priority_blocked(ctx, sf, profile)) {

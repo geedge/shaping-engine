@@ -99,6 +99,7 @@ struct shaping_rule_info {
     struct shaping_profile_info primary;
     struct shaping_profile_info borrowing[SHAPING_REF_PROFILE_NUM_MAX];
     int borrowing_num;
+    int is_enabled;
 };
 
 struct shaping_packet_wrapper {
