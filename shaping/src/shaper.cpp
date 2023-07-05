@@ -176,7 +176,7 @@ static int shaper_packet_enqueue(struct shaping_thread_ctx *ctx, struct shaping_
     struct shaping_packet_wrapper *s_pkt = NULL;
     struct timespec curr_time;
 
-    if (sf->queue_len == ctx->session_queue_len_max) {
+    if (sf->queue_len == ctx->conf.session_queue_len_max) {
         return -1;
     }
 
@@ -588,6 +588,23 @@ static int shaper_profile_is_priority_blocked(struct shaping_thread_ctx *ctx, st
 static int shaper_token_consume(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, int req_token_bytes,
                         struct shaping_profile_info *profile, int profile_type, unsigned char direction)
 {
+    struct shaping_rule_info *rule = &sf->matched_rule_infos[sf->anchor];
+    time_t curr_time = time(NULL);
+    
+    if (curr_time - sf->check_rule_time >= ctx->conf.check_rule_enable_interval_sec) {
+        sf->check_rule_time = curr_time;
+        if (shaper_rule_is_enabled(ctx, rule->id) != 1) {
+            rule->is_enabled = 0;
+            return 0;//rule is disabled, don't need to get token and forward packet
+        } else {
+            rule->is_enabled = 1;
+        }
+    }
+
+    if (rule->is_enabled != 1) {
+        return 0;
+    }
+
     if (shaper_profile_is_priority_blocked(ctx, sf, profile)) {
         return -1;
     } else {
@@ -910,7 +927,7 @@ void polling_entry(struct shaper *sp, struct shaping_stat *stat, struct shaping_
     int ret;
 
     for (int i = 0; i < SHAPING_PRIORITY_NUM_MAX; i++) {
-        sf_num = shaper_flow_in_order_get(sp, sf_ins, i, ctx->polling_node_num_max[i]);
+        sf_num = shaper_flow_in_order_get(sp, sf_ins, i, ctx->conf.polling_node_num_max[i]);
         if (sf_num == 0) {
             continue;
         }
@@ -1124,6 +1141,8 @@ int shaper_global_conf_init(struct shaping_system_conf *conf)
     MESA_load_profile_uint_def(SHAPING_GLOBAL_CONF_FILE, "CONFIG", "SESSION_QUEUE_LEN_MAX", &conf->session_queue_len_max, 128);
     MESA_load_profile_uint_def(SHAPING_GLOBAL_CONF_FILE, "CONFIG", "PRIORITY_QUEUE_LEN_MAX", &conf->priority_queue_len_max, 1024);
 
+    MESA_load_profile_int_def(SHAPING_GLOBAL_CONF_FILE, "CONFIG", "CHECK_RULE_ENABLE_INTERVAL_SEC", &conf->check_rule_enable_interval_sec, 120);
+
     return 0;
 
 ERROR:
@@ -1213,9 +1232,7 @@ struct shaping_ctx *shaping_engine_init()
         ctx->thread_ctx[i].marsio_info = ctx->marsio_info;
         ctx->thread_ctx[i].swarmkv_db = ctx->swarmkv_db;
         ctx->thread_ctx[i].ref_ctx = ctx;
-        ctx->thread_ctx[i].session_queue_len_max = conf.session_queue_len_max;
-        memcpy(ctx->thread_ctx[i].polling_node_num_max, conf.polling_node_num_max, sizeof(conf.polling_node_num_max));
-        ctx->thread_ctx[i].firewall_sid = conf.firewall_sid;
+        memcpy(&ctx->thread_ctx[i].conf, &conf, sizeof(conf));
     }
 
     return ctx;

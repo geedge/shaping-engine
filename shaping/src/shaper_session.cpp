@@ -140,7 +140,7 @@ static void shaper_session_log_send(struct shaping_thread_ctx *ctx, struct shapi
         goto END;
     }
 
-    sids.elems[0] = ctx->firewall_sid;
+    sids.elems[0] = ctx->conf.firewall_sid;
     sids.num = 1;
     if (marsio_buff_set_sid_list(tx_buff, sids.elems, sids.num) != 0) {
         LOG_ERROR("%s: marsio_buff_set_sid_list failed for session %s", LOG_TAG_SHAPING, addr_str);
