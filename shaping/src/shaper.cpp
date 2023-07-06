@@ -285,7 +285,6 @@ int shaper_flow_push(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, un
             shaper_global_stat_async_invoke_inc(ctx->global_stat);
             swarmkv_async_command(ctx->swarmkv_db, swarmkv_reply_cb_do_nothing, ctx->global_stat, "HINCRBY tsg-shaping-%d priority-%d 1", s_rule_info->primary.id, priority);
         }
-        shaper_stat_queueing_pkt_inc(&s_rule_info->primary.stat, pkt_wrapper->direction, ctx->thread_index);
     }
 
     if (s_rule_info->borrowing_num == 0) {// no borrow profile
@@ -344,8 +343,6 @@ void shaper_flow_pop(struct shaping_thread_ctx *ctx, struct shaping_flow *sf)
             shaper_global_stat_async_invoke_inc(ctx->global_stat);
             swarmkv_async_command(ctx->swarmkv_db, swarmkv_reply_cb_do_nothing, ctx->global_stat, "HINCRBY tsg-shaping-%d priority-%d -1", s_rule_info->primary.id, priority);
         }
-
-        shaper_stat_queueing_pkt_dec(&s_rule_info->primary.stat, pkt_wrapper->direction, ctx->thread_index);
     }
     
     if (s_rule_info->borrowing_num == 0) {
@@ -366,6 +363,7 @@ void shaper_flow_pop(struct shaping_thread_ctx *ctx, struct shaping_flow *sf)
 END:
     latency = shaper_pkt_latency_us_calculate(&s_rule_info->primary, &curr_time);
     shaper_stat_max_latency_update(&s_rule_info->primary.stat, pkt_wrapper->direction, latency, ctx->thread_index);
+    shaper_stat_queueing_pkt_dec(&s_rule_info->primary.stat, pkt_wrapper->direction, ctx->thread_index);
 
     return;
 }
@@ -692,7 +690,7 @@ static enum shaping_packet_action shaper_pkt_action_decide_queueing(struct shapi
         shaper_flow_pop(ctx, sf);
         goto DROP;
     }
-    /*todo: AQM*/
+    /*todo: AQM, just for primary profile*/
 
     for (int i = 0; i < profile_num; i++) {
         profile = pf_container[i].pf_info;
@@ -718,6 +716,7 @@ static enum shaping_packet_action shaper_pkt_action_decide_queueing(struct shapi
     clock_gettime(CLOCK_MONOTONIC, &curr_time);
     enqueue_time = curr_time.tv_sec * MICRO_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MICRO_SEC;
     if (0 == shaper_flow_push(ctx, sf, enqueue_time)) {
+        shaper_stat_queueing_pkt_inc(&sf->matched_rule_infos[sf->anchor].primary.stat, pkt_wrapper->direction, ctx->thread_index);
         return SHAPING_QUEUED;
     } else {
         goto DROP;
@@ -765,6 +764,7 @@ FLOW_PUSH:
     clock_gettime(CLOCK_MONOTONIC, &curr_time);
     enqueue_time = curr_time.tv_sec * MICRO_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MICRO_SEC;
     if (0 == shaper_flow_push(ctx, sf, enqueue_time)) {
+        shaper_stat_queueing_pkt_inc(&sf->matched_rule_infos[sf->anchor].primary.stat, meta->dir, ctx->thread_index);
         return SHAPING_QUEUED;
     } else {
         goto DROP;
@@ -780,7 +780,6 @@ static int shaper_polling_first_pkt_token_get(struct shaper *sp, struct shaping_
                                         struct shaping_stat *stat, struct shaping_thread_ctx *ctx)
 {
     struct shaping_packet_wrapper *pkt_wrapper;
-    struct shaping_rule_info *rule = NULL;
     int old_anchor = sf->anchor;
     int shaping_ret;
 
@@ -831,12 +830,8 @@ static int shaper_polling_first_pkt_token_get(struct shaper *sp, struct shaping_
         sf->anchor = 0;
 
         if (0 == shaper_flow_push(ctx, sf, pkt_wrapper->enqueue_time_us)) {
-            /*in pkt process, when queue not empty, 
-            new pkt's queueing stat was added to primary profile of first rule.
-            while shaper_flow_push() here will add queueing stat to primary profile of first rule again if sf add avl tree success,
-            so need adjust queueing stat here*/
-            rule = &sf->matched_rule_infos[sf->anchor];
-            shaper_stat_queueing_pkt_dec(&rule->primary.stat, pkt_wrapper->direction, ctx->thread_index);
+            /*in pkt process, when queue not empty, new pkt's queueing stat was added to primary profile of first rule. 
+            so don't need add queueing stat here*/
         } else {
             shaper_queue_clear(sf, ctx);//first packet fail, then every packet will fail
             if (sf->flag & SESSION_CLOSE) {
