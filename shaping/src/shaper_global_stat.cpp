@@ -160,6 +160,11 @@ void shaper_global_stat_queueing_dec(struct shaping_global_stat *stat, int pkt_l
     return;
 }
 
+long long shaper_global_stat_queueing_pkts_get(struct shaping_global_stat *stat)
+{
+    return stat->local_stat_data.queueing_pkts;
+}
+
 void shaper_global_stat_ctrlpkt_err_inc(struct shaping_global_stat *stat)
 {
     struct shaping_global_stat_data *local_stat_data = &stat->local_stat_data;

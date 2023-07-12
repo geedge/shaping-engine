@@ -84,6 +84,7 @@ void shaper_global_stat_curr_session_inc(struct shaping_global_stat *stat);
 void shaper_global_stat_curr_session_dec(struct shaping_global_stat *stat);
 void shaper_global_stat_queueing_inc(struct shaping_global_stat *stat, int pkt_len);
 void shaper_global_stat_queueing_dec(struct shaping_global_stat *stat, int pkt_len);
+long long shaper_global_stat_queueing_pkts_get(struct shaping_global_stat *stat);
 
 void shaper_global_stat_ctrlpkt_err_inc(struct shaping_global_stat *stat);
 void shaper_global_stat_ctrlpkt_opening_inc(struct shaping_global_stat *stat);

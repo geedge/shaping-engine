@@ -917,6 +917,10 @@ END:
 
 void polling_entry(struct shaper *sp, struct shaping_stat *stat, struct shaping_thread_ctx *ctx)
 {
+    if (shaper_global_stat_queueing_pkts_get(ctx->global_stat) == 0) {
+        return;
+    }
+    
     struct shaper_flow_instance sf_ins[SHAPER_FLOW_POP_NUM_MAX];
     int sf_num;
     int ret;
