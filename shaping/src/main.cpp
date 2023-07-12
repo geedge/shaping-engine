@@ -28,7 +28,7 @@ static void *shaper_thread_loop(void *data)
             session_table_reset_with_callback(ctx->session_table, shaper_session_data_free_cb, ctx);
             __atomic_fetch_and(&ctx->session_need_reset, 0, __ATOMIC_SEQ_CST);
         }
-        marsio_poll_wait(ctx->marsio_info->instance, &ctx->marsio_info->mr_dev, 1, ctx->thread_index, 1);
+        marsio_poll_wait(ctx->marsio_info->instance, &ctx->marsio_info->mr_dev, 1, ctx->thread_index, ctx->global_stat->output_interval_s * 1000);
     }
 
     return NULL;
