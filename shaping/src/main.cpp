@@ -11,6 +11,7 @@
 #include "shaper_stat.h"
 #include "shaper_marsio.h"
 #include "shaper_session.h"
+#include "shaper_swarmkv.h"
 #include "shaper_global_stat.h"
 
 static int quit = 0;
@@ -38,8 +39,9 @@ static void sig_handler(int signo)
 {
     if (signo == SIGHUP)
     {
-        LOG_INFO("%s: recv SIGHUP, reload zlog.conf", LOG_TAG_SHAPING);
+        LOG_INFO("%s: recv SIGHUP, reload zlog.conf and swarmkv log level", LOG_TAG_SHAPING);
         LOG_RELOAD();
+        swarmkv_reload_log_level();
     }
 
     if (signo == SIGQUIT) {
