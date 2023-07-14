@@ -685,10 +685,12 @@ static enum shaping_packet_action shaper_pkt_action_decide_queueing(struct shapi
         return SHAPING_FORWARD;
     }
 
-    clock_gettime(CLOCK_MONOTONIC, &curr_time);
-    if (shaper_pkt_latency_us_calculate(pf_container[0].pf_info, &curr_time) > SHAPING_LATENCY_THRESHOLD) {
-        shaper_flow_pop(ctx, sf);
-        goto DROP;
+    if (pf_container[0].pf_type == PROFILE_IN_RULE_TYPE_PRIMARY) {
+        clock_gettime(CLOCK_MONOTONIC, &curr_time);
+        if (shaper_pkt_latency_us_calculate(pf_container[0].pf_info, &curr_time) > SHAPING_LATENCY_THRESHOLD) {
+            shaper_flow_pop(ctx, sf);
+            goto DROP;
+        }
     }
     /*todo: AQM, just for primary profile*/
 

@@ -49,7 +49,7 @@ struct stub_matched_rules matched_rules;
 struct shaping_profile pf_array[MAX_STUB_PROFILE_NUM];
 static int profile_priority_len[MAX_STUB_PROFILE_NUM][10] = {{0}};
 
-static unsigned long long curr_time = 1;
+static unsigned long long curr_time = 2000000000;//2s
 
 void * stub_get_token_thread_func(void *data)
 {
