@@ -17,6 +17,7 @@ struct shaper_swarmkv_conf
     short swarmkv_cluster_announce_port;
     short swarmkv_health_check_port;
     short swarmkv_health_check_announce_port;
+    short swarmkv_log_level;
 };
 
 static int shaper_swarmkv_config_load(struct shaper_swarmkv_conf *conf)
@@ -81,7 +82,19 @@ static int shaper_swarmkv_config_load(struct shaper_swarmkv_conf *conf)
         return ret;
     }
 
+    MESA_load_profile_short_def(SHAPING_GLOBAL_CONF_FILE, "SWARMKV", "SWARMKV_LOG_LEVEL", &conf->swarmkv_log_level, 4);
+
     return 0;
+}
+
+void swarmkv_reload_log_level()
+{
+#if 0 //TODO: need interface to reload log level
+    short log_level = 0;
+
+    MESA_load_profile_short_def(SHAPING_GLOBAL_CONF_FILE, "SWARMKV", "SWARMKV_LOG_LEVEL", &log_level, 4);
+#endif
+    return;
 }
 
 struct swarmkv* shaper_swarmkv_init()
@@ -106,7 +119,7 @@ struct swarmkv* shaper_swarmkv_init()
     swarmkv_options_set_health_check_port(swarmkv_opts, conf.swarmkv_health_check_port);
     swarmkv_options_set_health_check_announce_port(swarmkv_opts, conf.swarmkv_health_check_announce_port);
     swarmkv_options_set_log_path(swarmkv_opts, "log");
-    swarmkv_options_set_log_level(swarmkv_opts, 4);
+    swarmkv_options_set_log_level(swarmkv_opts, conf.swarmkv_log_level);
 
     swarmkv_db = swarmkv_open(swarmkv_opts, conf.swarmkv_cluster_name, &err);
     if (err) {
