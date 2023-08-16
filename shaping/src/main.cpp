@@ -20,7 +20,10 @@ static void *shaper_thread_loop(void *data)
 {
     struct shaping_thread_ctx *ctx = (struct shaping_thread_ctx *)data;
 
-    marsio_thread_init(ctx->marsio_info->instance);
+    if (marsio_thread_init(ctx->marsio_info->instance) != 0) {
+        LOG_ERROR("%s: marsio_thread_init failed", LOG_TAG_SHAPING);
+        return NULL;
+    }
 
     //loop to process pkts
     while(!quit) {
@@ -81,7 +84,10 @@ int main(int argc, char **argv)
     }
 
     for (int i = 0; i < ctx->thread_num; i++) {
-        pthread_create(&ctx->thread_ctx[i].tid, NULL, shaper_thread_loop, &ctx->thread_ctx[i]);
+        int ret = pthread_create(&ctx->thread_ctx[i].tid, NULL, shaper_thread_loop, &ctx->thread_ctx[i]);
+        if (ret < 0) {
+            LOG_ERROR("%s: create thread failed, error %d: %s", LOG_TAG_SHAPING, errno, strerror(errno));
+        }
     }
 
     while(!quit) {

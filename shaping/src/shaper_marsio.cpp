@@ -88,8 +88,8 @@ struct shaping_marsio_info* shaper_marsio_init(struct shaping_system_conf *sys_c
     }
 
     if (sys_conf->cpu_affinity_enable) {
-        if (marsio_option_set(marsio_info->instance, MARSIO_OPT_THREAD_MASK, &sys_conf->cpu_affinity_mask, sizeof(sys_conf->cpu_affinity_mask)) != 0) {
-            LOG_ERROR("%s: shaping marsio set MARSIO_OPT_THREAD_MASK failed", LOG_TAG_MARSIO);
+        if (marsio_option_set(marsio_info->instance, MARSIO_OPT_THREAD_MASK_IN_CPUSET, &sys_conf->cpu_affinity_mask, sizeof(cpu_set_t)) != 0) {
+            LOG_ERROR("%s: shaping marsio set MARSIO_OPT_THREAD_MASK_IN_CPUSET failed", LOG_TAG_MARSIO);
             goto ERROR;
         }
     }

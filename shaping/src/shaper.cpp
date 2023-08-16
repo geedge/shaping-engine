@@ -1073,8 +1073,10 @@ int shaper_global_conf_init(struct shaping_system_conf *conf)
         LOG_ERROR("%s: shaping init global conf get CPU_AFFINITY_MASK failed or incomplete config", LOG_TAG_SHAPING);
         return -1;
     }
+    CPU_ZERO(&conf->cpu_affinity_mask);
     for (int i = 0; i < conf->work_thread_num; i++) {
-        conf->cpu_affinity_mask |= 1 << cpu_mask[i];
+        int cpu_id = cpu_mask[i];
+        CPU_SET(cpu_id, &conf->cpu_affinity_mask);
     }
 
     ret = MESA_load_profile_int_def(SHAPING_GLOBAL_CONF_FILE, "SYSTEM", "firewall_sids", &conf->firewall_sid, 1001);
