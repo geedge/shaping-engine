@@ -1,5 +1,5 @@
 #pragma once
-
+#include <sched.h>
 #include <sys/queue.h>
 #include <marsio.h>
 #include "uthash.h"
@@ -31,7 +31,7 @@ struct shaping_system_conf {
     int work_thread_num;
     int cpu_affinity_enable;
     int firewall_sid;
-    unsigned long long cpu_affinity_mask;
+    cpu_set_t cpu_affinity_mask;
     int check_rule_enable_interval_sec;
 };
 
