@@ -703,8 +703,11 @@ static enum shaping_packet_action shaper_pkt_action_decide_queueing(struct shapi
     for (int i = 0; i < profile_num; i++) {
         profile = pf_container[i].pf_info;
         profile_type = pf_container[i].pf_type;
-        if (0 == shaper_token_consume(ctx, sf, pkt_wrapper->length, profile, profile_type, pkt_wrapper->direction)) {
-            shaper_stat_forward_inc(&profile->stat, pkt_wrapper->direction, pkt_wrapper->length, ctx->thread_index);
+        int ret = shaper_token_consume(ctx, sf, pkt_wrapper->length, profile, profile_type, pkt_wrapper->direction);
+        if (ret >= SHAPER_TOKEN_GET_SUCCESS) {
+            if (ret == SHAPER_TOKEN_GET_SUCCESS) {
+                shaper_stat_forward_inc(&profile->stat, pkt_wrapper->direction, pkt_wrapper->length, ctx->thread_index);
+            }
             get_token_success = 1;
             break;
         }
