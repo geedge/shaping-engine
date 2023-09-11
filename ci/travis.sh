@@ -73,8 +73,3 @@ if [ -n "${PACKAGE}" ]; then
   python3 rpm_upload_tools.py ${PULP3_REPO_NAME} ${PULP3_DIST_NAME} *.rpm
 fi
 
-if [ -n "${UPLOAD_SYMBOL_FILES}" ]; then
-  rpm -i shaping_engine*debuginfo*.rpm
-  cp /usr/lib/debug/opt/tsg/shaping_engine/bin/shaping_engine*debug /tmp/shaping_engine.debuginfo.${CI_COMMIT_SHORT_SHA}
-  sentry-cli upload-dif -t elf /tmp/shaping_engine.debuginfo.${CI_COMMIT_SHORT_SHA}
-fi
