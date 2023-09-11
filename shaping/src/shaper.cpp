@@ -65,6 +65,12 @@ struct shaping_profile_container {
     int pf_type;
 };
 
+enum shaper_token_get_result {
+    SHAPER_TOKEN_GET_FAILED = -1,
+    SHAPER_TOKEN_GET_SUCCESS = 0,
+    SHAPER_TOKEN_GET_PASS = 1,//don't need to get token, regard as success
+};
+
 struct shaper* shaper_new(unsigned int priority_queue_len_max)
 {
     struct shaper *sp = NULL;
@@ -495,23 +501,23 @@ static int shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct 
 
     if (__atomic_load_n(&pf_info->async_token_ref_count, __ATOMIC_SEQ_CST) != 0) {//has async operation not completed
         shaper_deposit_token_sub(pf_info, req_token_bits, direction);
-        return 0;
+        return SHAPER_TOKEN_GET_SUCCESS;
     }
 
     if (pf_info->is_invalid) {
         if (profile_type == PROFILE_IN_RULE_TYPE_PRIMARY) {//for primary, means this rule don't need get token
-            return 0;
+            return SHAPER_TOKEN_GET_SUCCESS;
         } else {//for borrowing, means this profile has no token to borrow
-            return -1;
+            return SHAPER_TOKEN_GET_FAILED;
         }
     }
 
     if (shaper_deposit_token_is_enough(pf_info, req_token_bits, direction)) {
         shaper_deposit_token_sub(pf_info, req_token_bits, direction);
-        return 0;
+        return SHAPER_TOKEN_GET_SUCCESS;
     }
 
-    return -1;
+    return SHAPER_TOKEN_GET_FAILED;
 }
 
 static void shaper_queue_len_get_cb(const struct swarmkv_reply *reply, void * cb_arg)
@@ -593,18 +599,18 @@ static int shaper_token_consume(struct shaping_thread_ctx *ctx, struct shaping_f
         sf->check_rule_time = curr_time;
         if (shaper_rule_is_enabled(ctx, rule->id) != 1) {
             rule->is_enabled = 0;
-            return 0;//rule is disabled, don't need to get token and forward packet
+            return SHAPER_TOKEN_GET_PASS;//rule is disabled, don't need to get token and forward packet
         } else {
             rule->is_enabled = 1;
         }
     }
 
     if (rule->is_enabled != 1) {
-        return 0;
+        return SHAPER_TOKEN_GET_PASS;//rule is disabled, don't need to get token and forward packet
     }
 
     if (shaper_profile_is_priority_blocked(ctx, sf, profile)) {
-        return -1;
+        return SHAPER_TOKEN_GET_FAILED;
     } else {
         int req_token_bits = req_token_bytes * 8;
         return shaper_token_get_from_profile(ctx, sf, profile, profile_type, req_token_bits, direction);
@@ -742,8 +748,11 @@ static enum shaping_packet_action shaper_pkt_action_decide_no_queue(struct shapi
         return SHAPING_FORWARD;
     }
 
-    if (0 == shaper_token_consume(ctx, sf, meta->raw_len, profile, profile_type, meta->dir)) {
-        shaper_stat_forward_inc(&profile->stat, meta->dir, meta->raw_len, ctx->thread_index);
+    int ret = shaper_token_consume(ctx, sf, meta->raw_len, profile, profile_type, meta->dir);
+    if (ret >= SHAPER_TOKEN_GET_SUCCESS) {
+        if (ret == SHAPER_TOKEN_GET_SUCCESS) {
+            shaper_stat_forward_inc(&profile->stat, meta->dir, meta->raw_len, ctx->thread_index);
+        }
 
         sf->anchor = shaper_next_anchor_get(sf, meta->dir);
         if (sf->anchor == 0) {//no next rule
