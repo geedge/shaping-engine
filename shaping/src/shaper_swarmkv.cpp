@@ -1,10 +1,10 @@
-#include <MESA/swarmkv.h>
 #include <MESA/MESA_handle_logger.h>
 #include <MESA/MESA_prof_load.h>
 
 #include "log.h"
 #include "shaper.h"
 #include "utils.h"
+#include "shaper_swarmkv.h"
 
 struct shaper_swarmkv_conf
 {
@@ -97,7 +97,7 @@ void swarmkv_reload_log_level()
     return;
 }
 
-struct swarmkv* shaper_swarmkv_init()
+struct swarmkv* shaper_swarmkv_init(int caller_thread_num)
 {
     struct swarmkv_options *swarmkv_opts = NULL;
     struct swarmkv *swarmkv_db = NULL;
@@ -120,6 +120,8 @@ struct swarmkv* shaper_swarmkv_init()
     swarmkv_options_set_health_check_announce_port(swarmkv_opts, conf.swarmkv_health_check_announce_port);
     swarmkv_options_set_log_path(swarmkv_opts, "log");
     swarmkv_options_set_log_level(swarmkv_opts, conf.swarmkv_log_level);
+    swarmkv_options_set_caller_thread_number(swarmkv_opts, caller_thread_num);
+    swarmkv_options_set_worker_thread_number(swarmkv_opts, 1);
 
     swarmkv_db = swarmkv_open(swarmkv_opts, conf.swarmkv_cluster_name, &err);
     if (err) {

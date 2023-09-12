@@ -25,6 +25,8 @@ static void *shaper_thread_loop(void *data)
         return NULL;
     }
 
+    swarmkv_register_thread(ctx->swarmkv_db);
+
     //loop to process pkts
     while(!quit) {
         shaper_packet_recv_and_process(ctx);

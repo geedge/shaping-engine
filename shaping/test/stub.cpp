@@ -418,6 +418,21 @@ void swarmkv_close(struct swarmkv * db)
     }
     return;
 }
+
+void swarmkv_caller_loop(struct swarmkv *db, int flags, struct timeval *tv)
+{
+    return;
+}
+
+int swarmkv_options_set_caller_thread_number(struct swarmkv_options *opts, int nr_caller_threads)
+{
+    return 0;
+}
+
+int swarmkv_options_set_worker_thread_number(struct swarmkv_options *opts, int nr_worker_threads)
+{
+    return 0;
+}
 /**********************************************/
 
 /*************stub of maat*********************/

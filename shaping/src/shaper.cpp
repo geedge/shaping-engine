@@ -428,6 +428,8 @@ static void shaper_token_get_cb(const struct swarmkv_reply *reply, void * cb_arg
         s_pf_info->is_invalid = 0;
     }
 
+    LOG_INFO("Swarmkv reply type =%d, integer =%llu",reply->type, reply->integer);
+
     shaper_deposit_token_add(s_pf_info, reply->integer, arg->direction);//deposit tokens to profile
 
 END:
@@ -498,6 +500,8 @@ static int shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct 
             }
             break;
     }
+
+    swarmkv_caller_loop(ctx->swarmkv_db, SWARMKV_LOOP_NONBLOCK, NULL);
 
     if (__atomic_load_n(&pf_info->async_token_ref_count, __ATOMIC_SEQ_CST) != 0) {//has async operation not completed
         shaper_deposit_token_sub(pf_info, req_token_bits, direction);
@@ -931,6 +935,8 @@ END:
 
 void polling_entry(struct shaper *sp, struct shaping_stat *stat, struct shaping_thread_ctx *ctx)
 {
+    swarmkv_caller_loop(ctx->swarmkv_db, SWARMKV_LOOP_NONBLOCK, NULL);
+
     if (shaper_global_stat_queueing_pkts_get(ctx->global_stat) == 0) {
         return;
     }
@@ -1208,7 +1214,7 @@ struct shaping_ctx *shaping_engine_init()
     }
 
     /*init swarmkv*/
-    ctx->swarmkv_db = shaper_swarmkv_init();
+    ctx->swarmkv_db = shaper_swarmkv_init(conf.work_thread_num);
     if (ctx->swarmkv_db == NULL) {
         goto ERROR;
     }
