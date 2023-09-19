@@ -170,7 +170,7 @@ void shaping_flow_free(struct shaping_thread_ctx *ctx, struct shaping_flow *sf)
     struct shaping_node *s_node = (struct shaping_node*)sf;
 
     if (__atomic_sub_fetch(&sf->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
-        shaper_stat_refresh(ctx->stat, sf, ctx->thread_index, 1);
+        shaper_stat_refresh(ctx, sf, ctx->thread_index, 1);
         shaping_node_free(s_node);
     }
     
@@ -250,19 +250,6 @@ void shaper_queue_clear(struct shaping_flow *sf, struct shaping_thread_ctx *ctx)
     return;
 }
 
-static void swarmkv_reply_cb_do_nothing(const struct swarmkv_reply *reply, void * cb_arg)
-{
-    struct shaping_global_stat *global_stat = (struct shaping_global_stat *)cb_arg;
-
-    shaper_global_stat_async_callback_inc(global_stat);
-
-    if (reply->type != SWARMKV_REPLY_INTEGER) {
-        shaper_global_stat_async_hincrby_failed_inc(global_stat);
-    }
-
-    return;
-}
-
 //return success(0) while any avl tree insert success
 int shaper_flow_push(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, unsigned long long enqueue_time)
 {
@@ -277,20 +264,10 @@ int shaper_flow_push(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, un
     pkt_wrapper = shaper_first_pkt_get(sf);
     assert(pkt_wrapper != NULL);
 
-    if ((sf->flag & SESSION_UPDATE_PF_PRIO_LEN) == 0) {
-        if (sf->processed_pkts > CONFIRM_PRIORITY_PKTS) {
-            sf->flag |= SESSION_UPDATE_PF_PRIO_LEN;
-        }
-    }
-
     priority = s_rule_info->primary.priority;
     avl_tree_node_key_set(s_node->avl_node[priority], pkt_wrapper->income_time_ns);
     if (0 == avl_tree_node_insert(sp->priority_trees[priority], s_node->avl_node[priority])) {
         ret = 0;
-        if (sf->flag & SESSION_UPDATE_PF_PRIO_LEN) {
-            shaper_global_stat_async_invoke_inc(ctx->global_stat);
-            swarmkv_async_command(ctx->swarmkv_db, swarmkv_reply_cb_do_nothing, ctx->global_stat, "HINCRBY tsg-shaping-%d priority-%d 1", s_rule_info->primary.id, priority);
-        }
     }
 
     if (s_rule_info->borrowing_num == 0) {// no borrow profile
@@ -302,10 +279,8 @@ int shaper_flow_push(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, un
         avl_tree_node_key_set(s_node->avl_node[priority], pkt_wrapper->income_time_ns);
         if (0 == avl_tree_node_insert(sp->priority_trees[priority], s_node->avl_node[priority])) {
             ret = 0;
-            if (sf->flag & SESSION_UPDATE_PF_PRIO_LEN) {
-                shaper_global_stat_async_invoke_inc(ctx->global_stat);
-                swarmkv_async_command(ctx->swarmkv_db, swarmkv_reply_cb_do_nothing, ctx->global_stat, "HINCRBY tsg-shaping-%d priority-%d 1", s_rule_info->borrowing[i].id, priority);
-            }
+            //TODO: calculate queue_len for borrow profile and add judge when refresh stat????
+            //shaper_stat_queueing_pkt_inc(&s_rule_info->borrowing[i].stat, pkt_wrapper->direction, ctx->thread_index);
         }
     }
 
@@ -345,10 +320,6 @@ void shaper_flow_pop(struct shaping_thread_ctx *ctx, struct shaping_flow *sf)
     priority = s_rule_info->primary.priority;
     if (avl_node_in_tree(s_node->avl_node[priority])) {
         avl_tree_node_remove(sp->priority_trees[priority], s_node->avl_node[priority]);
-        if (sf->flag & SESSION_UPDATE_PF_PRIO_LEN) {
-            shaper_global_stat_async_invoke_inc(ctx->global_stat);
-            swarmkv_async_command(ctx->swarmkv_db, swarmkv_reply_cb_do_nothing, ctx->global_stat, "HINCRBY tsg-shaping-%d priority-%d -1", s_rule_info->primary.id, priority);
-        }
     }
     
     if (s_rule_info->borrowing_num == 0) {
@@ -359,10 +330,7 @@ void shaper_flow_pop(struct shaping_thread_ctx *ctx, struct shaping_flow *sf)
         priority = s_rule_info->borrowing[i].priority;
         if (avl_node_in_tree(s_node->avl_node[priority])) {
             avl_tree_node_remove(sp->priority_trees[priority], s_node->avl_node[priority]);
-            if (sf->flag & SESSION_UPDATE_PF_PRIO_LEN) {
-                shaper_global_stat_async_invoke_inc(ctx->global_stat);
-                swarmkv_async_command(ctx->swarmkv_db, swarmkv_reply_cb_do_nothing, ctx->global_stat, "HINCRBY tsg-shaping-%d priority-%d -1", s_rule_info->borrowing[i].id, priority);
-            }
+            //TODO: calculate queue_len for borrow profile and add judge when refresh stat????
         }
     }
 
@@ -433,7 +401,6 @@ static void shaper_token_get_cb(const struct swarmkv_reply *reply, void * cb_arg
     shaper_deposit_token_add(s_pf_info, reply->integer, arg->direction);//deposit tokens to profile
 
 END:
-    __atomic_sub_fetch(&s_pf_info->async_token_ref_count, 1, __ATOMIC_SEQ_CST);
     shaping_flow_free(arg->ctx, sf);//sub ref count and decide if need to free
     free(cb_arg);
     cb_arg = NULL;
@@ -472,7 +439,6 @@ static int shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct 
     struct shaping_async_cb_arg *arg = NULL;
     char key[32] = {0};
 
-    __atomic_add_fetch(&pf_info->async_token_ref_count, 1, __ATOMIC_SEQ_CST);
     __atomic_add_fetch(&sf->ref_count, 1, __ATOMIC_SEQ_CST);
 
     snprintf(key, sizeof(key), "tsg-shaping-%d-%s", pf_info->id, direction == SHAPING_DIR_OUT ? "outgoing" : "incoming");
@@ -499,13 +465,6 @@ static int shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct 
                 free(arg);
             }
             break;
-    }
-
-    swarmkv_caller_loop(ctx->swarmkv_db, SWARMKV_LOOP_NONBLOCK, NULL);
-
-    if (__atomic_load_n(&pf_info->async_token_ref_count, __ATOMIC_SEQ_CST) != 0) {//has async operation not completed
-        shaper_deposit_token_sub(pf_info, req_token_bits, direction);
-        return SHAPER_TOKEN_GET_SUCCESS;
     }
 
     if (pf_info->is_invalid) {
@@ -555,7 +514,6 @@ static void shaper_queue_len_get_cb(const struct swarmkv_reply *reply, void * cb
     }
 
 END:
-    __atomic_sub_fetch(&s_pf_info->async_queue_len_ref_count, 1, __ATOMIC_SEQ_CST);
     shaping_flow_free(arg->ctx, sf);//sub ref count and decide if need to free
     free(cb_arg);
     cb_arg = NULL;
@@ -576,20 +534,15 @@ static int shaper_profile_is_priority_blocked(struct shaping_thread_ctx *ctx, st
     arg->sf = sf;
     arg->priority = priority;
 
-    __atomic_add_fetch(&profile->async_queue_len_ref_count, 1, __ATOMIC_SEQ_CST);
     __atomic_add_fetch(&sf->ref_count, 1, __ATOMIC_SEQ_CST);
 
     shaper_global_stat_async_invoke_inc(ctx->global_stat);
     swarmkv_async_command(ctx->swarmkv_db, shaper_queue_len_get_cb, arg, swarmkv_queue_len_get_cmd[priority], profile->id);
 
-    if (__atomic_load_n(&profile->async_queue_len_ref_count, __ATOMIC_SEQ_CST) != 0) {
-        return 0;
+    if (profile->is_priority_blocked) {
+        return 1;
     } else {
-        if (profile->is_priority_blocked) {
-            return 1;
-        } else {
-            return 0;
-        }
+        return 0;
     }
 }
 
@@ -835,7 +788,7 @@ static int shaper_polling_first_pkt_token_get(struct shaper *sp, struct shaping_
             break;
     }
 
-    shaper_stat_refresh(ctx->stat, sf, ctx->thread_index, 0);
+    shaper_stat_refresh(ctx, sf, ctx->thread_index, 0);
 
     if (shaper_queue_empty(sf)) {
         if (sf->flag & SESSION_CLOSE) {
@@ -915,7 +868,7 @@ void shaping_packet_process(struct shaping_thread_ctx *ctx, marsio_buff_t *rx_bu
     }
 
 END:
-    shaper_stat_refresh(ctx->stat, sf, ctx->thread_index, 0);
+    shaper_stat_refresh(ctx, sf, ctx->thread_index, 0);
     if(sf->flag & SESSION_CLOSE) {
         if (shaper_queue_empty(sf)) {
             char *addr_str = addr_tuple4_to_str(&sf->tuple4);

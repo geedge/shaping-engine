@@ -341,7 +341,7 @@ TEST(single_session, tcp_tx_in_order)
 
     /***********send stat data here********************/
     stub_curr_time_inc(STUB_TIME_INC_FOR_METRIC_SEND);//inc time to send metric
-    shaper_stat_refresh(ctx->thread_ctx[0].stat, sf, ctx->thread_ctx[0].thread_index, 1);
+    shaper_stat_refresh(&ctx->thread_ctx[0], sf, ctx->thread_ctx[0].thread_index, 1);
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
     sleep(2);//wait telegraf generate metric
 
@@ -1578,7 +1578,7 @@ TEST(statistics, udp_queueing_pkt)
 
     /***********send stat data here********************/
     stub_curr_time_inc(STUB_TIME_INC_FOR_METRIC_SEND);//inc time to send metric
-    shaper_stat_refresh(ctx->thread_ctx[0].stat, sf, ctx->thread_ctx[0].thread_index, 1);
+    shaper_stat_refresh(&ctx->thread_ctx[0], sf, ctx->thread_ctx[0].thread_index, 1);
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
     shaper_global_stat_refresh(ctx->global_stat);
     sleep(2);//wait telegraf generate metric

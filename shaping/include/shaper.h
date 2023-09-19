@@ -84,8 +84,6 @@ struct shaping_profile_info {
     int priority;
     int in_deposit_token;
     int out_deposit_token;
-    int async_token_ref_count;
-    int async_queue_len_ref_count;
     unsigned long long enqueue_time_us;//to calculate max latency
     unsigned char is_priority_blocked;
     unsigned char is_invalid;
