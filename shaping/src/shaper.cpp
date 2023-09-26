@@ -27,7 +27,13 @@ extern "C" {
 #define MICRO_SECONDS_PER_SEC 1000000
 #define NANO_SECONDS_PER_SEC 1000000000
 
+#define NANO_SECONDS_PER_MILLI_SEC 1000000
+#define MILLI_SECONDS_PER_SEC 1000
+
 #define SHAPING_LATENCY_THRESHOLD 2000000 //2s
+
+#define TOKEN_ENLARGE_TIMES 10
+#define TOKEN_GET_FAILED_INTERVAL_MS 1
 
 #define SWARMKV_QUEUE_LEN_GET_CMD_PRIORITY_1 "HMGET tsg-shaping-%d priority-0"
 #define SWARMKV_QUEUE_LEN_GET_CMD_PRIORITY_2 SWARMKV_QUEUE_LEN_GET_CMD_PRIORITY_1 " priority-1"
@@ -384,6 +390,8 @@ static void shaper_token_get_cb(const struct swarmkv_reply *reply, void * cb_arg
 
     shaper_global_stat_async_callback_inc(arg->ctx->global_stat);
 
+    LOG_INFO("Swarmkv reply type =%d, integer =%llu",reply->type, reply->integer);
+
     if (reply->type != SWARMKV_REPLY_INTEGER) {
         shaper_global_stat_async_tconsume_failed_inc(arg->ctx->global_stat);
         goto END;
@@ -396,7 +404,12 @@ static void shaper_token_get_cb(const struct swarmkv_reply *reply, void * cb_arg
         s_pf_info->is_invalid = 0;
     }
 
-    LOG_INFO("Swarmkv reply type =%d, integer =%llu",reply->type, reply->integer);
+    if (reply->integer == 0) {//no token
+        struct timespec curr_time;
+        clock_gettime(CLOCK_MONOTONIC, &curr_time);
+        s_pf_info->last_failed_get_token_ms = curr_time.tv_sec * MILLI_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MILLI_SEC;
+        goto END;
+    }
 
     shaper_deposit_token_add(s_pf_info, reply->integer, arg->direction);//deposit tokens to profile
 
@@ -566,10 +579,22 @@ static int shaper_token_consume(struct shaping_thread_ctx *ctx, struct shaping_f
         return SHAPER_TOKEN_GET_PASS;//rule is disabled, don't need to get token and forward packet
     }
 
+    if (shaper_deposit_token_is_enough(profile, req_token_bytes * 8, direction)) {
+        shaper_deposit_token_sub(profile, req_token_bytes * 8, direction);
+        return SHAPER_TOKEN_GET_SUCCESS;
+    }
+
+    struct timespec curr_timespec;
+    clock_gettime(CLOCK_MONOTONIC, &curr_timespec);
+    unsigned long long curr_time_ms = curr_timespec.tv_sec * MILLI_SECONDS_PER_SEC + curr_timespec.tv_nsec / NANO_SECONDS_PER_MILLI_SEC;
+    if (curr_time_ms - profile->last_failed_get_token_ms < TOKEN_GET_FAILED_INTERVAL_MS) {//if failed to get token in last 1ms, return failed; for swarmkv can't reproduce token in 1ms
+        return SHAPER_TOKEN_GET_FAILED;
+    }
+
     if (shaper_profile_is_priority_blocked(ctx, sf, profile)) {
         return SHAPER_TOKEN_GET_FAILED;
     } else {
-        int req_token_bits = req_token_bytes * 8;
+        int req_token_bits = req_token_bytes * TOKEN_ENLARGE_TIMES * 8;
         return shaper_token_get_from_profile(ctx, sf, profile, profile_type, req_token_bits, direction);
     }
 }
@@ -792,8 +817,8 @@ static int shaper_polling_first_pkt_token_get(struct shaper *sp, struct shaping_
 
     if (shaper_queue_empty(sf)) {
         if (sf->flag & SESSION_CLOSE) {
-            shaping_flow_free(ctx, sf);
             sf->flag &= (~SESSION_CLOSE);
+            shaping_flow_free(ctx, sf);
         }
         return 0;
     } else {
@@ -806,8 +831,8 @@ static int shaper_polling_first_pkt_token_get(struct shaper *sp, struct shaping_
         } else {
             shaper_queue_clear(sf, ctx);//first packet fail, then every packet will fail
             if (sf->flag & SESSION_CLOSE) {
-                shaping_flow_free(ctx, sf);
                 sf->flag &= (~SESSION_CLOSE);
+                shaping_flow_free(ctx, sf);
             }
         }
         return 0;
@@ -874,8 +899,8 @@ END:
             char *addr_str = addr_tuple4_to_str(&sf->tuple4);
             LOG_DEBUG("%s: shaping free a shaping_flow for session: %s", LOG_TAG_SHAPING, addr_str);
 
-            shaping_flow_free(ctx, sf);
             sf->flag &= (~SESSION_CLOSE);
+            shaping_flow_free(ctx, sf);
 
             if (addr_str) {
                 free(addr_str);

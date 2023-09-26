@@ -15,6 +15,7 @@
 #include <pthread.h>
 #include "stub.h"
 #include "shaper_maat.h"
+#include "log.h"
 
 using namespace std;
 
@@ -165,6 +166,8 @@ unsigned long long stub_curr_time_get()
 void stub_init()
 {
     int i;
+
+    LOG_INIT("./conf/zlog.conf");
 
     TAILQ_INIT(&tx_queue);
     memset(&matched_rules, 0, sizeof(struct stub_matched_rules));

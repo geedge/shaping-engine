@@ -5,6 +5,7 @@
 #include <cjson/cJSON.h>
 #include <sys/queue.h>
 
+#include "log.h"
 #include "shaper.h"
 #include "shaper_maat.h"
 #include "shaper_stat.h"
@@ -965,15 +966,8 @@ TEST(single_session_async, udp_tx_in_order)
     send_packets(&ctx->thread_ctx[0], sf, 80, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
 
 
-    //first 20 packets,async get token
-    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 20));
-    ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
-
-    stub_refresh_token_bucket(0);
-    for (int i = 0; i < 10; i++) {//异步获取token多发送了10个报文，补回token，不应发送报文
-        polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-        stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);
-    }
+    //first 10 packets, got token
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
     while (!TAILQ_EMPTY(&expec_tx_queue)) {//last 90 delay packets
@@ -1003,7 +997,7 @@ TEST(single_session_async, udp_tx_in_order)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, 160, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
+    shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, 170, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
     fclose(stat_file);
