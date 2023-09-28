@@ -467,14 +467,14 @@ static int shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct 
     shaper_global_stat_async_invoke_inc(ctx->global_stat);
     switch (pf_info->type) {
         case PROFILE_TYPE_GENERIC:
-            swarmkv_tconsume(ctx->swarmkv_db, key, strlen(key), req_token_bits, shaper_token_get_cb, arg);
+            swarmkv_tconsume(ctx->swarmkv_db, key, strlen(key), req_token_bits * TOKEN_ENLARGE_TIMES, shaper_token_get_cb, arg);
             break;
         case PROFILE_TYPE_HOST_FARINESS:
         case PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS:
-            swarmkv_ftconsume(ctx->swarmkv_db, key, strlen(key), sf->src_ip_str, sf->src_ip_str_len, sf->matched_rule_infos[sf->anchor].fair_factor, req_token_bits, shaper_token_get_cb, arg);
+            swarmkv_ftconsume(ctx->swarmkv_db, key, strlen(key), sf->src_ip_str, sf->src_ip_str_len, sf->matched_rule_infos[sf->anchor].fair_factor, req_token_bits * TOKEN_ENLARGE_TIMES, shaper_token_get_cb, arg);
             break;
         case PROFILE_TYPE_SPLIT_BY_LOCAL_HOST:
-            swarmkv_btconsume(ctx->swarmkv_db, key, strlen(key), sf->src_ip_str, sf->src_ip_str_len, req_token_bits, shaper_token_get_cb, arg);
+            swarmkv_btconsume(ctx->swarmkv_db, key, strlen(key), sf->src_ip_str, sf->src_ip_str_len, req_token_bits * TOKEN_ENLARGE_TIMES, shaper_token_get_cb, arg);
             break;
         default:
             if (arg) {
@@ -597,7 +597,7 @@ static int shaper_token_consume(struct shaping_thread_ctx *ctx, struct shaping_f
     if (shaper_profile_is_priority_blocked(ctx, sf, profile)) {
         return SHAPER_TOKEN_GET_FAILED;
     } else {
-        int req_token_bits = req_token_bytes * TOKEN_ENLARGE_TIMES * 8;
+        int req_token_bits = req_token_bytes * 8;
         return shaper_token_get_from_profile(ctx, sf, profile, profile_type, req_token_bits, direction);
     }
 }
