@@ -240,7 +240,7 @@ TEST(single_session, udp_tx_in_order)
     stub_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
-    sf = shaping_flow_new();
+    sf = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf != NULL);
 
     stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
@@ -321,7 +321,7 @@ TEST(single_session, tcp_tx_in_order)
     stub_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
-    sf = shaping_flow_new();
+    sf = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf != NULL);
 
     stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
@@ -402,7 +402,7 @@ TEST(single_session, udp_diff_direction)
     stub_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
-    sf = shaping_flow_new();
+    sf = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf != NULL);
 
     stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
@@ -482,7 +482,7 @@ TEST(single_session, udp_multi_rules)
     stub_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
-    sf = shaping_flow_new();
+    sf = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf != NULL);
 
     stub_set_matched_shaping_rules(3, rule_id, priority, profile_num, profile_id);
@@ -562,7 +562,7 @@ TEST(single_session, udp_borrow)
     stub_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
-    sf = shaping_flow_new();
+    sf = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf != NULL);
 
     stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
@@ -636,7 +636,7 @@ TEST(single_session, udp_borrow_same_priority_9)
     stub_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
-    sf = shaping_flow_new();
+    sf = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf != NULL);
 
     stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
@@ -722,9 +722,9 @@ TEST(two_session_diff_priority, udp_in_order)
     TAILQ_INIT(&expec_tx_queue2);
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
-    sf1 = shaping_flow_new();
+    sf1 = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf1 != NULL);
-    sf2 = shaping_flow_new();
+    sf2 = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf2 != NULL);
 
     stub_set_matched_shaping_rules(2, rule_ids, prioritys, profile_nums, profile_ids);
@@ -835,9 +835,9 @@ TEST(two_session_diff_priority, udp_in_order_multi_rule)
     
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
-    sf1 = shaping_flow_new();
+    sf1 = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf1 != NULL);
-    sf2 = shaping_flow_new();
+    sf2 = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf2 != NULL);
 
     stub_set_matched_shaping_rules(4, rule_ids, prioritys, profile_nums, profile_ids);
@@ -948,7 +948,7 @@ TEST(single_session_async, udp_tx_in_order)
     stub_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
-    sf = shaping_flow_new();
+    sf = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf != NULL);
     
     stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
@@ -1023,7 +1023,7 @@ TEST(single_session_async, udp_close_before_async_exec)
     stub_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
-    sf = shaping_flow_new();
+    sf = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf != NULL);
 
     stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
@@ -1099,9 +1099,9 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
     
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
-    sf1 = shaping_flow_new();
+    sf1 = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf1 != NULL);
-    sf2 = shaping_flow_new();
+    sf2 = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf2 != NULL);
 
 
@@ -1199,9 +1199,9 @@ TEST(two_session_same_rule, udp_tx_in_order)
     
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
-    sf1 = shaping_flow_new();
+    sf1 = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf1 != NULL);
-    sf2 = shaping_flow_new();
+    sf2 = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf2 != NULL);
 
     stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
@@ -1286,9 +1286,9 @@ TEST(two_session_diff_priority_same_profile, two_thread_udp_tx_in_order)
     
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
-    sf1 = shaping_flow_new();
+    sf1 = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf1 != NULL);
-    sf2 = shaping_flow_new();
+    sf2 = shaping_flow_new(&ctx->thread_ctx[1]);
     ASSERT_TRUE(sf2 != NULL);
 
     stub_set_matched_shaping_rules(2, rule_ids, prioritys, profile_nums, profile_id);
@@ -1381,9 +1381,9 @@ TEST(two_session_diff_priority_same_profile, udp_random_tx_in_order)
     
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
-    sf1 = shaping_flow_new();
+    sf1 = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf1 != NULL);
-    sf2 = shaping_flow_new();
+    sf2 = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf2 != NULL);
 
     stub_set_matched_shaping_rules(2, rule_ids, prioritys, profile_nums, profile_id);
@@ -1483,7 +1483,7 @@ TEST(statistics, udp_drop_pkt)
     stub_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
-    sf = shaping_flow_new();
+    sf = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf != NULL);
     
     stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
@@ -1558,7 +1558,7 @@ TEST(statistics, udp_queueing_pkt)
     
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
-    sf = shaping_flow_new();
+    sf = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf != NULL);
 
     stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);

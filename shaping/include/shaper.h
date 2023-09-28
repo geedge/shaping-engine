@@ -6,6 +6,9 @@
 #include "session_table.h"
 #include "utils.h"
 #include "shaper_stat.h"
+extern "C" {
+#include "timeout.h"
+}
 
 #define SHAPING_DIR_IN 0x1
 #define SHAPING_DIR_OUT 0x2
@@ -21,6 +24,9 @@
 #define CONFIRM_PRIORITY_PKTS 20
 
 #define SHAPING_WROK_THREAD_NUM_MAX 128
+
+#define SHAPING_STAT_REFRESH_INTERVAL_SEC 2
+#define SHAPING_STAT_REFRESH_MAX_PER_POLLING 5
 
 #define SHAPING_GLOBAL_CONF_FILE "./conf/shaping.conf"
 
@@ -46,6 +52,8 @@ struct shaping_thread_ctx {
     struct swarmkv *swarmkv_db;//handle of swarmkv 
     struct shaping_maat_info *maat_info;
     struct session_table *session_table;
+    struct timeouts *expires;
+    time_t last_update_timeout_sec;
     int session_need_reset;
     struct shaping_system_conf conf;
 };
@@ -141,6 +149,8 @@ struct shaping_flow {
     unsigned long long processed_pkts;
     struct timespec stat_update_time;
     time_t check_rule_time;
+    struct timeout timeout_handle;
+    time_t last_update_timeout_sec;
 };
 
 struct shaper_flow_instance {
@@ -150,7 +160,7 @@ struct shaper_flow_instance {
 
 struct shaper;//instance of shaping, thread unsafe
 
-struct shaping_flow* shaping_flow_new();
+struct shaping_flow* shaping_flow_new(struct shaping_thread_ctx *ctx);
 void shaping_flow_free(struct shaping_thread_ctx *ctx, struct shaping_flow *sf);
 struct shaper* shaper_new(unsigned int priority_queue_len_max);
 void shaper_free(struct shaper *sp);

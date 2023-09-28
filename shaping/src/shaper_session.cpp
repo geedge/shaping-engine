@@ -30,7 +30,7 @@ struct shaping_flow* shaper_session_opening(struct shaping_thread_ctx *ctx, stru
         return NULL;
     }
 
-    sf = shaping_flow_new();
+    sf = shaping_flow_new(ctx);
     raw_packet_parser_get_most_inner_tuple4(raw_parser, &sf->tuple4);
     sf->src_ip_str = addr_src_ip_to_str(&sf->tuple4);
     sf->src_ip_str_len = strlen(sf->src_ip_str);
