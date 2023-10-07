@@ -1026,12 +1026,20 @@ TEST(single_session_async, udp_close_before_async_exec)
     /*******send packets***********/
     send_packets(&ctx->thread_ctx[0], sf, 10, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));//async callback haven't been called, no token, no packet be sent
+    sf->flag |= SESSION_CLOSE;// receive close ctrlbuf
 
     stub_set_async_token_get_times(0, 0);//refresh async count, async thread will be executed
     sleep(1);//ensure async thread exec complete
 
-    shaping_flow_free(&ctx->thread_ctx[0], sf);
+    for (int i = 0; i < 10; i++) {
+        polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
+    }
+
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
+    
     fieldstat_global_disable_prometheus_endpoint();
+    shaping_engine_destroy(ctx);
+    stub_clear_matched_shaping_rules();
 }
 
 /*session1 match rule1; session2 match rule2
@@ -1565,6 +1573,6 @@ TEST(statistics, udp_queueing_pkt)
 int main(int argc, char **argv) 
 {
     testing::InitGoogleTest(&argc, argv);
-    //testing::GTEST_FLAG(filter) = "two_session_diff_priority_same_profile.session_timer_test";
+    //testing::GTEST_FLAG(filter) = "single_session_async.udp_close_before_async_exec";
     return RUN_ALL_TESTS();
 }
