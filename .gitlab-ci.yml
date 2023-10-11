@@ -13,108 +13,108 @@ stages:
 # compile use image: build-env:master
 ###############################################################################
 
-.build_by_travis_for_centos7:
-  image: $BUILD_IMAGE_CENTOS7
-  before_script:
-  - mkdir -p $BUILD_PADDING_PREFIX/$CI_PROJECT_NAMESPACE/
-  - ln -s $CI_PROJECT_DIR $BUILD_PADDING_PREFIX/$CI_PROJECT_PATH
-  - cd $BUILD_PADDING_PREFIX/$CI_PROJECT_PATH
-  - chmod +x ./ci/travis.sh
-  script:
-  - yum makecache
-  - ./ci/travis.sh
-  tags:
-  - share
+# .build_by_travis_for_centos7:
+#   image: $BUILD_IMAGE_CENTOS7
+#   before_script:
+#   - mkdir -p $BUILD_PADDING_PREFIX/$CI_PROJECT_NAMESPACE/
+#   - ln -s $CI_PROJECT_DIR $BUILD_PADDING_PREFIX/$CI_PROJECT_PATH
+#   - cd $BUILD_PADDING_PREFIX/$CI_PROJECT_PATH
+#   - chmod +x ./ci/travis.sh
+#   script:
+#   - yum makecache
+#   - ./ci/travis.sh
+#   tags:
+#   - share
 
-branch_build_debug_for_centos7:
-  stage: build
-  extends: .build_by_travis_for_centos7
-  variables:
-    BUILD_TYPE: Debug
-  except:
-    - /^develop-.*$/i
-    - /^release-.*$/i
-    - tags
+# branch_build_debug_for_centos7:
+#   stage: build
+#   extends: .build_by_travis_for_centos7
+#   variables:
+#     BUILD_TYPE: Debug
+#   except:
+#     - /^develop-.*$/i
+#     - /^release-.*$/i
+#     - tags
 
-branch_build_release_for_centos7:
-  stage: build
-  variables:
-    BUILD_TYPE: RelWithDebInfo
-  extends: .build_by_travis_for_centos7
-  except:
-    - /^develop-.*$/i
-    - /^release-.*$/i
-    - tags
+# branch_build_release_for_centos7:
+#   stage: build
+#   variables:
+#     BUILD_TYPE: RelWithDebInfo
+#   extends: .build_by_travis_for_centos7
+#   except:
+#     - /^develop-.*$/i
+#     - /^release-.*$/i
+#     - tags
 
-develop_build_debug_for_centos7:
-  stage: build
-  extends: .build_by_travis_for_centos7
-  variables:
-    TESTING_VERSION_BUILD: 1
-    UPLOAD_SYMBOL_FILES: 1
-    BUILD_TYPE: Debug
-#   ASAN_OPTION: ADDRESS
-    PACKAGE: 1
-    PULP3_REPO_NAME: tsg-testing-x86_64.el7
-    PULP3_DIST_NAME: tsg-testing-x86_64.el7
-  artifacts:
-    name: "shaping_engine-develop-$CI_COMMIT_REF_NAME-debug"
-    paths:
-      - build/*.rpm
-  only:
-    - /^develop-.*$/i
-    - /^release-.*$/i
+# develop_build_debug_for_centos7:
+#   stage: build
+#   extends: .build_by_travis_for_centos7
+#   variables:
+#     TESTING_VERSION_BUILD: 1
+#     UPLOAD_SYMBOL_FILES: 1
+#     BUILD_TYPE: Debug
+# #   ASAN_OPTION: ADDRESS
+#     PACKAGE: 1
+#     PULP3_REPO_NAME: tsg-testing-x86_64.el7
+#     PULP3_DIST_NAME: tsg-testing-x86_64.el7
+#   artifacts:
+#     name: "shaping_engine-develop-$CI_COMMIT_REF_NAME-debug"
+#     paths:
+#       - build/*.rpm
+#   only:
+#     - /^develop-.*$/i
+#     - /^release-.*$/i
 
-develop_build_release_for_centos7:
-  stage: build
-  extends: .build_by_travis_for_centos7
-  variables:
-    TESTING_VERSION_BUILD: 1
-    UPLOAD_SYMBOL_FILES: 1
-#   ASAN_OPTION: ADDRESS
-    BUILD_TYPE: RelWithDebInfo
-    PACKAGE: 1
-    PULP3_REPO_NAME: tsg-testing-x86_64.el7
-    PULP3_DIST_NAME: tsg-testing-x86_64.el7
-  artifacts:
-    name: "shaping_engine-develop-$CI_COMMIT_REF_NAME-release"
-    paths:
-      - build/*.rpm
-  only:
-    - /^develop-.*$/i
-    - /^release-.*$/i
+# develop_build_release_for_centos7:
+#   stage: build
+#   extends: .build_by_travis_for_centos7
+#   variables:
+#     TESTING_VERSION_BUILD: 1
+#     UPLOAD_SYMBOL_FILES: 1
+# #   ASAN_OPTION: ADDRESS
+#     BUILD_TYPE: RelWithDebInfo
+#     PACKAGE: 1
+#     PULP3_REPO_NAME: tsg-testing-x86_64.el7
+#     PULP3_DIST_NAME: tsg-testing-x86_64.el7
+#   artifacts:
+#     name: "shaping_engine-develop-$CI_COMMIT_REF_NAME-release"
+#     paths:
+#       - build/*.rpm
+#   only:
+#     - /^develop-.*$/i
+#     - /^release-.*$/i
 
-release_build_debug_for_centos7:
-  stage: build
-  variables:
-    UPLOAD_SYMBOL_FILES: 1
-    BUILD_TYPE: Debug
-    PACKAGE: 1
-    PULP3_REPO_NAME: tsg-stable-x86_64.el7
-    PULP3_DIST_NAME: tsg-stable-x86_64.el7
-  extends: .build_by_travis_for_centos7
-  artifacts:
-    name: "shaping_engine-install-$CI_COMMIT_REF_NAME-debug"
-    paths:
-    - build/*.rpm
-  only:
-    - tags
+# release_build_debug_for_centos7:
+#   stage: build
+#   variables:
+#     UPLOAD_SYMBOL_FILES: 1
+#     BUILD_TYPE: Debug
+#     PACKAGE: 1
+#     PULP3_REPO_NAME: tsg-stable-x86_64.el7
+#     PULP3_DIST_NAME: tsg-stable-x86_64.el7
+#   extends: .build_by_travis_for_centos7
+#   artifacts:
+#     name: "shaping_engine-install-$CI_COMMIT_REF_NAME-debug"
+#     paths:
+#     - build/*.rpm
+#   only:
+#     - tags
 
-release_build_release_for_centos7:
-  stage: build
-  variables:
-    BUILD_TYPE: RelWithDebInfo
-    UPLOAD_SYMBOL_FILES: 1
-    PACKAGE: 1
-    PULP3_REPO_NAME: tsg-stable-x86_64.el7
-    PULP3_DIST_NAME: tsg-stable-x86_64.el7
-  extends: .build_by_travis_for_centos7
-  artifacts:
-    name: "shaping_engine-install-$CI_COMMIT_REF_NAME-release"
-    paths:
-      - build/*.rpm
-  only:
-    - tags
+# release_build_release_for_centos7:
+#   stage: build
+#   variables:
+#     BUILD_TYPE: RelWithDebInfo
+#     UPLOAD_SYMBOL_FILES: 1
+#     PACKAGE: 1
+#     PULP3_REPO_NAME: tsg-stable-x86_64.el7
+#     PULP3_DIST_NAME: tsg-stable-x86_64.el7
+#   extends: .build_by_travis_for_centos7
+#   artifacts:
+#     name: "shaping_engine-install-$CI_COMMIT_REF_NAME-release"
+#     paths:
+#       - build/*.rpm
+#   only:
+#     - tags
 
 ###############################################################################
 # compile use image: build-env:rockylinux

@@ -8,6 +8,12 @@ extern "C"
 
 #define MIN(a, b) ((a) > (b) ? (b) : (a))
 
+#ifndef container_of
+#define container_of(ptr, type, member) ({			 \
+	const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+	(type *)( (char *)__mptr - offsetof(type,member) );})
+#endif
+
 #define LOG_TAG_SHAPING "SHAPING"
 #define LOG_TAG_SWARMKV "SWARMKV"
 #define LOG_TAG_STAT    "STAT"

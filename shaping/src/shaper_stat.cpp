@@ -4,12 +4,14 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <MESA/MESA_prof_load.h>
+#include <MESA/swarmkv.h>
 #include <fieldstat.h>
 
 #include "log.h"
 #include "utils.h"
 #include "shaper.h"
 #include "shaper_stat.h"
+#include "shaper_global_stat.h"
 
 #define SHAPER_STAT_ROW_NAME "traffic_shaping_rule_hits"
 
@@ -131,9 +133,23 @@ static void shaper_stat_tags_build(int vsys_id, int rule_id, int profile_id, int
     return;
 }
 
-static void shaper_stat_profile_metirc_refresh(struct shaping_stat *stat, int vsys_id, int thread_id, int rule_id, struct shaping_profile_info *profile, int profile_type, int need_update_guage)
+static void shaper_stat_swarmkv_hincrby_cb(const struct swarmkv_reply *reply, void * cb_arg)
+{
+    struct shaping_global_stat *global_stat = (struct shaping_global_stat *)cb_arg;
+
+    shaper_global_stat_async_callback_inc(global_stat);
+
+    if (reply->type != SWARMKV_REPLY_INTEGER) {
+        shaper_global_stat_async_hincrby_failed_inc(global_stat);
+    }
+
+    return;
+}
+
+static void shaper_stat_profile_metirc_refresh(struct shaping_thread_ctx *ctx, int vsys_id, int thread_id, int rule_id, struct shaping_profile_info *profile, int profile_type, int need_update_guage)
 {
     struct shaping_stat_for_profile *profile_stat = &profile->stat;
+    struct shaping_stat *stat = ctx->stat;
     unsigned long long old_latency;
     
     shaper_stat_tags_build(vsys_id, rule_id, profile->id, profile->priority, profile_type);
@@ -158,6 +174,9 @@ static void shaper_stat_profile_metirc_refresh(struct shaping_stat *stat, int vs
     if (need_update_guage) {
         fieldstat_dynamic_table_metric_value_incrby(stat->instance, stat->table_id, stat->column_ids[IN_QUEUE_LEN_IDX], SHAPER_STAT_ROW_NAME, profile_stat->in.queue_len, tags, TAG_IDX_MAX, thread_id);
         fieldstat_dynamic_table_metric_value_incrby(stat->instance, stat->table_id, stat->column_ids[OUT_QUEUE_LEN_IDX], SHAPER_STAT_ROW_NAME, profile_stat->out.queue_len, tags, TAG_IDX_MAX, thread_id);
+
+        shaper_global_stat_async_invoke_inc(ctx->global_stat);
+        swarmkv_async_command(ctx->swarmkv_db, shaper_stat_swarmkv_hincrby_cb, ctx->global_stat, "HINCRBY tsg-shaping-%d priority-%d %lld", profile->id, profile->priority, profile_stat->in.queue_len + profile_stat->out.queue_len);
         memset(profile_stat, 0, sizeof(struct shaping_stat_for_profile));
     } else {
         profile_stat->in.pkts = 0;
@@ -174,7 +193,7 @@ static void shaper_stat_profile_metirc_refresh(struct shaping_stat *stat, int vs
     return;
 }
 
-void shaper_stat_refresh(struct shaping_stat *stat, struct shaping_flow *sf, int thread_id, int force)
+void shaper_stat_refresh(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, int thread_id, int force)
 {
     struct shaping_rule_info *rule;
     struct timespec curr_time;
@@ -199,10 +218,10 @@ void shaper_stat_refresh(struct shaping_stat *stat, struct shaping_flow *sf, int
 
     for (int i = 0; i < sf->rule_num; i++) {
         rule = &sf->matched_rule_infos[i];
-        shaper_stat_profile_metirc_refresh(stat, rule->vsys_id, thread_id, rule->id, &rule->primary, PROFILE_IN_RULE_TYPE_PRIMARY, need_update_guage);
+        shaper_stat_profile_metirc_refresh(ctx, rule->vsys_id, thread_id, rule->id, &rule->primary, PROFILE_IN_RULE_TYPE_PRIMARY, need_update_guage);
 
         for (int j = 0; j < rule->borrowing_num; j++) {
-            shaper_stat_profile_metirc_refresh(stat, rule->vsys_id, thread_id, rule->id, &rule->borrowing[j], PROFILE_IN_RULE_TYPE_BORROW, need_update_guage);
+            shaper_stat_profile_metirc_refresh(ctx, rule->vsys_id, thread_id, rule->id, &rule->borrowing[j], PROFILE_IN_RULE_TYPE_BORROW, need_update_guage);
         }
     }
 

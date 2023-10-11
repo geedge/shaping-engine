@@ -381,7 +381,7 @@ void shaper_rules_update(struct shaping_thread_ctx *ctx, struct shaping_flow *sf
     }
 
     if (sf->rule_num > 0 && priority_changed) {
-        shaper_stat_refresh(ctx->stat, sf, ctx->thread_index, 1);
+        shaper_stat_refresh(ctx, sf, ctx->thread_index, 1);
     }
 
     sf->rule_num += rule_num;  

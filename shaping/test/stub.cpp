@@ -15,6 +15,7 @@
 #include <pthread.h>
 #include "stub.h"
 #include "shaper_maat.h"
+#include "log.h"
 
 using namespace std;
 
@@ -165,6 +166,8 @@ unsigned long long stub_curr_time_get()
 void stub_init()
 {
     int i;
+
+    LOG_INIT("./conf/zlog.conf");
 
     TAILQ_INIT(&tx_queue);
     memset(&matched_rules, 0, sizeof(struct stub_matched_rules));
@@ -417,6 +420,21 @@ void swarmkv_close(struct swarmkv * db)
         free(db);
     }
     return;
+}
+
+void swarmkv_caller_loop(struct swarmkv *db, int flags, struct timeval *tv)
+{
+    return;
+}
+
+int swarmkv_options_set_caller_thread_number(struct swarmkv_options *opts, int nr_caller_threads)
+{
+    return 0;
+}
+
+int swarmkv_options_set_worker_thread_number(struct swarmkv_options *opts, int nr_worker_threads)
+{
+    return 0;
 }
 /**********************************************/
 
