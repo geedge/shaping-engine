@@ -18,6 +18,7 @@ struct shaper_swarmkv_conf
     short swarmkv_health_check_port;
     short swarmkv_health_check_announce_port;
     short swarmkv_log_level;
+    int swarmkv_worker_thread_num;
 };
 
 static int shaper_swarmkv_config_load(struct shaper_swarmkv_conf *conf)
@@ -82,6 +83,8 @@ static int shaper_swarmkv_config_load(struct shaper_swarmkv_conf *conf)
         return ret;
     }
 
+    MESA_load_profile_int_def(SHAPING_GLOBAL_CONF_FILE, "SWARMKV", "SWARMKV_WORKER_THREAD_NUM", &conf->swarmkv_worker_thread_num, 1);
+
     MESA_load_profile_short_def(SHAPING_GLOBAL_CONF_FILE, "SWARMKV", "SWARMKV_LOG_LEVEL", &conf->swarmkv_log_level, 4);
 
     return 0;
@@ -121,7 +124,7 @@ struct swarmkv* shaper_swarmkv_init(int caller_thread_num)
     swarmkv_options_set_log_path(swarmkv_opts, "log");
     swarmkv_options_set_log_level(swarmkv_opts, conf.swarmkv_log_level);
     swarmkv_options_set_caller_thread_number(swarmkv_opts, caller_thread_num);
-    swarmkv_options_set_worker_thread_number(swarmkv_opts, 1);
+    swarmkv_options_set_worker_thread_number(swarmkv_opts, conf.swarmkv_worker_thread_num);
 
     swarmkv_db = swarmkv_open(swarmkv_opts, conf.swarmkv_cluster_name, &err);
     if (err) {
