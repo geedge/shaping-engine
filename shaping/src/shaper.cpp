@@ -750,6 +750,7 @@ static enum shaping_packet_action shaper_pkt_action_decide_no_queue(struct shapi
     int profile_type = PROFILE_IN_RULE_TYPE_PRIMARY;
     struct timespec curr_time;
     unsigned long long enqueue_time;
+    int enqueue_success = 0;
 
     if (meta->is_tcp_pure_ctrl) {
         shaper_stat_forward_all_rule_inc(ctx->stat, sf, meta->dir, meta->raw_len, ctx->thread_index);
@@ -771,7 +772,9 @@ static enum shaping_packet_action shaper_pkt_action_decide_no_queue(struct shapi
     }
 
 FLOW_PUSH:
-    if (shaper_packet_enqueue(ctx, sf, rx_buff, meta) != 0) {
+    if (shaper_packet_enqueue(ctx, sf, rx_buff, meta) == 0) {
+        enqueue_success = 1;
+    } else {
         char *addr_str = addr_tuple4_to_str(&sf->tuple4);
         LOG_ERROR("%s: shaping enqueue packet failed while queue empty for session: %s", LOG_TAG_SHAPING, addr_str);
         if (addr_str) {
@@ -790,6 +793,9 @@ FLOW_PUSH:
     }
 
 DROP:
+    if (enqueue_success) {
+        shaper_packet_dequeue(sf);
+    }
     shaper_stat_drop_inc(&sf->matched_rule_infos[sf->anchor].primary.stat, meta->dir, ctx->thread_index);
     sf->anchor = 0;
     return SHAPING_DROP;
