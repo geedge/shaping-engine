@@ -77,6 +77,14 @@ enum shaper_token_get_result {
     SHAPER_TOKEN_GET_PASS = 1,//don't need to get token, regard as success
 };
 
+struct shaping_profile_hash_node {
+    int id;
+    unsigned long long last_failed_get_token_ms;
+    UT_hash_handle hh;
+};
+
+struct shaping_profile_hash_node *g_shaping_profile_table = NULL;
+
 struct shaper* shaper_new(unsigned int priority_queue_len_max)
 {
     struct shaper *sp = NULL;
@@ -410,7 +418,7 @@ static void shaper_token_get_cb(const struct swarmkv_reply *reply, void * cb_arg
     if (reply->integer == 0) {//no token
         struct timespec curr_time;
         clock_gettime(CLOCK_MONOTONIC, &curr_time);
-        s_pf_info->last_failed_get_token_ms = curr_time.tv_sec * MILLI_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MILLI_SEC;
+        s_pf_info->hash_node->last_failed_get_token_ms = curr_time.tv_sec * MILLI_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MILLI_SEC;
         goto END;
     }
 
@@ -587,10 +595,22 @@ static int shaper_token_consume(struct shaping_thread_ctx *ctx, struct shaping_f
         return SHAPER_TOKEN_GET_SUCCESS;
     }
 
+    if (profile->hash_node == NULL) {
+        struct shaping_profile_hash_node *hash_node = NULL;
+        HASH_FIND_INT(g_shaping_profile_table, &profile->id, hash_node);
+        if (hash_node) {
+            profile->hash_node = hash_node;
+        } else {
+            profile->hash_node = (struct shaping_profile_hash_node*)calloc(1, sizeof(struct shaping_profile_hash_node));
+            profile->hash_node->id = profile->id;
+            HASH_ADD_INT(g_shaping_profile_table, id, profile->hash_node);
+        }
+    }
+
     struct timespec curr_timespec;
     clock_gettime(CLOCK_MONOTONIC, &curr_timespec);
     unsigned long long curr_time_ms = curr_timespec.tv_sec * MILLI_SECONDS_PER_SEC + curr_timespec.tv_nsec / NANO_SECONDS_PER_MILLI_SEC;
-    if (curr_time_ms - profile->last_failed_get_token_ms < TOKEN_GET_FAILED_INTERVAL_MS) {//if failed to get token in last 1ms, return failed; for swarmkv can't reproduce token in 1ms
+    if (curr_time_ms - profile->hash_node->last_failed_get_token_ms < TOKEN_GET_FAILED_INTERVAL_MS) {//if failed to get token in last 1ms, return failed; for swarmkv can't reproduce token in 1ms
         return SHAPER_TOKEN_GET_FAILED;
     }
 

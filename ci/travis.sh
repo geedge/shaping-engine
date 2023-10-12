@@ -48,6 +48,7 @@ yum install -y numactl-libs # required by mrzcpd
 yum install -y libibverbs # required by mrzcpd
 yum install -y libbreakpad_mini-devel
 yum install -y msgpack-devel
+yum install -y jemalloc-devel
 source /etc/profile.d/framework.sh
 source /etc/profile.d/mrzcpd.sh
 

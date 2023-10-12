@@ -93,10 +93,10 @@ struct shaping_profile_info {
     int in_deposit_token;
     int out_deposit_token;
     unsigned long long enqueue_time_us;//to calculate max latency
-    unsigned long long last_failed_get_token_ms;
     unsigned char is_priority_blocked;
     unsigned char is_invalid;
     struct shaping_stat_for_profile stat;
+    struct shaping_profile_hash_node *hash_node;
 };
 
 struct shaping_rule_info {
