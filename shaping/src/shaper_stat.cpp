@@ -15,7 +15,7 @@
 
 #define SHAPER_STAT_ROW_NAME "traffic_shaping_rule_hits"
 
-#define SHAPER_STAT_REFRESH_TIME_NS 200000000  //0.2s
+#define SHAPER_STAT_REFRESH_TIME_NS 500000000  //0.5s
 
 struct shaper_stat_conf {
     int enable_backgroud_thread;
@@ -205,7 +205,6 @@ void shaper_stat_refresh(struct shaping_thread_ctx *ctx, struct shaping_flow *sf
         clock_gettime(CLOCK_MONOTONIC, &curr_time);
         if (curr_time.tv_sec - sf->stat_update_time.tv_sec > 0 || curr_time.tv_nsec - sf->stat_update_time.tv_nsec > SHAPER_STAT_REFRESH_TIME_NS) {
             need_refresh = 1;
-            sf->stat_update_time = curr_time;
             memcpy(&sf->stat_update_time, &curr_time, sizeof(struct timespec));
         }
     }
