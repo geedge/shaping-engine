@@ -1361,7 +1361,7 @@ TEST(two_session_diff_priority_same_profile, session_timer_test)
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
     sleep(3);//wait session timer to expire, to refresh priority queue_len to swarmkv
-    for (int i = 0; i < 200; i++) {
+    for (int i = 0; i < 500; i++) {
         stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);//inc time to refresh stat in timer
     }
     polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);//timer triggered in polling
@@ -1384,7 +1384,7 @@ TEST(two_session_diff_priority_same_profile, session_timer_test)
     }
 
     sleep(3);//wait session timer to expire, to refresh priority queue_len to swarmkv
-    for (int i = 0; i < 200; i++) {
+    for (int i = 0; i < 500; i++) {
         stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);//inc time to refresh stat in timer
     }
     polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);//timer triggered in polling

@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <assert.h>
 #include <signal.h>
+#include <jemalloc/jemalloc.h>
 
 #include "log.h"
 #include "utils.h"
@@ -76,6 +77,14 @@ int main(int argc, char **argv)
     if (signal(SIGQUIT, sig_handler) == SIG_ERR)
     {
         LOG_ERROR("%s: unable to register SIGQUIT signal handler, error %d: %s", LOG_TAG_SHAPING, errno, strerror(errno));
+        LOG_CLOSE();
+        return -1;
+    }
+
+    bool flag = true;
+    int ret = mallctl("background_thread", NULL, NULL, &flag, sizeof(flag));
+    if (ret != 0) {
+        LOG_ERROR("%s: mallctl(background_thread) failed, ret %d", LOG_TAG_SHAPING, ret);
         LOG_CLOSE();
         return -1;
     }
