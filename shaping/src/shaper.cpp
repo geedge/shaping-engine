@@ -415,16 +415,17 @@ static void shaper_token_get_cb(const struct swarmkv_reply *reply, void * cb_arg
         s_pf_info->is_invalid = 0;
     }
 
-    if (reply->integer == 0) {//no token
+    if (reply->integer > 0) {
+        shaper_deposit_token_add(s_pf_info, reply->integer, arg->direction);//deposit tokens to profile
+    }
+
+END:
+    if (reply->type != SWARMKV_REPLY_INTEGER || reply->integer == 0) {
         struct timespec curr_time;
         clock_gettime(CLOCK_MONOTONIC, &curr_time);
         s_pf_info->hash_node->last_failed_get_token_ms = curr_time.tv_sec * MILLI_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MILLI_SEC;
-        goto END;
     }
 
-    shaper_deposit_token_add(s_pf_info, reply->integer, arg->direction);//deposit tokens to profile
-
-END:
     shaping_flow_free(arg->ctx, sf);//sub ref count and decide if need to free
     free(cb_arg);
     cb_arg = NULL;
