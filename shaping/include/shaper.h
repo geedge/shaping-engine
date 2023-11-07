@@ -50,6 +50,8 @@ struct shaping_thread_ctx {
     struct shaping_global_stat *global_stat;
     struct shaping_marsio_info *marsio_info;
     struct swarmkv *swarmkv_db;//handle of swarmkv 
+    int swarmkv_aqm_prob;
+    time_t swarmkv_aqm_update_time;
     struct shaping_maat_info *maat_info;
     struct session_table *session_table;
     struct timeouts *expires;
