@@ -262,6 +262,11 @@ struct swarmkv *swarmkv_open(struct swarmkv_options *opts, const char * cluster_
     return db;
 }
 
+size_t swarmkv_caller_get_pending_commands(struct swarmkv *db)
+{
+    return 0;
+}
+
 int swarmkv_options_set_log_path(struct swarmkv_options *opts, const char *logpath)
 {
     return 0;

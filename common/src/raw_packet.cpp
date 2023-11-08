@@ -148,7 +148,7 @@ int raw_packet_tcp_payload_len_get(struct raw_pkt_parser *handler)
         const struct layer_result *layer = &results->layers[i];
         enum layer_type type = layer->type;
 
-        LOG_DEBUG("%s: find most inner tcp, pkt_trace_id: %lu, layer[%d/%d]: %s", LOG_TAG_RAWPKT, handler->pkt_trace_id, i, results->layers_size, layer_type2str(type));
+        //LOG_DEBUG("%s: find most inner tcp, pkt_trace_id: %lu, layer[%d/%d]: %s", LOG_TAG_RAWPKT, handler->pkt_trace_id, i, results->layers_size, layer_type2str(type));
 
         // first get L4 layer
         if (type & LAYER_TYPE_TCP)
@@ -190,7 +190,7 @@ int raw_packet_parser_get_most_inner_tuple4(struct raw_pkt_parser *handler, stru
         const struct layer_result *layer = &results->layers[i];
         enum layer_type type = layer->type;
 
-        LOG_DEBUG("%s: find most inner tuple4, pkt_trace_id: %lu, layer[%d/%d]: %s", LOG_TAG_RAWPKT, handler->pkt_trace_id, i, results->layers_size, layer_type2str(type));
+        //LOG_DEBUG("%s: find most inner tuple4, pkt_trace_id: %lu, layer[%d/%d]: %s", LOG_TAG_RAWPKT, handler->pkt_trace_id, i, results->layers_size, layer_type2str(type));
 
         // first get L4 layer
         if (type & LAYER_TYPE_L4)
@@ -245,7 +245,7 @@ int raw_packet_parser_get_most_outer_tuple4(struct raw_pkt_parser *handler, stru
         const struct layer_result *layer = &results->layers[i];
         enum layer_type type = layer->type;
 
-        LOG_DEBUG("%s: find most outer tuple4, pkt_trace_id: %lu, layer[%d/%d]: %s", LOG_TAG_RAWPKT, handler->pkt_trace_id, i, results->layers_size, layer_type2str(type));
+        //LOG_DEBUG("%s: find most outer tuple4, pkt_trace_id: %lu, layer[%d/%d]: %s", LOG_TAG_RAWPKT, handler->pkt_trace_id, i, results->layers_size, layer_type2str(type));
 
         // first get L3 layer
         if (type & LAYER_TYPE_L3)
@@ -297,7 +297,7 @@ int raw_packet_parser_get_most_inner_address(struct raw_pkt_parser *handler, str
         const struct layer_result *layer = &results->layers[i];
         enum layer_type type = layer->type;
 
-        LOG_DEBUG("%s: find most inner address, pkt_trace_id: %lu, layer[%d/%d]: %s", LOG_TAG_RAWPKT, handler->pkt_trace_id, i, results->layers_size, layer_type2str(type));
+        //LOG_DEBUG("%s: find most inner address, pkt_trace_id: %lu, layer[%d/%d]: %s", LOG_TAG_RAWPKT, handler->pkt_trace_id, i, results->layers_size, layer_type2str(type));
         if (type & LAYER_TYPE_L3)
         {
             l3_layer_data = (const char *)handler->ptr_pkt_start + layer->offset;
@@ -322,7 +322,7 @@ int raw_packet_parser_get_most_outer_address(struct raw_pkt_parser *handler, str
         const struct layer_result *layer = &results->layers[i];
         enum layer_type type = layer->type;
 
-        LOG_DEBUG("%s: find most outer address, pkt_trace_id: %lu, layer[%d/%d]: %s", LOG_TAG_RAWPKT, handler->pkt_trace_id, i, results->layers_size, layer_type2str(type));
+        //LOG_DEBUG("%s: find most outer address, pkt_trace_id: %lu, layer[%d/%d]: %s", LOG_TAG_RAWPKT, handler->pkt_trace_id, i, results->layers_size, layer_type2str(type));
         if (type & LAYER_TYPE_L3)
         {
             l3_layer_data = (const char *)handler->ptr_pkt_start + layer->offset;
@@ -452,12 +452,12 @@ uint64_t raw_packet_parser_get_hash_value(struct raw_pkt_parser *handler, enum l
         return hash_value;
     }
 
-    char *inner_addr_str = addr_tuple4_to_str(&inner_addr);
-    char *outer_addr_str = addr_tuple4_to_str(&outer_addr);
-    LOG_DEBUG("%s: pkt_trace_id: %lu, outer_addr: %s, inner_addr: %s, is_internal: %d, hash_method: %s, hash_value: %lu",
-              LOG_TAG_RAWPKT, handler->pkt_trace_id, outer_addr_str, inner_addr_str, dir_is_internal, ldbc_method_to_string(method), hash_value);
-    free(inner_addr_str);
-    free(outer_addr_str);
+    //char *inner_addr_str = addr_tuple4_to_str(&inner_addr);
+    //char *outer_addr_str = addr_tuple4_to_str(&outer_addr);
+    //LOG_DEBUG("%s: pkt_trace_id: %lu, outer_addr: %s, inner_addr: %s, is_internal: %d, hash_method: %s, hash_value: %lu",
+    //          LOG_TAG_RAWPKT, handler->pkt_trace_id, outer_addr_str, inner_addr_str, dir_is_internal, ldbc_method_to_string(method), hash_value);
+    //free(inner_addr_str);
+    //free(outer_addr_str);
 
     return hash_value;
 }
@@ -664,7 +664,7 @@ static const void *parse_ether(struct raw_pkt_parser *handler, const void *data,
     const void *data_next_layer = (const char *)data + hdr_len;
     size_t data_next_length = length - hdr_len;
 
-    LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
+    //LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
     switch (next_proto)
     {
     case ETH_P_8021Q:
@@ -712,7 +712,7 @@ static const void *parse_ipv4(struct raw_pkt_parser *handler, const void *data, 
     const void *data_next_layer = (const char *)data + hdr_len;
     size_t data_next_length = length - hdr_len;
 
-    LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
+    //LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
     switch (next_proto)
     {
     case IPPROTO_TCP:
@@ -752,7 +752,7 @@ static const void *parse_ipv6(struct raw_pkt_parser *handler, const void *data, 
     const void *data_next_layer = (const char *)data + hdr_len;
     size_t data_next_length = length - hdr_len;
 
-    LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
+    //LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
     switch (next_proto)
     {
     case IPPROTO_TCP:
@@ -791,7 +791,7 @@ static const void *parse_tcp(struct raw_pkt_parser *handler, const void *data, s
     const void *data_next_layer = (const char *)data + hdr_len;
     size_t data_next_length = length - hdr_len;
 
-    LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
+    //LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
 
     return data_next_layer;
 }
@@ -814,7 +814,7 @@ static const void *parse_udp(struct raw_pkt_parser *handler, const void *data, s
     const void *data_next_layer = (const char *)data + hdr_len;
     size_t data_next_length = length - hdr_len;
 
-    LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
+    //LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
     switch (ntohs(hdr->uh_dport))
     {
     // VXLAN_DPORT
@@ -848,7 +848,7 @@ static const void *parse_pppoe_ses(struct raw_pkt_parser *handler, const void *d
     const void *data_next_layer = (const char *)data + hdr_len;
     size_t data_next_length = length - hdr_len;
 
-    LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
+    //LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
     switch (next_proto)
     {
         // PPPOE_TYPE_IPV4
@@ -883,7 +883,7 @@ static const void *parse_vxlan(struct raw_pkt_parser *handler, const void *data,
     const void *data_next_layer = (const char *)data + hdr_len;
     size_t data_next_length = length - hdr_len;
 
-    LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
+    //LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
     // TESTED
     return parse_ether(handler, data_next_layer, data_next_length, LAYER_TYPE_ETHER);
 }
@@ -907,7 +907,7 @@ static const void *parse_vlan8021q(struct raw_pkt_parser *handler, const void *d
     const void *data_next_layer = (const char *)data + hdr_len;
     size_t data_next_length = length - hdr_len;
 
-    LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
+    //LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
     switch (next_proto)
     {
     case ETH_P_8021Q:
@@ -954,7 +954,7 @@ static const void *parse_gtpv1_u(struct raw_pkt_parser *handler, const void *dat
     const void *data_next_layer = (const char *)data + hdr_len;
     size_t data_next_length = length - hdr_len;
 
-    LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
+    //LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
     switch (next_proto)
     {
     case 4:
@@ -1027,32 +1027,32 @@ static const void *parse_mpls(struct raw_pkt_parser *handler, const void *data, 
             data_next_layer = (const char *)data_next_layer + 4;
             data_next_length = data_next_length - 4;
 
-            LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
+            //LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
             // TESTED
             return parse_ether(handler, data_next_layer, data_next_length, LAYER_TYPE_ETHER);
         }
         else if (ip_version == 4)
         {
-            LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
+            //LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
             // TESTED
             return parse_ipv4(handler, data_next_layer, data_next_length, LAYER_TYPE_IPV4);
         }
         else if (ip_version == 6)
         {
-            LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
+            //LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
             // TODO
             return parse_ipv6(handler, data_next_layer, data_next_length, LAYER_TYPE_IPV6);
         }
         else
         {
-            LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
+            //LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
             // TODO
             return parse_ether(handler, data_next_layer, data_next_length, LAYER_TYPE_ETHER);
         }
     }
     else
     {
-        LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
+        //LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
         // TESTED
         return parse_mpls(handler, data_next_layer, data_next_length, LAYER_TYPE_MPLS);
     }

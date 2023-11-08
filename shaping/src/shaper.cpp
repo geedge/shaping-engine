@@ -463,6 +463,22 @@ static int shaper_deposit_token_is_enough(struct shaping_profile_info *pf_info, 
     }
 }
 
+static void shaper_token_temp_cb(const struct swarmkv_reply *reply, void * cb_arg)
+{
+    struct shaping_async_cb_arg *arg = (struct shaping_async_cb_arg*)cb_arg;
+
+    shaper_global_stat_async_callback_inc(arg->ctx->global_stat);
+
+    if (reply->type != SWARMKV_REPLY_INTEGER) {
+        shaper_global_stat_async_tconsume_failed_inc(arg->ctx->global_stat);
+    }
+
+    free(cb_arg);
+    cb_arg = NULL;
+
+    return;
+}
+
 static int shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, struct shaping_profile_info *pf_info, int profile_type, int req_token_bits, unsigned char direction)
 {
     struct shaping_async_cb_arg *arg = NULL;
@@ -481,6 +497,12 @@ static int shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct 
     switch (pf_info->type) {
         case PROFILE_TYPE_GENERIC:
             swarmkv_tconsume(ctx->swarmkv_db, key, strlen(key), req_token_bits * TOKEN_ENLARGE_TIMES, shaper_token_get_cb, arg);
+            for (int i = 0; i < 100; i++) {
+                struct shaping_async_cb_arg *tmp_arg = (struct shaping_async_cb_arg *)calloc(1, sizeof(struct shaping_async_cb_arg));
+                tmp_arg->ctx = ctx;
+                shaper_global_stat_async_invoke_inc(ctx->global_stat);
+                swarmkv_tconsume(ctx->swarmkv_db, key, strlen(key), 0, shaper_token_temp_cb, tmp_arg);
+            }
             break;
         case PROFILE_TYPE_HOST_FARINESS:
         case PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS:

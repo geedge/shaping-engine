@@ -129,6 +129,7 @@ int shaper_swarmkv_pending_queue_aqm_drop(struct shaping_thread_ctx *ctx)
     ctx->swarmkv_aqm_update_time = now;
 
 END:
+    int random = rand();
     if (rand() % PROBABILITY_MAX < ctx->swarmkv_aqm_prob) {
         return 1;
     }
