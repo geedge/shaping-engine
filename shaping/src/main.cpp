@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <assert.h>
 #include <signal.h>
+#include <sys/prctl.h>
 #include <jemalloc/jemalloc.h>
 
 #include "log.h"
@@ -19,7 +20,11 @@ static int quit = 0;
 
 static void *shaper_thread_loop(void *data)
 {
+    char thread_name[16] = {0};
     struct shaping_thread_ctx *ctx = (struct shaping_thread_ctx *)data;
+
+    snprintf(thread_name, sizeof(thread_name), "shape-work-%d", ctx->thread_index);
+    prctl(PR_SET_NAME, (unsigned long long)thread_name, NULL, NULL, NULL);
 
     if (marsio_thread_init(ctx->marsio_info->instance) != 0) {
         LOG_ERROR("%s: marsio_thread_init failed", LOG_TAG_SHAPING);
