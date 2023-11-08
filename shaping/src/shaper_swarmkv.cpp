@@ -108,7 +108,7 @@ void swarmkv_reload_log_level()
 
 int shaper_swarmkv_pending_queue_aqm_drop(struct shaping_thread_ctx *ctx)
 {
-    size_t pending_queue_len = swarmkv_caller_get_pending_commands(ctx->swarmkv_db);
+    long long pending_queue_len = swarmkv_caller_get_pending_commands(ctx->swarmkv_db);
     time_t now = time(NULL);
 
     if (now - ctx->swarmkv_aqm_update_time < FREEZE_TIME) {

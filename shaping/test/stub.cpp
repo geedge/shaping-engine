@@ -262,7 +262,7 @@ struct swarmkv *swarmkv_open(struct swarmkv_options *opts, const char * cluster_
     return db;
 }
 
-size_t swarmkv_caller_get_pending_commands(struct swarmkv *db)
+long long swarmkv_caller_get_pending_commands(struct swarmkv *db)
 {
     return 0;
 }
