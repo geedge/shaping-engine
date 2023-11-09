@@ -30,10 +30,9 @@ extern "C" {
 #define NANO_SECONDS_PER_MILLI_SEC 1000000
 #define MILLI_SECONDS_PER_SEC 1000
 
-#define SHAPING_LATENCY_THRESHOLD 2000000 //2s
-
 #define TOKEN_ENLARGE_TIMES 10
 #define TOKEN_GET_FAILED_INTERVAL_MS 1
+#define HMGET_REQUEST_INTERVAL_MS 1000
 
 #define SWARMKV_QUEUE_LEN_GET_CMD_PRIORITY_1 "HMGET tsg-shaping-%d priority-0"
 #define SWARMKV_QUEUE_LEN_GET_CMD_PRIORITY_2 SWARMKV_QUEUE_LEN_GET_CMD_PRIORITY_1 " priority-1"
@@ -79,7 +78,10 @@ enum shaper_token_get_result {
 
 struct shaping_profile_hash_node {
     int id;
-    unsigned long long last_failed_get_token_ms;
+    long long last_failed_get_token_ms;
+    long long last_hmget_ms[SHAPING_PRIORITY_NUM_MAX];
+    unsigned char is_priority_blocked[SHAPING_PRIORITY_NUM_MAX];
+    unsigned char is_invalid;
     UT_hash_handle hh;
 };
 
@@ -511,12 +513,13 @@ static int shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct 
 static void shaper_queue_len_get_cb(const struct swarmkv_reply *reply, void * cb_arg)
 {
     struct shaping_async_cb_arg *arg = (struct shaping_async_cb_arg *)cb_arg;
-    struct shaping_profile_info *s_pf_info = arg->s_pf_info;
+    struct shaping_profile_hash_node *pf_hash_node = arg->s_pf_info->hash_node;
     struct shaping_flow *sf = arg->sf;
+    int priority = arg->priority;
 
     shaper_global_stat_async_callback_inc(arg->ctx->global_stat);
 
-    s_pf_info->is_priority_blocked = 0;
+    pf_hash_node->is_priority_blocked[priority] = 0;
 
     if (!reply || (reply->type != SWARMKV_REPLY_NIL && reply->type != SWARMKV_REPLY_ARRAY)) {
         shaper_global_stat_async_hmget_failed_inc(arg->ctx->global_stat);
@@ -532,25 +535,33 @@ static void shaper_queue_len_get_cb(const struct swarmkv_reply *reply, void * cb
             char tmp_str[32] = {0};
             memcpy(tmp_str, reply->elements[i]->str, reply->elements[i]->len);
             if (strtoll(tmp_str, NULL, 10) > 0) {
-                s_pf_info->is_priority_blocked = 1;
+                pf_hash_node->is_priority_blocked[priority] = 1;
                 break;
             }
         }
     }
 
 END:
+    struct timespec curr_time;
+    clock_gettime(CLOCK_MONOTONIC, &curr_time);
+    pf_hash_node->last_hmget_ms[priority] = curr_time.tv_sec * MILLI_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MILLI_SEC;
+
     shaping_flow_free(arg->ctx, sf);//sub ref count and decide if need to free
     free(cb_arg);
     cb_arg = NULL;
 }
 
-static int shaper_profile_is_priority_blocked(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, struct shaping_profile_info *profile)
+static int shaper_profile_is_priority_blocked(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, struct shaping_profile_info *profile, long long curr_time_ms)
 {
     struct shaping_async_cb_arg *arg;
     int priority = profile->priority;
 
     if (priority == 0) {//highest priority, can't be blocked
         return 0;
+    }
+
+    if (curr_time_ms - profile->hash_node->last_hmget_ms[priority] < HMGET_REQUEST_INTERVAL_MS) {//don't send hmget command in 1s
+        goto END;
     }
 
     arg = (struct shaping_async_cb_arg *)calloc(1, sizeof(struct shaping_async_cb_arg));
@@ -564,7 +575,8 @@ static int shaper_profile_is_priority_blocked(struct shaping_thread_ctx *ctx, st
     shaper_global_stat_async_invoke_inc(ctx->global_stat);
     swarmkv_async_command(ctx->swarmkv_db, shaper_queue_len_get_cb, arg, swarmkv_queue_len_get_cmd[priority], profile->id);
 
-    if (profile->is_priority_blocked) {
+END:
+    if (profile->hash_node->is_priority_blocked[priority] == 1) {
         return 1;
     } else {
         return 0;
@@ -610,12 +622,17 @@ static int shaper_token_consume(struct shaping_thread_ctx *ctx, struct shaping_f
 
     struct timespec curr_timespec;
     clock_gettime(CLOCK_MONOTONIC, &curr_timespec);
-    unsigned long long curr_time_ms = curr_timespec.tv_sec * MILLI_SECONDS_PER_SEC + curr_timespec.tv_nsec / NANO_SECONDS_PER_MILLI_SEC;
+    long long curr_time_ms = curr_timespec.tv_sec * MILLI_SECONDS_PER_SEC + curr_timespec.tv_nsec / NANO_SECONDS_PER_MILLI_SEC;
     if (curr_time_ms - profile->hash_node->last_failed_get_token_ms < TOKEN_GET_FAILED_INTERVAL_MS) {//if failed to get token in last 1ms, return failed; for swarmkv can't reproduce token in 1ms
         return SHAPER_TOKEN_GET_FAILED;
     }
 
-    if (shaper_profile_is_priority_blocked(ctx, sf, profile)) {
+    if (shaper_swarmkv_pending_queue_aqm_drop(ctx) == 1) {
+        profile->hash_node->last_failed_get_token_ms = curr_time_ms;
+        return SHAPER_TOKEN_GET_FAILED;
+    }
+
+    if (shaper_profile_is_priority_blocked(ctx, sf, profile, curr_time_ms)) {
         return SHAPER_TOKEN_GET_FAILED;
     } else {
         int req_token_bits = req_token_bytes * 8;
@@ -699,7 +716,7 @@ static enum shaping_packet_action shaper_pkt_action_decide_queueing(struct shapi
 
     if (pf_container[0].pf_type == PROFILE_IN_RULE_TYPE_PRIMARY) {
         clock_gettime(CLOCK_MONOTONIC, &curr_time);
-        if (shaper_pkt_latency_us_calculate(pf_container[0].pf_info, &curr_time) > SHAPING_LATENCY_THRESHOLD) {
+        if (shaper_pkt_latency_us_calculate(pf_container[0].pf_info, &curr_time) > ctx->conf.pkt_max_delay_time_us) {
             shaper_flow_pop(ctx, sf);
             goto DROP;
         }
@@ -1196,6 +1213,7 @@ int shaper_global_conf_init(struct shaping_system_conf *conf)
     MESA_load_profile_uint_def(SHAPING_GLOBAL_CONF_FILE, "CONFIG", "PRIORITY_QUEUE_LEN_MAX", &conf->priority_queue_len_max, 1024);
 
     MESA_load_profile_int_def(SHAPING_GLOBAL_CONF_FILE, "CONFIG", "CHECK_RULE_ENABLE_INTERVAL_SEC", &conf->check_rule_enable_interval_sec, 120);
+    MESA_load_profile_uint_def(SHAPING_GLOBAL_CONF_FILE, "CONFIG", "PKT_MAX_DELAY_TIME_US", &conf->pkt_max_delay_time_us, 2000000);
 
     return 0;
 

@@ -113,7 +113,7 @@ int session_table_insert(struct session_table *table, uint64_t session_id, const
     HASH_FIND(hh1, table->root_by_id, &session_id, sizeof(session_id), temp);
     if (temp)
     {
-        LOG_DEBUG("%s: insert: key %lu exists", LOG_TAG_STABLE, session_id);
+        LOG_ERROR("%s: insert: key %lu exists", LOG_TAG_STABLE, session_id);
         return -1;
     }
 
@@ -128,7 +128,7 @@ int session_table_insert(struct session_table *table, uint64_t session_id, const
     HASH_ADD(hh1, table->root_by_id, session_id, sizeof(temp->session_id), temp);
     HASH_ADD(hh2, table->root_by_addr, session_addr, sizeof(temp->session_addr), temp);
 
-    LOG_DEBUG("%s: insert: key %lu success", LOG_TAG_STABLE, session_id);
+    //LOG_DEBUG("%s: insert: key %lu success", LOG_TAG_STABLE, session_id);
     table->session_node_count++;
 
     return 0;
@@ -140,7 +140,7 @@ int session_table_delete_by_id(struct session_table *table, uint64_t session_id)
     HASH_FIND(hh1, table->root_by_id, &session_id, sizeof(session_id), temp);
     if (!temp)
     {
-        LOG_DEBUG("%s: delete: key %lu not exists", LOG_TAG_STABLE, session_id);
+        LOG_ERROR("%s: delete: key %lu not exists", LOG_TAG_STABLE, session_id);
         return -1;
     }
 
@@ -156,7 +156,7 @@ int session_table_delete_by_id(struct session_table *table, uint64_t session_id)
     free(temp);
     temp = NULL;
 
-    LOG_DEBUG("%s: delete: key %lu success", LOG_TAG_STABLE, session_id);
+    //LOG_DEBUG("%s: delete: key %lu success", LOG_TAG_STABLE, session_id);
     table->session_node_count--;
 
     return 0;
@@ -174,7 +174,7 @@ int session_table_delete_by_addr(struct session_table *table, const struct addr_
         HASH_FIND(hh2, table->root_by_addr, &reverse_addr, sizeof(struct addr_tuple4), temp);
         if (!temp)
         {
-            LOG_DEBUG("%s: delete: key %s not exists", LOG_TAG_STABLE, addr_str);
+            LOG_ERROR("%s: delete: key %s not exists", LOG_TAG_STABLE, addr_str);
             free(addr_str);
             return -1;
         }
@@ -192,7 +192,7 @@ int session_table_delete_by_addr(struct session_table *table, const struct addr_
     free(temp);
     temp = NULL;
 
-    LOG_DEBUG("%s: delete: key %s success", LOG_TAG_STABLE, addr_str);
+    //LOG_DEBUG("%s: delete: key %s success", LOG_TAG_STABLE, addr_str);
     free(addr_str);
     addr_str = NULL;
     table->session_node_count--;
@@ -206,11 +206,11 @@ struct session_node *session_table_search_by_id(struct session_table *table, uin
     HASH_FIND(hh1, table->root_by_id, &session_id, sizeof(session_id), temp);
     if (!temp)
     {
-        LOG_DEBUG("%s: search: key %lu not exists", LOG_TAG_STABLE, session_id);
+        //LOG_DEBUG("%s: search: key %lu not exists", LOG_TAG_STABLE, session_id);
         return NULL;
     }
 
-    LOG_DEBUG("%s: search: key %lu success", LOG_TAG_STABLE, session_id);
+    //LOG_DEBUG("%s: search: key %lu success", LOG_TAG_STABLE, session_id);
 
     return temp;
 }
@@ -227,14 +227,14 @@ struct session_node *session_table_search_by_addr(struct session_table *table, c
         HASH_FIND(hh2, table->root_by_addr, &reverse_addr, sizeof(struct addr_tuple4), temp);
         if (!temp)
         {
-            LOG_DEBUG("%s: search: key %s not exists", LOG_TAG_STABLE, addr_str);
+            //LOG_DEBUG("%s: search: key %s not exists", LOG_TAG_STABLE, addr_str);
             free(addr_str);
             addr_str = NULL;
             return NULL;
         }
     }
 
-    LOG_DEBUG("%s: search: key %s success", LOG_TAG_STABLE, addr_str);
+    //LOG_DEBUG("%s: search: key %s success", LOG_TAG_STABLE, addr_str);
     free(addr_str);
     addr_str = NULL;
 

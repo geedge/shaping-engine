@@ -56,7 +56,7 @@ static void send_packets(struct shaping_thread_ctx *ctx, struct shaping_flow *sf
     for (int i = 0; i < pkt_num; i++) {
         memset(&meta, 0, sizeof(meta));
 
-        time = stub_curr_time_get();
+        time = stub_curr_time_ns_get();
         packet = packet_new(time, pkt_len, dir);
         if (expec_tx_queue) {
             pkt_node = packet_node_new(packet);
@@ -75,7 +75,7 @@ static void send_packets(struct shaping_thread_ctx *ctx, struct shaping_flow *sf
             polling_entry(ctx->sp, ctx->stat, ctx);
         }
 
-        stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);
+        stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
     }
 
     return;
@@ -261,7 +261,7 @@ TEST(single_session, udp_tx_in_order)
         stub_refresh_token_bucket(0);
         for (int i = 0; i < 20; i++) {//even though invoke polling more than 10 times, there should be only 10 pkts be sent
             polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-            stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);
+            stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
         }
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
         ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
@@ -348,7 +348,7 @@ TEST(single_session, tcp_tx_in_order)
     stub_refresh_token_bucket(0);
     for (int i = 0; i < 10; i++) {//10 pkts which is not pure control
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-        stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);
+        stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
     }
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
 
@@ -422,7 +422,7 @@ TEST(single_session, udp_diff_direction)
     stub_refresh_token_bucket(0);
     for (int i = 0; i < 20; i++) {
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-        stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);
+        stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
     }
     //10 out packets
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
@@ -503,7 +503,7 @@ TEST(single_session, udp_multi_rules)
             //there are 3 rules, send one packet need 3 polling process, so 10 packets need 30 polling
             //even though invoke polling more than 30 times, there should be only 10 pkts be sent
             polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-            stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);
+            stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
         }
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
         ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
@@ -577,7 +577,7 @@ TEST(single_session, udp_borrow)
         stub_refresh_token_bucket(2);
         for (int i = 0; i < 20; i++) {//even though invoke polling more than 10 times, there should be only 10 pkts be sent
             polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-            stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);
+            stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
         }
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
         ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
@@ -651,7 +651,7 @@ TEST(single_session, udp_borrow_same_priority_9)
         stub_refresh_token_bucket(3);
         for (int i = 0; i < 20; i++) {//even though invoke polling more than 10 times, there should be only 10 pkts be sent
             polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-            stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);
+            stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
         }
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
         ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
@@ -747,7 +747,7 @@ TEST(two_session_diff_priority, udp_in_order)
         stub_refresh_token_bucket(1);
         for (int i = 0; i < 10; i++) {
             polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-            stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);
+            stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
         }
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 10));//stream2 priority 1, first
         ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
@@ -758,7 +758,7 @@ TEST(two_session_diff_priority, udp_in_order)
         stub_refresh_token_bucket(1);
         for (int i = 0; i < 10; i++) {
             polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-            stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);
+            stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
         }
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 10));//stream1 priority 2
         ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
@@ -864,7 +864,7 @@ TEST(two_session_diff_priority, udp_in_order_multi_rule)
         stub_refresh_token_bucket(4);
         for (int i = 0; i < 30; i++) {
             polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-            stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);
+            stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
         }
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 10));
         ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
@@ -877,7 +877,7 @@ TEST(two_session_diff_priority, udp_in_order_multi_rule)
         stub_refresh_token_bucket(4);
         for (int i = 0; i < 10; i++) {
             polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-            stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);
+            stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
         }
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 10));//stream2 priority 3
         ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
@@ -965,7 +965,7 @@ TEST(single_session_async, udp_tx_in_order)
         stub_refresh_token_bucket(0);
         for (int i = 0; i < 20; i++) {//even though invoke polling more than 10 times, there should be only 10 pkts be sent
             polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-            stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);
+            stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
         }
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
         ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
@@ -1103,7 +1103,7 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
         stub_refresh_token_bucket(2);
         for (int i = 0; i < 20; i++) {//even though invoke polling more than 10 times, there should be only 10 pkts be sent
             polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-            stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);
+            stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
         }
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 10));
         ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
@@ -1114,7 +1114,7 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
         stub_refresh_token_bucket(2);
         for (int i = 0; i < 20; i++) {//even though invoke polling more than 10 times, there should be only 10 pkts be sent
             polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-            stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);
+            stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
         }
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 10));
         ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
@@ -1200,7 +1200,7 @@ TEST(two_session_same_rule, udp_tx_in_order)
         stub_refresh_token_bucket(1);
         for (int i = 0; i < 20; i++) {//even though invoke polling more than 10 times, there should be only 10 pkts be sent
             polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-            stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);
+            stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
         }
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
         ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
@@ -1280,6 +1280,7 @@ TEST(two_session_diff_priority_same_profile, two_thread_udp_tx_in_order)
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
     shaper_stat_refresh(&ctx->thread_ctx[0], sf1, 0, 1);//刷新线程0中的优先级队列长度到swarmkv中
+    stub_curr_time_s_inc(1);//inc time to refresh hmget interval
     for (int i = 0; i < 10; i++) {//线程1中的session优先级为2，被线程0中优先级为1的session阻断
         stub_refresh_token_bucket(0);
         polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);
@@ -1294,6 +1295,7 @@ TEST(two_session_diff_priority_same_profile, two_thread_udp_tx_in_order)
     }
 
     shaper_stat_refresh(&ctx->thread_ctx[0], sf1, 0, 1);//刷新线程0中的优先级队列长度到swarmkv中
+    stub_curr_time_s_inc(1);//inc time to refresh hmget interval
     while (!TAILQ_EMPTY(&expec_tx_queue2)) {
         stub_refresh_token_bucket(0);
         polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);
@@ -1362,15 +1364,16 @@ TEST(two_session_diff_priority_same_profile, session_timer_test)
 
     sleep(3);//wait session timer to expire, to refresh priority queue_len to swarmkv
     for (int i = 0; i < 500; i++) {
-        stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);//inc time to refresh stat in timer
+        stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);//inc time to refresh stat in timer
     }
     polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);//timer triggered in polling
     polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);
 
+    stub_curr_time_s_inc(1);//inc time to refresh hmget interval
     for (int i = 0; i < 10; i++) {//线程1中的session优先级为2，被线程0中优先级为1的session阻断
         stub_refresh_token_bucket(0);
         polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);
-        stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);
+        stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
 
         ASSERT_EQ(-1, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 1));//优先级低，不能发出报文
     }
@@ -1378,22 +1381,23 @@ TEST(two_session_diff_priority_same_profile, session_timer_test)
     while (!TAILQ_EMPTY(&expec_tx_queue1)) {
         stub_refresh_token_bucket(0);
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-        stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);
+        stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
 
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 1));//sf1 priority 1
     }
 
     sleep(3);//wait session timer to expire, to refresh priority queue_len to swarmkv
     for (int i = 0; i < 500; i++) {
-        stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);//inc time to refresh stat in timer
+        stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);//inc time to refresh stat in timer
     }
     polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);//timer triggered in polling
     polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);
 
+    stub_curr_time_s_inc(1);//inc time to refresh hmget interval
     while (!TAILQ_EMPTY(&expec_tx_queue2)) {
         stub_refresh_token_bucket(0);
         polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);
-        stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);
+        stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
 
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 1));//sf2 priority 2
     }
@@ -1444,7 +1448,7 @@ TEST(statistics, udp_drop_pkt)
     while (!TAILQ_EMPTY(&expec_tx_queue)) {
         stub_refresh_token_bucket(0);
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-        stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);
+        stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 1));
     }
 
@@ -1531,7 +1535,7 @@ TEST(statistics, udp_queueing_pkt)
     while (!TAILQ_EMPTY(&expec_tx_queue)) {//last 90 delay packets
         stub_refresh_token_bucket(0);
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-        stub_curr_time_inc(STUB_TIME_INC_FOR_PACKET);
+        stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 1));
     }
 

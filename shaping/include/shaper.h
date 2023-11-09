@@ -33,6 +33,7 @@ extern "C" {
 struct shaping_system_conf {
     unsigned int session_queue_len_max;
     unsigned int priority_queue_len_max;
+    unsigned int pkt_max_delay_time_us;
     int polling_node_num_max[SHAPING_PRIORITY_NUM_MAX];
     int work_thread_num;
     int cpu_affinity_enable;
@@ -50,6 +51,8 @@ struct shaping_thread_ctx {
     struct shaping_global_stat *global_stat;
     struct shaping_marsio_info *marsio_info;
     struct swarmkv *swarmkv_db;//handle of swarmkv 
+    int swarmkv_aqm_prob;
+    time_t swarmkv_aqm_update_time;
     struct shaping_maat_info *maat_info;
     struct session_table *session_table;
     struct timeouts *expires;

@@ -41,8 +41,9 @@ struct stub_pkt_queue* stub_get_tx_queue();
 
 int stub_AQM_drop_packet(int queue_len, unsigned long long income_time);
 
-void stub_curr_time_inc(unsigned long long time_ns);
-unsigned long long stub_curr_time_get();
+void stub_curr_time_ns_inc(unsigned long long time_ns);
+void stub_curr_time_s_inc(int time_s);
+unsigned long long stub_curr_time_ns_get();
 
 void stub_init();
 
