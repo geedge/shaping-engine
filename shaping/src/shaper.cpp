@@ -30,8 +30,6 @@ extern "C" {
 #define NANO_SECONDS_PER_MILLI_SEC 1000000
 #define MILLI_SECONDS_PER_SEC 1000
 
-#define SHAPING_LATENCY_THRESHOLD 2000000 //2s
-
 #define TOKEN_ENLARGE_TIMES 10
 #define TOKEN_GET_FAILED_INTERVAL_MS 1
 #define HMGET_REQUEST_INTERVAL_MS 1000
@@ -718,7 +716,7 @@ static enum shaping_packet_action shaper_pkt_action_decide_queueing(struct shapi
 
     if (pf_container[0].pf_type == PROFILE_IN_RULE_TYPE_PRIMARY) {
         clock_gettime(CLOCK_MONOTONIC, &curr_time);
-        if (shaper_pkt_latency_us_calculate(pf_container[0].pf_info, &curr_time) > SHAPING_LATENCY_THRESHOLD) {
+        if (shaper_pkt_latency_us_calculate(pf_container[0].pf_info, &curr_time) > ctx->conf.pkt_max_delay_time_us) {
             shaper_flow_pop(ctx, sf);
             goto DROP;
         }
@@ -1215,6 +1213,7 @@ int shaper_global_conf_init(struct shaping_system_conf *conf)
     MESA_load_profile_uint_def(SHAPING_GLOBAL_CONF_FILE, "CONFIG", "PRIORITY_QUEUE_LEN_MAX", &conf->priority_queue_len_max, 1024);
 
     MESA_load_profile_int_def(SHAPING_GLOBAL_CONF_FILE, "CONFIG", "CHECK_RULE_ENABLE_INTERVAL_SEC", &conf->check_rule_enable_interval_sec, 120);
+    MESA_load_profile_uint_def(SHAPING_GLOBAL_CONF_FILE, "CONFIG", "PKT_MAX_DELAY_TIME_US", &conf->pkt_max_delay_time_us, 2000000);
 
     return 0;
 

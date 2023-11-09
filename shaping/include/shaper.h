@@ -33,6 +33,7 @@ extern "C" {
 struct shaping_system_conf {
     unsigned int session_queue_len_max;
     unsigned int priority_queue_len_max;
+    unsigned int pkt_max_delay_time_us;
     int polling_node_num_max[SHAPING_PRIORITY_NUM_MAX];
     int work_thread_num;
     int cpu_affinity_enable;

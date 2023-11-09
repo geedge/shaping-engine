@@ -50,7 +50,8 @@ struct stub_matched_rules matched_rules;
 struct shaping_profile pf_array[MAX_STUB_PROFILE_NUM];
 static int profile_priority_len[MAX_STUB_PROFILE_NUM][10] = {{0}};
 
-static unsigned long long curr_time = 2000000000;//2s
+static unsigned long long curr_time_ns = 2000000000;//2s
+static unsigned int curr_time_s = 0;
 
 void * stub_get_token_thread_func(void *data)
 {
@@ -151,16 +152,23 @@ struct stub_pkt_queue* stub_get_tx_queue()
     return &tx_queue;
 }
 
-void stub_curr_time_inc(unsigned long long time_ns)
+void stub_curr_time_ns_inc(unsigned long long time_ns)
 {
-    curr_time += time_ns;
+    curr_time_ns += time_ns;
 
     return;
 }
 
-unsigned long long stub_curr_time_get()
+void stub_curr_time_s_inc(int time_s)
 {
-    return curr_time;
+    curr_time_s += time_s;
+
+    return;
+}
+
+unsigned long long stub_curr_time_ns_get()
+{
+    return curr_time_ns;
 }
 
 void stub_init()
@@ -193,8 +201,8 @@ void stub_init()
 
 int clock_gettime (clockid_t __clock_id, struct timespec *__tp)
 {
-    __tp->tv_sec = 0;
-    __tp->tv_nsec = curr_time;
+    __tp->tv_sec = curr_time_s;
+    __tp->tv_nsec = curr_time_ns;
 
     return 0;
 }

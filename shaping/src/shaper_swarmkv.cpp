@@ -119,12 +119,12 @@ int shaper_swarmkv_pending_queue_aqm_drop(struct shaping_thread_ctx *ctx)
         if (ctx->swarmkv_aqm_prob < PROBABILITY_MAX) {
             ctx->swarmkv_aqm_prob += INCREMENT;
         }
-        LOG_DEBUG("%s: shaping pending queue len %lu, aqm prob %d", LOG_TAG_SWARMKV, pending_queue_len, ctx->swarmkv_aqm_prob);
+        LOG_DEBUG("%s: shaping pending queue len %lld, aqm prob %d", LOG_TAG_SWARMKV, pending_queue_len, ctx->swarmkv_aqm_prob);
     } else {
         if (ctx->swarmkv_aqm_prob >= DECREMENT) {
             ctx->swarmkv_aqm_prob -= DECREMENT;
         }
-        LOG_DEBUG("%s: shaping pending queue len %lu, aqm prob %d", LOG_TAG_SWARMKV, pending_queue_len, ctx->swarmkv_aqm_prob);
+        LOG_DEBUG("%s: shaping pending queue len %lld, aqm prob %d", LOG_TAG_SWARMKV, pending_queue_len, ctx->swarmkv_aqm_prob);
     }
     ctx->swarmkv_aqm_update_time = now;
 
