@@ -93,11 +93,7 @@ struct shaping_profile_info {
     int id;//profile_id
     enum shaping_profile_type type;
     int priority;
-    int in_deposit_token;
-    int out_deposit_token;
     unsigned long long enqueue_time_us;//to calculate max latency
-    unsigned char is_priority_blocked;
-    unsigned char is_invalid;
     struct shaping_stat_for_profile stat;
     struct shaping_profile_hash_node *hash_node;
 };
@@ -118,7 +114,6 @@ struct shaping_packet_wrapper {
     unsigned long long enqueue_time_us;//first enqueue time
     unsigned int length;
     unsigned char direction;
-    unsigned char tcp_pure_contorl;
     TAILQ_ENTRY(shaping_packet_wrapper) node;
 };
 TAILQ_HEAD(delay_queue, shaping_packet_wrapper);
@@ -187,3 +182,4 @@ void shaping_packet_process(struct shaping_thread_ctx *ctx, marsio_buff_t *rx_bu
 
 struct shaping_ctx *shaping_engine_init();
 void shaping_engine_destroy(struct shaping_ctx *ctx);
+void shaper_thread_resource_clear();

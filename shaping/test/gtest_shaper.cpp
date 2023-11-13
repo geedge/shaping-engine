@@ -274,7 +274,7 @@ TEST(single_session, udp_tx_in_order)
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
     shaper_global_stat_refresh(ctx->global_stat);
 
-
+    shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     
     stub_clear_matched_shaping_rules();
@@ -330,12 +330,12 @@ TEST(single_session, tcp_tx_in_order)
 
     /*******send packets***********/
     send_packets(&ctx->thread_ctx[0], sf, 20, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
-    send_packets(&ctx->thread_ctx[0], sf, 20, 100, SHAPING_DIR_OUT, &expec_pure_ctl_tx_queue, 1, 1);
+    send_packets(&ctx->thread_ctx[0], sf, 10, 100, SHAPING_DIR_OUT, &expec_pure_ctl_tx_queue, 1, 1);
 
     //first 10 packets
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
-    //20 pure ctrl pkts
-    ASSERT_EQ(0, judge_packet_eq(&expec_pure_ctl_tx_queue, actual_tx_queue, 20));
+    //10 pure ctrl pkts
+    ASSERT_EQ(0, judge_packet_eq(&expec_pure_ctl_tx_queue, actual_tx_queue, 10));
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
 
@@ -344,6 +344,13 @@ TEST(single_session, tcp_tx_in_order)
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
     sleep(2);//wait telegraf generate metric
 
+
+    stub_refresh_token_bucket(0);
+    for (int i = 0; i < 10; i++) {
+        polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
+        stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
+    }
+    ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));//pure ctrl pkts force consume 1000 tokens, current token: -1000--->0, so no pkt can be sent
 
     stub_refresh_token_bucket(0);
     for (int i = 0; i < 10; i++) {//10 pkts which is not pure control
@@ -358,7 +365,7 @@ TEST(single_session, tcp_tx_in_order)
     /***********send stat data here********************/
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
 
-    
+    shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
 
@@ -370,7 +377,7 @@ TEST(single_session, tcp_tx_in_order)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 0, 0, 1, 30, 3000, 0, 10, 0, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(line, 0, 0, 1, 20, 2000, 0, 10, 0, SHAPING_DIR_OUT, profile_type_primary);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
     shaping_stat_judge(line, 0, 0, 1, 10, 1000, 0, 0, 30000, SHAPING_DIR_OUT, profile_type_primary);
@@ -436,7 +443,7 @@ TEST(single_session, udp_diff_direction)
     /***********send stat data here********************/
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
 
-    
+    shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
 
@@ -515,6 +522,7 @@ TEST(single_session, udp_multi_rules)
     /***********send stat data here********************/
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
 
+    shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
 
@@ -589,6 +597,7 @@ TEST(single_session, udp_borrow)
     /***********send stat data here********************/
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
 
+    shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
 
@@ -663,6 +672,7 @@ TEST(single_session, udp_borrow_same_priority_9)
     /***********send stat data here********************/
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
 
+    shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
 
@@ -771,7 +781,7 @@ TEST(two_session_diff_priority, udp_in_order)
     /***********send stat data here********************/
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
 
-
+    shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
 
@@ -890,7 +900,7 @@ TEST(two_session_diff_priority, udp_in_order_multi_rule)
     /***********send stat data here********************/
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
 
-    
+    shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
 
@@ -977,6 +987,7 @@ TEST(single_session_async, udp_tx_in_order)
     /***********send stat data here********************/
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
 
+    shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
 
@@ -1038,6 +1049,7 @@ TEST(single_session_async, udp_close_before_async_exec)
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
     
     fieldstat_global_disable_prometheus_endpoint();
+    shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
 }
@@ -1127,6 +1139,7 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
     /***********send stat data here********************/
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
 
+    shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
 
@@ -1213,6 +1226,7 @@ TEST(two_session_same_rule, udp_tx_in_order)
     /***********send stat data here********************/
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
 
+    shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
 
@@ -1308,6 +1322,7 @@ TEST(two_session_diff_priority_same_profile, two_thread_udp_tx_in_order)
     shaping_flow_free(&ctx->thread_ctx[0], sf1);
     shaping_flow_free(&ctx->thread_ctx[1], sf2);
     fieldstat_global_disable_prometheus_endpoint();
+    shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
 }
@@ -1407,6 +1422,7 @@ TEST(two_session_diff_priority_same_profile, session_timer_test)
     shaping_flow_free(&ctx->thread_ctx[0], sf1);
     shaping_flow_free(&ctx->thread_ctx[1], sf2);
     fieldstat_global_disable_prometheus_endpoint();
+    shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
 }
@@ -1459,6 +1475,7 @@ TEST(statistics, udp_drop_pkt)
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
     shaper_global_stat_refresh(ctx->global_stat);
 
+    shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
 
@@ -1546,6 +1563,7 @@ TEST(statistics, udp_queueing_pkt)
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
     shaper_global_stat_refresh(ctx->global_stat);
 
+    shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
 
@@ -1577,6 +1595,6 @@ TEST(statistics, udp_queueing_pkt)
 int main(int argc, char **argv) 
 {
     testing::InitGoogleTest(&argc, argv);
-    //testing::GTEST_FLAG(filter) = "single_session_async.udp_close_before_async_exec";
+    //testing::GTEST_FLAG(filter) = "single_session.tcp_tx_in_order";
     return RUN_ALL_TESTS();
 }
