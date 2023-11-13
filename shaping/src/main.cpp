@@ -43,6 +43,8 @@ static void *shaper_thread_loop(void *data)
         marsio_poll_wait(ctx->marsio_info->instance, &ctx->marsio_info->mr_dev, 1, ctx->thread_index, ctx->global_stat->output_interval_s * 1000);
     }
 
+    shaper_thread_resource_clear();
+
     return NULL;
 }
 
