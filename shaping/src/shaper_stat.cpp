@@ -1,4 +1,3 @@
-#include <cstring>
 #include <stdio.h>
 #include <time.h>
 #include <sys/socket.h>
@@ -135,13 +134,22 @@ static void shaper_stat_tags_build(int vsys_id, int rule_id, int profile_id, int
 
 static void shaper_stat_swarmkv_hincrby_cb(const struct swarmkv_reply *reply, void * cb_arg)
 {
-    struct shaping_global_stat *global_stat = (struct shaping_global_stat *)cb_arg;
+    struct shaping_async_cb_arg *arg = (struct shaping_async_cb_arg *)cb_arg;
+    struct timespec curr_time;
+    long long curr_time_us;
 
-    shaper_global_stat_async_callback_inc(global_stat);
+    clock_gettime(CLOCK_MONOTONIC, &curr_time);
+    curr_time_us = curr_time.tv_sec * MICRO_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MICRO_SEC;
+    shaper_global_stat_swarmkv_latency_update(arg->ctx->global_stat, curr_time_us - arg->start_time_us);
+
+    shaper_global_stat_async_callback_inc(arg->ctx->global_stat);
+    shaper_global_stat_hincrby_callback_inc(arg->ctx->global_stat);
 
     if (reply->type != SWARMKV_REPLY_INTEGER) {
-        shaper_global_stat_async_hincrby_failed_inc(global_stat);
+        shaper_global_stat_async_hincrby_failed_inc(arg->ctx->global_stat);
     }
+
+    free(cb_arg);
 
     return;
 }
@@ -175,8 +183,16 @@ static void shaper_stat_profile_metirc_refresh(struct shaping_thread_ctx *ctx, i
         fieldstat_dynamic_table_metric_value_incrby(stat->instance, stat->table_id, stat->column_ids[IN_QUEUE_LEN_IDX], SHAPER_STAT_ROW_NAME, profile_stat->in.queue_len, tags, TAG_IDX_MAX, thread_id);
         fieldstat_dynamic_table_metric_value_incrby(stat->instance, stat->table_id, stat->column_ids[OUT_QUEUE_LEN_IDX], SHAPER_STAT_ROW_NAME, profile_stat->out.queue_len, tags, TAG_IDX_MAX, thread_id);
 
+        struct shaping_async_cb_arg *arg = (struct shaping_async_cb_arg *)calloc(1, sizeof(struct shaping_async_cb_arg));
+        struct timespec curr_time;
+
+        clock_gettime(CLOCK_MONOTONIC, &curr_time);
+        arg->ctx = ctx;
+        arg->start_time_us = curr_time.tv_sec * MICRO_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MICRO_SEC;
         shaper_global_stat_async_invoke_inc(ctx->global_stat);
-        swarmkv_async_command(ctx->swarmkv_db, shaper_stat_swarmkv_hincrby_cb, ctx->global_stat, "HINCRBY tsg-shaping-%d priority-%d %lld", profile->id, profile->priority, profile_stat->in.queue_len + profile_stat->out.queue_len);
+        shaper_global_stat_hincrby_invoke_inc(ctx->global_stat);
+        swarmkv_async_command(ctx->swarmkv_db, shaper_stat_swarmkv_hincrby_cb, arg, "HINCRBY tsg-shaping-%d priority-%d %lld", profile->id, profile->priority, profile_stat->in.queue_len + profile_stat->out.queue_len);
+
         memset(profile_stat, 0, sizeof(struct shaping_stat_for_profile));
     } else {
         profile_stat->in.pkts = 0;

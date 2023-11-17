@@ -20,6 +20,12 @@ enum shaping_global_stat_column_index {
 
     ASYNC_INVOKE_IDX,
     ASYNC_CALLBACK_IDX,
+    ASYNC_TCONSUME_INVOKE_IDX,
+    ASYNC_TCONSUME_CALLBACK_IDX,
+    ASYNC_HINCRBY_INVOKE_IDX,
+    ASYNC_HINCRBY_CALLBACK_IDX,
+    ASYNC_HMGET_INVOKE_IDX,
+    ASYNC_HMGET_CALLBACK_IDX,
     ASYNC_TCONSUME_FAILED,
     ASYNC_HINCRBY_FAILED,
     ASYNC_HMGET_FAILED,
@@ -63,6 +69,12 @@ struct shaping_global_stat_data {
     long long session_log_send;
     long long async_invoke;
     long long async_callback;
+    long long async_tconsume_invoke;
+    long long async_tconsume_callback;
+    long long async_hincrby_invoke;
+    long long async_hincrby_callback;
+    long long async_hmget_invoke;
+    long long async_hmget_callback;
     long long async_tconsume_failed;
     long long async_hincrby_failed;
     long long async_hmget_failed;
@@ -73,12 +85,15 @@ struct shaping_global_stat_data {
 struct shaping_global_stat {
     struct fieldstat_instance *instance;
     int column_ids[GLOBAL_STAT_COLUNM_IDX_MAX];
+    int swarmkv_latency_summary_id;
     struct shaping_global_stat_data local_stat_data;
     int output_interval_s;
 };
 
 struct shaping_global_stat* shaper_global_stat_init();
 void shaper_global_stat_destroy(struct shaping_global_stat *stat);
+
+void shaper_global_stat_swarmkv_latency_update(struct shaping_global_stat *stat, long long latency_us);
 
 void shaper_global_stat_curr_session_inc(struct shaping_global_stat *stat);
 void shaper_global_stat_curr_session_dec(struct shaping_global_stat *stat);
@@ -96,6 +111,14 @@ void shaper_global_stat_session_log_send_num_inc(struct shaping_global_stat *sta
 
 void shaper_global_stat_async_invoke_inc(struct shaping_global_stat *stat);
 void shaper_global_stat_async_callback_inc(struct shaping_global_stat *stat);
+
+void sheper_global_stat_tconsume_invoke_inc(struct shaping_global_stat *stat);
+void shaper_global_stat_tconsume_callback_inc(struct shaping_global_stat *stat);
+void shaper_global_stat_hincrby_invoke_inc(struct shaping_global_stat *stat);
+void shaper_global_stat_hincrby_callback_inc(struct shaping_global_stat *stat);
+void shaper_global_stat_hmget_invoke_inc(struct shaping_global_stat *stat);
+void shaper_global_stat_hmget_callback_inc(struct shaping_global_stat *stat);
+
 void shaper_global_stat_async_tconsume_failed_inc(struct shaping_global_stat *stat);
 void shaper_global_stat_async_hincrby_failed_inc(struct shaping_global_stat *stat);
 void shaper_global_stat_async_hmget_failed_inc(struct shaping_global_stat *stat);
