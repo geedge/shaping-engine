@@ -140,7 +140,6 @@ struct shaping_flow {
     int priority;
     int rule_num;
     int anchor;//rule_idx
-    int ref_count;
     unsigned int queue_len;
     unsigned int flag;
     struct metadata ctrl_meta;
