@@ -22,20 +22,31 @@ static int shaper_global_stat_conf_load(struct shaping_global_stat *stat, struct
 
 static void shaper_global_stat_fieldstat_reg(struct shaping_global_stat *stat)
 {
+    const char * quantiles = "0.1,0.5,0.8,0.9,0.95,0.99";
+    stat->swarmkv_latency_summary_id = fieldstat_register_summary(stat->instance, "async_delay(us)", NULL, 0, quantiles, 1, 500000, 3, 1);
+
     stat->column_ids[CURR_SESSION_NUM_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_GAUGE, "curr_session_num", NULL, 0);
     stat->column_ids[QUEUEING_PKTS_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_GAUGE, "curr_queueing_pkts", NULL, 0);
     stat->column_ids[QUEUEING_BYTES_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_GAUGE, "curr_queueing_bytes", NULL, 0);
 
     stat->column_ids[CTRL_ERR_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "ctrl_error", NULL, 0);
-    stat->column_ids[CTRL_OPENING_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "ctrl_opening", NULL, 0);
+    stat->column_ids[CTRL_OPENING_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "ctrl_open", NULL, 0);
     stat->column_ids[CTRL_ACTIVE_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "ctrl_active", NULL, 0);
     stat->column_ids[CTRL_CLOSE_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "ctrl_close", NULL, 0);
-    stat->column_ids[CTRL_ACTIVE_CLOSE_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "ctrl_active_close", NULL, 0);
-    stat->column_ids[CTRL_RESETALL_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "ctrl_resetall", NULL, 0);
-    stat->column_ids[SESSION_LOG_SEND_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "session_log_send", NULL, 0);
+    stat->column_ids[CTRL_ACTIVE_CLOSE_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "ctrl_sf_close", NULL, 0);
+    stat->column_ids[CTRL_RESETALL_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "ctrl_reset", NULL, 0);
+    stat->column_ids[SESSION_LOG_SEND_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "sess_log_send", NULL, 0);
 
-    stat->column_ids[ASYNC_INVOKE_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "async_invoke", NULL, 0);
-    stat->column_ids[ASYNC_CALLBACK_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "async_callback", NULL, 0);
+    stat->column_ids[ASYNC_INVOKE_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "async", NULL, 0);
+    stat->column_ids[ASYNC_CALLBACK_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "async_cb", NULL, 0);
+
+    stat->column_ids[ASYNC_TCONSUME_INVOKE_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "tconsume", NULL, 0);
+    stat->column_ids[ASYNC_TCONSUME_CALLBACK_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "tconsume_cb", NULL, 0);
+    stat->column_ids[ASYNC_HINCRBY_INVOKE_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "hincrby", NULL, 0);
+    stat->column_ids[ASYNC_HINCRBY_CALLBACK_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "hincrby_cb", NULL, 0);
+    stat->column_ids[ASYNC_HMGET_INVOKE_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "hmget", NULL, 0);
+    stat->column_ids[ASYNC_HMGET_CALLBACK_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "hmget_cb", NULL, 0);
+
     stat->column_ids[ASYNC_TCONSUME_FAILED] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "tconsume_failed", NULL, 0);
     stat->column_ids[ASYNC_HINCRBY_FAILED] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "hincrby_failed", NULL, 0);
     stat->column_ids[ASYNC_HMGET_FAILED] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "hmget_failed", NULL, 0);
@@ -118,6 +129,13 @@ void shaper_global_stat_destroy(struct shaping_global_stat *stat)
         fieldstat_instance_free(stat->instance);
     }
     free(stat);
+
+    return;
+}
+
+void shaper_global_stat_swarmkv_latency_update(struct shaping_global_stat *stat, long long latency_us)
+{
+    fieldstat_value_set(stat->instance, stat->swarmkv_latency_summary_id, latency_us);
 
     return;
 }
@@ -246,6 +264,60 @@ void shaper_global_stat_async_callback_inc(struct shaping_global_stat *stat)
     return;
 }
 
+void sheper_global_stat_tconsume_invoke_inc(struct shaping_global_stat *stat)
+{
+    struct shaping_global_stat_data *local_stat_data = &stat->local_stat_data;
+
+    __atomic_add_fetch(&local_stat_data->async_tconsume_invoke, 1, __ATOMIC_RELAXED);
+
+    return;
+}
+
+void shaper_global_stat_tconsume_callback_inc(struct shaping_global_stat *stat)
+{
+    struct shaping_global_stat_data *local_stat_data = &stat->local_stat_data;
+    
+    __atomic_add_fetch(&local_stat_data->async_tconsume_callback, 1, __ATOMIC_RELAXED);
+
+    return;
+}
+
+void shaper_global_stat_hincrby_invoke_inc(struct shaping_global_stat *stat)
+{
+    struct shaping_global_stat_data *local_stat_data = &stat->local_stat_data;
+    
+    __atomic_add_fetch(&local_stat_data->async_hincrby_invoke, 1, __ATOMIC_RELAXED);
+
+    return;
+}
+
+void shaper_global_stat_hincrby_callback_inc(struct shaping_global_stat *stat)
+{
+    struct shaping_global_stat_data *local_stat_data = &stat->local_stat_data;
+    
+    __atomic_add_fetch(&local_stat_data->async_hincrby_callback, 1, __ATOMIC_RELAXED);
+
+    return;
+}
+
+void shaper_global_stat_hmget_invoke_inc(struct shaping_global_stat *stat)
+{
+    struct shaping_global_stat_data *local_stat_data = &stat->local_stat_data;
+    
+    __atomic_add_fetch(&local_stat_data->async_hmget_invoke, 1, __ATOMIC_RELAXED);
+
+    return;
+}
+
+void shaper_global_stat_hmget_callback_inc(struct shaping_global_stat *stat)
+{
+    struct shaping_global_stat_data *local_stat_data = &stat->local_stat_data;
+    
+    __atomic_add_fetch(&local_stat_data->async_hmget_callback, 1, __ATOMIC_RELAXED);
+
+    return;
+}
+
 void shaper_global_stat_async_tconsume_failed_inc(struct shaping_global_stat *stat)
 {
     struct shaping_global_stat_data *local_stat_data = &stat->local_stat_data;
@@ -342,6 +414,14 @@ void shaper_global_stat_refresh(struct shaping_global_stat *stat)
 
     fieldstat_value_set(stat->instance, stat->column_ids[ASYNC_INVOKE_IDX], local_stat_data->async_invoke);
     fieldstat_value_set(stat->instance, stat->column_ids[ASYNC_CALLBACK_IDX], local_stat_data->async_callback);
+
+    fieldstat_value_set(stat->instance, stat->column_ids[ASYNC_TCONSUME_INVOKE_IDX], local_stat_data->async_tconsume_invoke);
+    fieldstat_value_set(stat->instance, stat->column_ids[ASYNC_TCONSUME_CALLBACK_IDX], local_stat_data->async_tconsume_callback);
+    fieldstat_value_set(stat->instance, stat->column_ids[ASYNC_HINCRBY_INVOKE_IDX], local_stat_data->async_hincrby_invoke);
+    fieldstat_value_set(stat->instance, stat->column_ids[ASYNC_HINCRBY_CALLBACK_IDX], local_stat_data->async_hincrby_callback);
+    fieldstat_value_set(stat->instance, stat->column_ids[ASYNC_HMGET_INVOKE_IDX], local_stat_data->async_hmget_invoke);
+    fieldstat_value_set(stat->instance, stat->column_ids[ASYNC_HMGET_CALLBACK_IDX], local_stat_data->async_hmget_callback);
+    
     fieldstat_value_set(stat->instance, stat->column_ids[ASYNC_TCONSUME_FAILED], local_stat_data->async_tconsume_failed);
     fieldstat_value_set(stat->instance, stat->column_ids[ASYNC_HINCRBY_FAILED], local_stat_data->async_hincrby_failed);
     fieldstat_value_set(stat->instance, stat->column_ids[ASYNC_HMGET_FAILED], local_stat_data->async_hmget_failed);

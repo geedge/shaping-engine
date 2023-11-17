@@ -28,6 +28,13 @@ extern "C" {
 #define SHAPING_STAT_REFRESH_INTERVAL_SEC 2
 #define SHAPING_STAT_REFRESH_MAX_PER_POLLING 5
 
+#define NANO_SECONDS_PER_MICRO_SEC 1000
+#define MICRO_SECONDS_PER_SEC 1000000
+#define NANO_SECONDS_PER_SEC 1000000000
+
+#define NANO_SECONDS_PER_MILLI_SEC 1000000
+#define MILLI_SECONDS_PER_SEC 1000
+
 #define SHAPING_GLOBAL_CONF_FILE "./conf/shaping.conf"
 
 struct shaping_system_conf {
@@ -153,6 +160,14 @@ struct shaping_flow {
 struct shaper_flow_instance {
     struct shaping_flow *sf;
     int priority;
+};
+
+struct shaping_async_cb_arg {
+    struct shaping_thread_ctx *ctx;
+    struct shaping_profile_hash_node *pf_hash_node;
+    int priority;
+    unsigned char direction;
+    long long start_time_us;
 };
 
 struct shaper;//instance of shaping, thread unsafe
