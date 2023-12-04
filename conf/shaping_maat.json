@@ -11,6 +11,7 @@
             "do_log": 1,
             "effective_rage": 0,
             "user_region": "{\"priority\":1,\"fair_factor\":10,\"profile_chain\":[1]}",
+            "group_num" : 0,
             "is_valid": "yes",
             "groups": [
                 {
