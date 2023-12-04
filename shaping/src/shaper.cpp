@@ -650,6 +650,28 @@ static void shaper_profile_hash_node_update(struct shaping_profile_info *profile
     return;
 }
 
+static int shaping_swarmkv_is_too_short_interval(long long curr_time_ms, struct shaping_profile_info *profile)
+{
+    long long last_failed_ms;
+
+    switch (profile->type) {
+        case PROFILE_TYPE_GENERIC:
+            last_failed_ms = profile->hash_node->last_failed_get_token_ms;
+            break;
+        case PROFILE_TYPE_HOST_FARINESS:
+        case PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS:
+        case PROFILE_TYPE_SPLIT_BY_LOCAL_HOST:
+            last_failed_ms = profile->last_failed_get_token_ms;
+            break;
+    }
+
+    if (curr_time_ms - last_failed_ms < TOKEN_GET_FAILED_INTERVAL_MS) {//if failed to get token in last 1ms, it't too short interval; for swarmkv can't reproduce token in 1ms
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
 static int shaper_token_consume(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, int req_token_bytes,
                         struct shaping_profile_info *profile, int profile_type, unsigned char direction)
 {
@@ -680,7 +702,8 @@ static int shaper_token_consume(struct shaping_thread_ctx *ctx, struct shaping_f
     struct timespec curr_timespec;
     clock_gettime(CLOCK_MONOTONIC, &curr_timespec);
     long long curr_time_ms = curr_timespec.tv_sec * MILLI_SECONDS_PER_SEC + curr_timespec.tv_nsec / NANO_SECONDS_PER_MILLI_SEC;
-    if (curr_time_ms - profile->hash_node->last_failed_get_token_ms < TOKEN_GET_FAILED_INTERVAL_MS) {//if failed to get token in last 1ms, return failed; for swarmkv can't reproduce token in 1ms
+
+    if (shaping_swarmkv_is_too_short_interval(curr_time_ms, profile)) {
         return SHAPER_TOKEN_GET_FAILED;
     }
 
