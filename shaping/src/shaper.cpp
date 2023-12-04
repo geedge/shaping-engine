@@ -380,19 +380,41 @@ int shaper_flow_in_order_get(struct shaper *sp, struct shaper_flow_instance sf_i
     return count;
 }
 
-static void shaper_deposit_token_add(struct shaping_profile_hash_node *pf_hash_node, int req_token_bits, unsigned char direction, int priority)
+static void shaper_deposit_token_add(struct shaping_profile_info *profile, int req_token_bits, unsigned char direction, int priority)
 {
-    if (direction == SHAPING_DIR_IN) {
-        pf_hash_node->in_deposit_token_bits[priority] += req_token_bits;
-    } else {
-        pf_hash_node->out_deposit_token_bits[priority] += req_token_bits;
+    int *deposit_token;
+    struct shaping_profile_hash_node *pf_hash_node = profile->hash_node;
+
+    switch (profile->type) {
+        case PROFILE_TYPE_GENERIC:
+            if (direction == SHAPING_DIR_IN) {
+                deposit_token = &pf_hash_node->in_deposit_token_bits[priority];
+            } else {
+                deposit_token = &pf_hash_node->out_deposit_token_bits[priority];
+            }
+            break;
+        case PROFILE_TYPE_HOST_FARINESS:
+        case PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS:
+        case PROFILE_TYPE_SPLIT_BY_LOCAL_HOST:
+            if (direction == SHAPING_DIR_IN) {
+                deposit_token = &profile->in_deposit_token_bits;
+            } else {
+                deposit_token = &profile->out_deposit_token_bits;
+            }
+            break;
+        default:
+            LOG_ERROR("%s: invalid profile type %d, profile id %d", LOG_TAG_SHAPING, profile->type, profile->id);
+            return;
     }
+
+    *deposit_token += req_token_bits;
 }
 
 static void shaper_token_get_cb(const struct swarmkv_reply *reply, void * cb_arg)
 {
     struct shaping_async_cb_arg *arg = (struct shaping_async_cb_arg*)cb_arg;
-    struct shaping_profile_hash_node *pf_hash_node = arg->pf_hash_node;
+    struct shaping_profile_info *profile = arg->profile;
+    struct shaping_profile_hash_node *pf_hash_node = profile->hash_node;
     struct timespec curr_time;
     long long curr_time_us;
 
@@ -418,14 +440,23 @@ static void shaper_token_get_cb(const struct swarmkv_reply *reply, void * cb_arg
     }
 
     if (reply->integer > 0) {
-        shaper_deposit_token_add(pf_hash_node, reply->integer, arg->direction, arg->priority);//deposit tokens to profile
+        shaper_deposit_token_add(profile, reply->integer, arg->direction, profile->priority);//deposit tokens to profile
     }
 
 END:
     if (reply->type != SWARMKV_REPLY_INTEGER || reply->integer == 0) {
         struct timespec curr_time;
         clock_gettime(CLOCK_MONOTONIC, &curr_time);
-        pf_hash_node->last_failed_get_token_ms = curr_time.tv_sec * MILLI_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MILLI_SEC;
+        switch (profile->type) {
+            case PROFILE_TYPE_GENERIC:
+                pf_hash_node->last_failed_get_token_ms = curr_time.tv_sec * MILLI_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MILLI_SEC;
+                break;
+            case PROFILE_TYPE_HOST_FARINESS:
+            case PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS:
+            case PROFILE_TYPE_SPLIT_BY_LOCAL_HOST:
+                profile->last_failed_get_token_ms = curr_time.tv_sec * MILLI_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MILLI_SEC;
+                break;
+        }
     }
 
     free(cb_arg);
@@ -443,20 +474,37 @@ static void shaper_deposit_token_sub(struct shaping_profile_hash_node *pf_hash_n
     }
 }
 
-static int shaper_deposit_token_is_enough(struct shaping_profile_hash_node *pf_hash_node, int req_token_bits, unsigned char direction, int priority)
+static int shaper_deposit_token_is_enough(struct shaping_profile_info *profile, int req_token_bits, unsigned char direction, int priority)
 {
-    if (direction == SHAPING_DIR_IN) {
-        if (pf_hash_node->in_deposit_token_bits[priority] >= req_token_bits) {
-            return 1;
-        } else {
+    int deposit_token;
+    struct shaping_profile_hash_node *pf_hash_node = profile->hash_node;
+
+    switch (profile->type) {
+        case PROFILE_TYPE_GENERIC:
+            if (direction == SHAPING_DIR_IN) {
+                deposit_token = pf_hash_node->in_deposit_token_bits[priority];
+            } else {
+                deposit_token = pf_hash_node->out_deposit_token_bits[priority];
+            }
+            break;
+        case PROFILE_TYPE_HOST_FARINESS:
+        case PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS:
+        case PROFILE_TYPE_SPLIT_BY_LOCAL_HOST:
+            if (direction == SHAPING_DIR_IN) {
+                deposit_token = profile->in_deposit_token_bits;
+            } else {
+                deposit_token = profile->out_deposit_token_bits;
+            }
+            break;
+        default:
+            LOG_ERROR("%s: invalid profile type %d, profile id %d", LOG_TAG_SHAPING, profile->type, profile->id);
             return 0;
-        }
+    }
+
+    if (deposit_token >= req_token_bits) {
+        return 1;
     } else {
-        if (pf_hash_node->out_deposit_token_bits[priority] >= req_token_bits) {
-            return 1;
-        } else {
-            return 0;
-        }
+        return 0;
     }
 }
 
@@ -468,8 +516,7 @@ static int shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct 
     snprintf(key, sizeof(key), "tsg-shaping-%d-%s", pf_info->id, direction == SHAPING_DIR_OUT ? "outgoing" : "incoming");
     arg = (struct shaping_async_cb_arg *)calloc(1, sizeof(struct shaping_async_cb_arg));
     arg->ctx = ctx;
-    arg->pf_hash_node = pf_info->hash_node;
-    arg->priority = pf_info->priority;
+    arg->profile = pf_info;
     arg->direction = direction;
     arg->start_time_us = curr_timespec->tv_sec * MICRO_SECONDS_PER_SEC + curr_timespec->tv_nsec / NANO_SECONDS_PER_MICRO_SEC;
 
@@ -493,6 +540,8 @@ static int shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct 
             break;
     }
 
+    swarmkv_caller_loop(ctx->swarmkv_db, SWARMKV_LOOP_NONBLOCK, NULL);
+
     if (pf_info->hash_node->is_invalid) {
         if (profile_type == PROFILE_IN_RULE_TYPE_PRIMARY) {//for primary, means this rule don't need get token
             return SHAPER_TOKEN_GET_SUCCESS;
@@ -501,7 +550,7 @@ static int shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct 
         }
     }
 
-    if (shaper_deposit_token_is_enough(pf_info->hash_node, req_token_bits, direction, pf_info->priority)) {
+    if (shaper_deposit_token_is_enough(pf_info, req_token_bits, direction, pf_info->priority)) {
         shaper_deposit_token_sub(pf_info->hash_node, req_token_bits, direction, pf_info->priority);
         return SHAPER_TOKEN_GET_SUCCESS;
     }
@@ -512,8 +561,9 @@ static int shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct 
 static void shaper_queue_len_get_cb(const struct swarmkv_reply *reply, void * cb_arg)
 {
     struct shaping_async_cb_arg *arg = (struct shaping_async_cb_arg *)cb_arg;
-    struct shaping_profile_hash_node *pf_hash_node = arg->pf_hash_node;
-    int priority = arg->priority;
+    struct shaping_profile_info *profile = arg->profile;
+    struct shaping_profile_hash_node *pf_hash_node = profile->hash_node;
+    int priority = profile->priority;
     struct timespec curr_time;
     long long curr_time_us;
 
@@ -568,8 +618,7 @@ static int shaper_profile_is_priority_blocked(struct shaping_thread_ctx *ctx, st
 
     arg = (struct shaping_async_cb_arg *)calloc(1, sizeof(struct shaping_async_cb_arg));
     arg->ctx = ctx;
-    arg->pf_hash_node = profile->hash_node;
-    arg->priority = priority;
+    arg->profile = profile;
     arg->start_time_us = curr_timespec->tv_sec * MICRO_SECONDS_PER_SEC + curr_timespec->tv_nsec / NANO_SECONDS_PER_MICRO_SEC;
 
     shaper_global_stat_async_invoke_inc(ctx->global_stat);
@@ -623,7 +672,7 @@ static int shaper_token_consume(struct shaping_thread_ctx *ctx, struct shaping_f
 
     shaper_profile_hash_node_update(profile);
 
-    if (shaper_deposit_token_is_enough(profile->hash_node, req_token_bytes * 8, direction, profile->priority)) {
+    if (shaper_deposit_token_is_enough(profile, req_token_bytes * 8, direction, profile->priority)) {
         shaper_deposit_token_sub(profile->hash_node, req_token_bytes * 8, direction, profile->priority);
         return SHAPER_TOKEN_GET_SUCCESS;
     }
