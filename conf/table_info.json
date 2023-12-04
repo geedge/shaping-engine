@@ -7,7 +7,7 @@
         "custom": {
             "key": 1,
             "key_type": "integer",
-            "key_len": 8
+            "key_len": 9
         }
     },
     {

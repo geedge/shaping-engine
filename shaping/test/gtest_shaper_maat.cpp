@@ -14,6 +14,7 @@ TEST(shaping_rule, parse)
                         1\t\
                         {}\t\
                         {\"vsys_id\":2333,\"priority\":1,\"fair_factor\":10,\"profile_chain\":[1,2,3]}\t\
+                        0\t\
                         1\t\
                         }";
 
