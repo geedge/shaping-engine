@@ -100,6 +100,9 @@ struct shaping_profile_info {
     int id;//profile_id
     enum shaping_profile_type type;
     int priority;
+    int in_deposit_token_bits;
+    int out_deposit_token_bits;
+    long long last_failed_get_token_ms;
     unsigned long long enqueue_time_us;//to calculate max latency
     struct shaping_stat_for_profile stat;
     struct shaping_profile_hash_node *hash_node;
@@ -164,8 +167,7 @@ struct shaper_flow_instance {
 
 struct shaping_async_cb_arg {
     struct shaping_thread_ctx *ctx;
-    struct shaping_profile_hash_node *pf_hash_node;
-    int priority;
+    struct shaping_profile_info *profile;
     unsigned char direction;
     long long start_time_us;
 };
