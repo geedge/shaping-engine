@@ -26,12 +26,14 @@ enum input_mode
 
 struct shaper_maat_config {
     enum input_mode input_mode;
-    char table_info[2048];
-    char accept_tags[2048];
-    char json_cfg_file[2048];
+    char table_info[512];
+    char accept_tags[512];
+    char json_cfg_file[512];
     int redis_db_idx;
-    char redis_ip[2048];
-    char redis_port_range[2048];
+    char redis_ip[512];
+    char redis_port_range[512];
+    char log_path[512];
+    enum log_level log_level;
 };
 
 struct maat *g_maat_instance = NULL;
@@ -398,6 +400,8 @@ static int shaper_maat_config_load(struct shaper_maat_config *conf)
     MESA_load_profile_int_def(SHAPING_GLOBAL_CONF_FILE, "MAAT", "REDIS_DB_IDX", &conf->redis_db_idx, 0);
     MESA_load_profile_string_def(SHAPING_GLOBAL_CONF_FILE, "MAAT", "REDIS_IP", conf->redis_ip, sizeof(conf->redis_ip), "127.0.0.1");
     MESA_load_profile_string_def(SHAPING_GLOBAL_CONF_FILE, "MAAT", "REDIS_PORT", conf->redis_port_range, sizeof(conf->redis_port_range), "6379");
+    MESA_load_profile_string_def(SHAPING_GLOBAL_CONF_FILE, "MAAT", "LOG_PATH", conf->log_path, sizeof(conf->log_path), "log/shaping_maat.log");
+    MESA_load_profile_int_def(SHAPING_GLOBAL_CONF_FILE, "MAAT", "LOG_LEVEL", (int *)&conf->log_level, LOG_LEVEL_INFO);
 
     return 0;
 }
@@ -416,6 +420,9 @@ struct shaping_maat_info* shaper_maat_init(const char *instance_name)
     maat_info = (struct shaping_maat_info *)calloc(1, sizeof(struct shaping_maat_info));
 
     opts = maat_options_new();
+
+    maat_options_set_logger(opts, conf.log_path, conf.log_level);
+
     maat_options_set_instance_name(opts, instance_name);
     switch (conf.input_mode) {
         case MAAT_INPUT_JSON:
