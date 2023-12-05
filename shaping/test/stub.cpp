@@ -481,6 +481,11 @@ struct maat *maat_new(struct maat_options *opts, const char *table_info_path)
     return instance;
 }
 
+int maat_options_set_logger(struct maat_options *opts, const char *log_path, enum log_level level)
+{
+    return 0;
+}
+
 void maat_options_free(struct maat_options *opts)
 {
     return;
