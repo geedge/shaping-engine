@@ -465,13 +465,36 @@ END:
     return;
 }
 
-static void shaper_deposit_token_sub(struct shaping_profile_hash_node *pf_hash_node, int req_token_bits, unsigned char direction, int priority)
+static void shaper_deposit_token_sub(struct shaping_profile_info *profile, int req_token_bits, unsigned char direction, int priority)
 {
-    if (direction == SHAPING_DIR_IN) {
-        pf_hash_node->in_deposit_token_bits[priority] -= req_token_bits;
-    } else {
-        pf_hash_node->out_deposit_token_bits[priority] -= req_token_bits;
+    int *deposit_token;
+    struct shaping_profile_hash_node *pf_hash_node = profile->hash_node;
+
+    switch (profile->type) {
+        case PROFILE_TYPE_GENERIC:
+            if (direction == SHAPING_DIR_IN) {
+                deposit_token = &pf_hash_node->in_deposit_token_bits[priority];
+            } else {
+                deposit_token = &pf_hash_node->out_deposit_token_bits[priority];
+            }
+            break;
+        case PROFILE_TYPE_HOST_FARINESS:
+        case PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS:
+        case PROFILE_TYPE_SPLIT_BY_LOCAL_HOST:
+            if (direction == SHAPING_DIR_IN) {
+                deposit_token = &profile->in_deposit_token_bits;
+            } else {
+                deposit_token = &profile->out_deposit_token_bits;
+            }
+            break;
+        default:
+            LOG_ERROR("%s: invalid profile type %d, profile id %d", LOG_TAG_SHAPING, profile->type, profile->id);
+            return;
     }
+
+    *deposit_token -= req_token_bits;
+
+    return;
 }
 
 static int shaper_deposit_token_is_enough(struct shaping_profile_info *profile, int req_token_bits, unsigned char direction, int priority)
@@ -551,7 +574,7 @@ static int shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct 
     }
 
     if (shaper_deposit_token_is_enough(pf_info, req_token_bits, direction, pf_info->priority)) {
-        shaper_deposit_token_sub(pf_info->hash_node, req_token_bits, direction, pf_info->priority);
+        shaper_deposit_token_sub(pf_info, req_token_bits, direction, pf_info->priority);
         return SHAPER_TOKEN_GET_SUCCESS;
     }
 
@@ -695,7 +718,7 @@ static int shaper_token_consume(struct shaping_thread_ctx *ctx, struct shaping_f
     shaper_profile_hash_node_update(profile);
 
     if (shaper_deposit_token_is_enough(profile, req_token_bytes * 8, direction, profile->priority)) {
-        shaper_deposit_token_sub(profile->hash_node, req_token_bytes * 8, direction, profile->priority);
+        shaper_deposit_token_sub(profile, req_token_bytes * 8, direction, profile->priority);
         return SHAPER_TOKEN_GET_SUCCESS;
     }
 
@@ -962,7 +985,7 @@ static void shaper_token_consume_force(struct shaping_flow *sf, struct metadata 
     for (int i = 0; i < sf->rule_num; i++) {
         rule = &sf->matched_rule_infos[i];
         shaper_profile_hash_node_update(&rule->primary);
-        shaper_deposit_token_sub(rule->primary.hash_node, meta->raw_len * 8, meta->dir, rule->primary.priority);
+        shaper_deposit_token_sub(&rule->primary, meta->raw_len * 8, meta->dir, rule->primary.priority);
     }
 
     return;

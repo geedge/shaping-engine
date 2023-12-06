@@ -303,6 +303,85 @@ TEST(single_session, udp_tx_in_order)
 /*session1 match rule1
   rule1:
       profile: limit 1000*/
+TEST(max_min_host_fairness_profile, udp_tx_in_order)
+{
+    struct stub_pkt_queue expec_tx_queue;
+    struct stub_pkt_queue *actual_tx_queue;
+    struct shaping_ctx *ctx = NULL;
+    struct shaping_flow *sf = NULL;
+    long long rule_id[] = {0};
+    int priority[] = {1};
+    int profile_num[] = {1};
+    int profile_id[][MAX_REF_PROFILE] = {{0}};
+
+    TAILQ_INIT(&expec_tx_queue);
+    stub_init();
+    ctx = shaping_engine_init();
+    ASSERT_TRUE(ctx != NULL);
+    sf = shaping_flow_new(&ctx->thread_ctx[0]);
+    ASSERT_TRUE(sf != NULL);
+
+    stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
+    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT);
+    stub_set_profile_type(0, PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS);
+    actual_tx_queue = stub_get_tx_queue();
+    shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
+
+
+    /**********send packets*********************/
+    send_packets(&ctx->thread_ctx[0], sf, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
+    /*******************************************/
+
+    //first 10 packets
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
+    ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
+
+    while (!TAILQ_EMPTY(&expec_tx_queue)) {//last 90 delay packets
+        stub_refresh_token_bucket(0);
+        for (int i = 0; i < 20; i++) {//even though invoke polling more than 10 times, there should be only 10 pkts be sent
+            polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
+            stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
+        }
+        ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
+        ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
+    }
+
+    shaping_flow_free(&ctx->thread_ctx[0], sf);
+    fieldstat_global_disable_prometheus_endpoint();
+
+    /***********send stat data here********************/
+    fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
+    shaper_global_stat_refresh(ctx->global_stat);
+
+    shaper_thread_resource_clear();
+    shaping_engine_destroy(ctx);
+    
+    stub_clear_matched_shaping_rules();
+
+    /*******test statistics***********/
+    sleep(2);//wait telegraf to output
+    FILE *stat_file;
+
+    //judge shaping metric
+    stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
+    memset(line, 0, sizeof(line));
+    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
+    shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, 170000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
+    fclose(stat_file);
+    stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
+    fclose(stat_file);
+
+    //judge shaping global metric
+    stat_file = fopen(SHAPING_GLOBAL_STAT_FILE_NAME, "r");
+    memset(line, 0, sizeof(line));
+    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
+    shaping_global_stat_judge(line, 100, 10000, 0, 0, 0, 0);
+    fclose(stat_file);
+}
+
+/*session1 match rule1
+  rule1:
+      profile: limit 1000*/
 TEST(single_session, tcp_tx_in_order)
 {
     struct stub_pkt_queue expec_tx_queue;
@@ -1595,6 +1674,6 @@ TEST(statistics, udp_queueing_pkt)
 int main(int argc, char **argv) 
 {
     testing::InitGoogleTest(&argc, argv);
-    //testing::GTEST_FLAG(filter) = "single_session.tcp_tx_in_order";
+    //testing::GTEST_FLAG(filter) = "max_min_host_fairness_profile.udp_tx_in_order";
     return RUN_ALL_TESTS();
 }

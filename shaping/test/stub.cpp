@@ -84,6 +84,12 @@ void stub_refresh_token_bucket(int profile_id)
     return;
 }
 
+void stub_set_profile_type(int profile_id, enum shaping_profile_type type)
+{
+    pf_array[profile_id].type = type;
+    return;
+}
+
 void stub_set_async_token_get_times(int profile_id, int times)
 {
     pf_async_times[profile_id] = times;
@@ -419,6 +425,7 @@ void swarmkv_tconsume(struct swarmkv * db, const char * key, size_t keylen, long
 
 void swarmkv_ftconsume(struct swarmkv * db, const char * key, size_t keylen, const char * member, size_t member_len, long long weight, long long tokens, swarmkv_on_reply_callback_t *cb, void *cb_arg)
 {
+    swarmkv_tconsume(db, key, keylen, tokens, cb, cb_arg);
     return;
 }
 
