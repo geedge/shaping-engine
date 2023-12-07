@@ -19,7 +19,7 @@ extern "C" {
 #define SHAPER_FLOW_POP_NUM_MAX 10
 
 #define SESSION_CLOSE 0x1
-#define SESSION_UPDATE_PF_PRIO_LEN 0x2
+#define SESSION_BORROW 0x2
 
 #define CONFIRM_PRIORITY_PKTS 20
 
@@ -150,6 +150,7 @@ struct shaping_flow {
     int priority;
     int rule_num;
     int anchor;//rule_idx
+    int ref_cnt;
     unsigned int queue_len;
     unsigned int flag;
     struct metadata ctrl_meta;
@@ -165,10 +166,23 @@ struct shaper_flow_instance {
     int priority;
 };
 
-struct shaping_async_cb_arg {
+struct shaping_tconsume_cb_arg {
     struct shaping_thread_ctx *ctx;
     struct shaping_profile_info *profile;
+    struct shaping_flow *sf;
     unsigned char direction;
+    long long start_time_us;
+};
+
+struct shaping_hmget_cb_arg {
+    struct shaping_thread_ctx *ctx;
+    struct shaping_profile_hash_node *pf_hash_node;
+    int priority;
+    long long start_time_us;
+};
+
+struct shaping_hincrby_cb_arg {
+    struct shaping_thread_ctx *ctx;
     long long start_time_us;
 };
 
