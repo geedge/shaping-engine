@@ -434,7 +434,7 @@ static void shaper_token_get_cb(const struct swarmkv_reply *reply, void * cb_arg
     shaper_global_stat_async_callback_inc(ctx->global_stat);
     shaper_global_stat_tconsume_callback_inc(ctx->global_stat);
 
-    LOG_INFO("Swarmkv reply type =%d, direction =%d, integer =%llu",reply->type, arg->direction, reply->integer);
+    LOG_INFO("Swarmkv reply type =%d, profile_id %d, direction =%d, integer =%llu",reply->type, profile->id, arg->direction, reply->integer);
 
     if (reply->type != SWARMKV_REPLY_INTEGER) {
         shaper_global_stat_async_tconsume_failed_inc(ctx->global_stat);
