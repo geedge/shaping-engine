@@ -653,6 +653,10 @@ static int shaper_profile_is_priority_blocked(struct shaping_thread_ctx *ctx, st
         return 0;
     }
 
+    if (profile->type == PROFILE_TYPE_SPLIT_BY_LOCAL_HOST) {//split-by profile don't need to check priority
+        return 0;
+    }
+
     if (curr_time_ms - profile->hash_node->last_hmget_ms[priority] < HMGET_REQUEST_INTERVAL_MS) {//don't send hmget command in 1s
         goto END;
     }
