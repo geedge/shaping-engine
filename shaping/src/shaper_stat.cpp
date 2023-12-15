@@ -136,18 +136,19 @@ static void shaper_stat_swarmkv_hincrby_cb(const struct swarmkv_reply *reply, vo
 {
     struct shaping_hincrby_cb_arg *arg = (struct shaping_hincrby_cb_arg *)cb_arg;
     struct shaping_thread_ctx *ctx = arg->ctx;
+    struct shaping_global_stat *global_stat = ctx->ref_ctx->global_stat;
     struct timespec curr_time;
     long long curr_time_us;
 
     clock_gettime(CLOCK_MONOTONIC, &curr_time);
     curr_time_us = curr_time.tv_sec * MICRO_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MICRO_SEC;
-    shaper_global_stat_swarmkv_latency_update(ctx->global_stat, curr_time_us - arg->start_time_us);
+    shaper_global_stat_swarmkv_latency_update(global_stat, curr_time_us - arg->start_time_us);
 
-    shaper_global_stat_async_callback_inc(ctx->global_stat);
-    shaper_global_stat_hincrby_callback_inc(ctx->global_stat);
+    shaper_global_stat_async_callback_inc(&ctx->thread_global_stat);
+    shaper_global_stat_hincrby_callback_inc(&ctx->thread_global_stat);
 
     if (reply->type != SWARMKV_REPLY_INTEGER) {
-        shaper_global_stat_async_hincrby_failed_inc(ctx->global_stat);
+        shaper_global_stat_async_hincrby_failed_inc(&ctx->thread_global_stat);
     }
 
     free(cb_arg);
@@ -190,8 +191,8 @@ static void shaper_stat_profile_metirc_refresh(struct shaping_thread_ctx *ctx, i
         clock_gettime(CLOCK_MONOTONIC, &curr_time);
         arg->ctx = ctx;
         arg->start_time_us = curr_time.tv_sec * MICRO_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MICRO_SEC;
-        shaper_global_stat_async_invoke_inc(ctx->global_stat);
-        shaper_global_stat_hincrby_invoke_inc(ctx->global_stat);
+        shaper_global_stat_async_invoke_inc(&ctx->thread_global_stat);
+        shaper_global_stat_hincrby_invoke_inc(&ctx->thread_global_stat);
         swarmkv_async_command(ctx->swarmkv_db, shaper_stat_swarmkv_hincrby_cb, arg, "HINCRBY tsg-shaping-%d priority-%d %lld", profile->id, profile->priority, profile_stat->in.queue_len + profile_stat->out.queue_len);
 
         memset(profile_stat, 0, sizeof(struct shaping_stat_for_profile));

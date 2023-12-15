@@ -6,6 +6,7 @@
 #include "session_table.h"
 #include "utils.h"
 #include "shaper_stat.h"
+#include "shaper_global_stat.h"
 extern "C" {
 #include "timeout.h"
 }
@@ -52,10 +53,10 @@ struct shaping_system_conf {
 struct shaping_thread_ctx {
     pthread_t tid;
     int thread_index;
+    struct shaping_global_stat_data thread_global_stat;
     struct shaping_ctx *ref_ctx;
     struct shaper *sp;
     struct shaping_stat *stat;
-    struct shaping_global_stat *global_stat;
     struct shaping_marsio_info *marsio_info;
     struct swarmkv *swarmkv_db;//handle of swarmkv 
     int swarmkv_aqm_prob;
