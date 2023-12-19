@@ -13,7 +13,6 @@ struct shaping_rule {
     int borrow_pf_id_array[SHAPING_REF_PROFILE_NUM_MAX];
     int borrow_pf_num;
     int fair_factor;
-    int ref_cnt;
 };
 
 struct shaping_profile {
@@ -22,7 +21,6 @@ struct shaping_profile {
     int in_limit_bandwidth;
     int out_limit_bandwidth;
     int valid;
-    int ref_cnt;
 };
 
 void shaper_rule_ex_new(const char *table_name, int table_id, const char *key, const char *table_line, void **ad, long argl, void *argp);

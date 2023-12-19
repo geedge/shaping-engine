@@ -187,17 +187,12 @@ void stub_init()
     memset(&matched_rules, 0, sizeof(struct stub_matched_rules));
     memset(&pf_array, 0, MAX_STUB_PROFILE_NUM * sizeof(struct shaping_profile));
 
-    for (i = 0; i < MAX_STUB_RULE_NUM; i++) {
-        matched_rules.rules[i].ref_cnt = 1;
-    }
-
     for (i = 0; i < MAX_STUB_PROFILE_NUM; i++) {
         pf_curr_avl_token[i].in_limit_bandwidth = DEFAULT_AVALIABLE_TOKEN_PER_SEC;
         pf_curr_avl_token[i].out_limit_bandwidth = DEFAULT_AVALIABLE_TOKEN_PER_SEC;
         pf_array[i].id = i;
         pf_array[i].in_limit_bandwidth = DEFAULT_AVALIABLE_TOKEN_PER_SEC;
         pf_array[i].out_limit_bandwidth = DEFAULT_AVALIABLE_TOKEN_PER_SEC;
-        pf_array[i].ref_cnt = 1;
         pf_async_times[i] = 0;
     }
     return;
@@ -531,11 +526,9 @@ void *maat_plugin_table_get_ex_data(struct maat *instance, int table_id, const c
 
     if (table_id == STUB_MAAT_SHAPING_RULE_TABLE_ID) {
         rule_id = *(int*)key;
-        matched_rules.rules[rule_id].ref_cnt++;
         return &matched_rules.rules[rule_id];
     } else {
         profile_id = atoi(key);
-        pf_array[profile_id].ref_cnt++;
         return &pf_array[profile_id];
     }
 }

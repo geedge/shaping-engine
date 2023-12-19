@@ -29,13 +29,10 @@ TEST(shaping_rule, parse)
     EXPECT_EQ(s_rule->borrow_pf_id_array[0], 2);
     EXPECT_EQ(s_rule->borrow_pf_id_array[1], 3);
     EXPECT_EQ(s_rule->priority, 1);
-    EXPECT_EQ(s_rule->ref_cnt, 1);
 
     shaper_rule_ex_dup(0, (void**)&s_rule_dup, (void**)&s_rule, 0, NULL);
     EXPECT_EQ(s_rule, s_rule_dup);
-    EXPECT_EQ(s_rule->ref_cnt, 2);
 
-    shaper_rule_ex_free(0, (void**)&s_rule, 0, NULL);
     shaper_rule_ex_free(0, (void**)&s_rule, 0, NULL);
     EXPECT_TRUE(s_rule == NULL);
 }
@@ -57,13 +54,10 @@ TEST(shaping_profile, parse)
     EXPECT_EQ(s_pf->in_limit_bandwidth, 1024);
     EXPECT_EQ(s_pf->out_limit_bandwidth, 2048);
     EXPECT_EQ(s_pf->type, PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS);
-    EXPECT_EQ(s_pf->ref_cnt, 1);
 
     shaper_profile_ex_dup(0, (void**)&s_pf_dup, (void**)&s_pf, 0, NULL);
     EXPECT_EQ(s_pf, s_pf_dup);
-    EXPECT_EQ(s_pf->ref_cnt, 2);
 
-    shaper_profile_ex_free(0, (void**)&s_pf, 0, NULL);
     shaper_profile_ex_free(0, (void**)&s_pf, 0, NULL);
     EXPECT_TRUE(s_pf == NULL);
 }
