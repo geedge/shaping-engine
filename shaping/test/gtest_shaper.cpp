@@ -272,7 +272,7 @@ TEST(single_session, udp_tx_in_order)
 
     /***********send stat data here********************/
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
-    shaper_global_stat_refresh(ctx->global_stat);
+    shaper_global_stat_refresh(ctx);
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
@@ -351,7 +351,7 @@ TEST(max_min_host_fairness_profile, udp_tx_in_order)
 
     /***********send stat data here********************/
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
-    shaper_global_stat_refresh(ctx->global_stat);
+    shaper_global_stat_refresh(ctx);
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
@@ -1552,7 +1552,7 @@ TEST(statistics, udp_drop_pkt)
 
     /***********send stat data here********************/
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
-    shaper_global_stat_refresh(ctx->global_stat);
+    shaper_global_stat_refresh(ctx);
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
@@ -1614,7 +1614,7 @@ TEST(statistics, udp_queueing_pkt)
     /***********send stat data here********************/
     shaper_stat_refresh(&ctx->thread_ctx[0], sf, ctx->thread_ctx[0].thread_index, 1);
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
-    shaper_global_stat_refresh(ctx->global_stat);
+    shaper_global_stat_refresh(ctx);
     sleep(2);//wait telegraf generate metric
 
     /*******judge global metric********/
@@ -1640,7 +1640,7 @@ TEST(statistics, udp_queueing_pkt)
 
     /***********send stat data here********************/
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
-    shaper_global_stat_refresh(ctx->global_stat);
+    shaper_global_stat_refresh(ctx);
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);

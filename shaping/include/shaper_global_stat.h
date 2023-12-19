@@ -1,9 +1,6 @@
-#include <fieldstat.h>
+#pragma once
 
-enum shaping_global_stat_dir {
-    SHAPING_GLOBAL_STAT_RX = 0,
-    SHAPING_GLOBAL_STAT_TX
-};
+#include <fieldstat.h>
 
 enum shaping_global_stat_column_index {
     CURR_SESSION_NUM_IDX = 0,
@@ -86,47 +83,50 @@ struct shaping_global_stat {
     struct fieldstat_instance *instance;
     int column_ids[GLOBAL_STAT_COLUNM_IDX_MAX];
     int swarmkv_latency_summary_id;
-    struct shaping_global_stat_data local_stat_data;
+    struct shaping_global_stat_data *stat_data;
     int output_interval_s;
 };
 
-struct shaping_global_stat* shaper_global_stat_init();
+struct shaping_global_stat* shaper_global_stat_init(int work_thread_num);
 void shaper_global_stat_destroy(struct shaping_global_stat *stat);
 
 void shaper_global_stat_swarmkv_latency_update(struct shaping_global_stat *stat, long long latency_us);
 
-void shaper_global_stat_curr_session_inc(struct shaping_global_stat *stat);
-void shaper_global_stat_curr_session_dec(struct shaping_global_stat *stat);
-void shaper_global_stat_queueing_inc(struct shaping_global_stat *stat, int pkt_len);
-void shaper_global_stat_queueing_dec(struct shaping_global_stat *stat, int pkt_len);
-long long shaper_global_stat_queueing_pkts_get(struct shaping_global_stat *stat);
+void shaper_global_stat_curr_session_inc(struct shaping_global_stat_data *thread_global_stat);
+void shaper_global_stat_curr_session_dec(struct shaping_global_stat_data *thread_global_stat);
+void shaper_global_stat_queueing_inc(struct shaping_global_stat_data *thread_global_stat, int pkt_len);
+void shaper_global_stat_queueing_dec(struct shaping_global_stat_data *thread_global_stat, int pkt_len);
+long long shaper_global_stat_queueing_pkts_get(struct shaping_global_stat_data *thread_global_stat);
 
-void shaper_global_stat_ctrlpkt_err_inc(struct shaping_global_stat *stat);
-void shaper_global_stat_ctrlpkt_opening_inc(struct shaping_global_stat *stat);
-void shaper_global_stat_ctrlpkt_active_inc(struct shaping_global_stat *stat);
-void shaper_global_stat_ctrlpkt_close_inc(struct shaping_global_stat *stat);
-void shaper_global_stat_ctrlpkt_active_close_inc(struct shaping_global_stat *stat);
-void shaper_global_stat_ctrlpkt_resetall_inc(struct shaping_global_stat *stat);
-void shaper_global_stat_session_log_send_num_inc(struct shaping_global_stat *stat);
+void shaper_global_stat_ctrlpkt_err_inc(struct shaping_global_stat_data *thread_global_stat);
+void shaper_global_stat_ctrlpkt_opening_inc(struct shaping_global_stat_data *thread_global_stat);
+void shaper_global_stat_ctrlpkt_active_inc(struct shaping_global_stat_data *thread_global_stat);
+void shaper_global_stat_ctrlpkt_close_inc(struct shaping_global_stat_data *thread_global_stat);
+void shaper_global_stat_ctrlpkt_active_close_inc(struct shaping_global_stat_data *thread_global_stat);
+void shaper_global_stat_ctrlpkt_resetall_inc(struct shaping_global_stat_data *thread_global_stat);
+void shaper_global_stat_session_log_send_num_inc(struct shaping_global_stat_data *thread_global_stat);
 
-void shaper_global_stat_async_invoke_inc(struct shaping_global_stat *stat);
-void shaper_global_stat_async_callback_inc(struct shaping_global_stat *stat);
+void shaper_global_stat_async_invoke_inc(struct shaping_global_stat_data *thread_global_stat);
+void shaper_global_stat_async_callback_inc(struct shaping_global_stat_data *thread_global_stat);
 
-void sheper_global_stat_tconsume_invoke_inc(struct shaping_global_stat *stat);
-void shaper_global_stat_tconsume_callback_inc(struct shaping_global_stat *stat);
-void shaper_global_stat_hincrby_invoke_inc(struct shaping_global_stat *stat);
-void shaper_global_stat_hincrby_callback_inc(struct shaping_global_stat *stat);
-void shaper_global_stat_hmget_invoke_inc(struct shaping_global_stat *stat);
-void shaper_global_stat_hmget_callback_inc(struct shaping_global_stat *stat);
+void sheper_global_stat_tconsume_invoke_inc(struct shaping_global_stat_data *thread_global_stat);
+void shaper_global_stat_tconsume_callback_inc(struct shaping_global_stat_data *thread_global_stat);
+void shaper_global_stat_hincrby_invoke_inc(struct shaping_global_stat_data *thread_global_stat);
+void shaper_global_stat_hincrby_callback_inc(struct shaping_global_stat_data *thread_global_stat);
+void shaper_global_stat_hmget_invoke_inc(struct shaping_global_stat_data *thread_global_stat);
+void shaper_global_stat_hmget_callback_inc(struct shaping_global_stat_data *thread_global_stat);
 
-void shaper_global_stat_async_tconsume_failed_inc(struct shaping_global_stat *stat);
-void shaper_global_stat_async_hincrby_failed_inc(struct shaping_global_stat *stat);
-void shaper_global_stat_async_hmget_failed_inc(struct shaping_global_stat *stat);
+void shaper_global_stat_async_tconsume_failed_inc(struct shaping_global_stat_data *thread_global_stat);
+void shaper_global_stat_async_hincrby_failed_inc(struct shaping_global_stat_data *thread_global_stat);
+void shaper_global_stat_async_hmget_failed_inc(struct shaping_global_stat_data *thread_global_stat);
 
-void shaper_global_stat_throughput_inc(struct shaping_global_stat *stat, enum shaping_global_stat_dir dir, int pkt_len);
-void shaper_global_stat_drop_inc(struct shaping_global_stat *stat, int pkt_len);
+void shaper_global_stat_drop_inc(struct shaping_global_stat_data *thread_global_stat, int pkt_len);
 
-void shaper_global_stat_hit_policy_throughput_inc(struct shaping_global_stat *stat, enum shaping_global_stat_dir dir, int pkt_len);
-void shaper_global_stat_hit_policy_drop_inc(struct shaping_global_stat *stat, int pkt_len);
+void shaper_global_stat_throughput_rx_inc(struct shaping_global_stat_data *thread_global_stat, int pkt_len);
+void shaper_global_stat_throughput_tx_inc(struct shaping_global_stat_data *thread_global_stat, int pkt_len);
 
-void shaper_global_stat_refresh(struct shaping_global_stat *stat);
+void shaper_global_stat_hit_policy_throughput_rx_inc(struct shaping_global_stat_data *thread_global_stat, int pkt_len);
+void shaper_global_stat_hit_policy_throughput_tx_inc(struct shaping_global_stat_data *thread_global_stat, int pkt_len);
+void shaper_global_stat_hit_policy_drop_inc(struct shaping_global_stat_data *thread_global_stat, int pkt_len);
+
+void shaper_global_stat_refresh(struct shaping_ctx *ctx);

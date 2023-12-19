@@ -40,7 +40,7 @@ struct shaping_flow* shaper_session_opening(struct shaping_thread_ctx *ctx, stru
 
     session_table_insert(ctx->session_table, meta->session_id, &sf->tuple4, sf, NULL);
 
-    shaper_global_stat_curr_session_inc(ctx->global_stat);
+    shaper_global_stat_curr_session_inc(&ctx->thread_global_stat);
 
     return sf;
 }
@@ -153,7 +153,7 @@ static void shaper_session_log_send(struct shaping_thread_ctx *ctx, struct shapi
     }
 
     marsio_send_burst(ctx->marsio_info->mr_path, ctx->thread_index, &tx_buff, 1);
-    shaper_global_stat_session_log_send_num_inc(ctx->global_stat);
+    shaper_global_stat_session_log_send_num_inc(&ctx->thread_global_stat);
 
 END:
     if (addr_str) {
@@ -184,10 +184,10 @@ struct shaping_flow* shaper_session_close(struct shaping_thread_ctx *ctx, struct
         sf->flag |= SESSION_CLOSE;
     }
 
-    shaper_global_stat_ctrlpkt_active_close_inc(ctx->global_stat);
+    shaper_global_stat_ctrlpkt_active_close_inc(&ctx->thread_global_stat);
 
     session_table_delete_by_id(ctx->session_table, meta->session_id);
-    shaper_global_stat_curr_session_dec(ctx->global_stat);
+    shaper_global_stat_curr_session_dec(&ctx->thread_global_stat);
 
     return sf;
 }
@@ -232,7 +232,7 @@ void shaper_session_data_free_cb(void *session_data, void *data)
         shaping_flow_free(ctx, sf);
     }
 
-    shaper_global_stat_curr_session_dec(ctx->global_stat);
+    shaper_global_stat_curr_session_dec(&ctx->thread_global_stat);
 
     return;
 }

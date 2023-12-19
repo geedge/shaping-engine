@@ -22,6 +22,7 @@ static void *shaper_thread_loop(void *data)
 {
     char thread_name[16] = {0};
     struct shaping_thread_ctx *ctx = (struct shaping_thread_ctx *)data;
+    int output_interval_s = ctx->ref_ctx->global_stat->output_interval_s;
 
     snprintf(thread_name, sizeof(thread_name), "shape-work-%d", ctx->thread_index);
     prctl(PR_SET_NAME, (unsigned long long)thread_name, NULL, NULL, NULL);
@@ -40,7 +41,7 @@ static void *shaper_thread_loop(void *data)
             session_table_reset_with_callback(ctx->session_table, shaper_session_data_free_cb, ctx);
             __atomic_fetch_and(&ctx->session_need_reset, 0, __ATOMIC_SEQ_CST);
         }
-        marsio_poll_wait(ctx->marsio_info->instance, &ctx->marsio_info->mr_dev, 1, ctx->thread_index, ctx->global_stat->output_interval_s * 1000);
+        marsio_poll_wait(ctx->marsio_info->instance, &ctx->marsio_info->mr_dev, 1, ctx->thread_index, output_interval_s * 1000);
     }
 
     shaper_thread_resource_clear();
@@ -111,7 +112,7 @@ int main(int argc, char **argv)
     while(!quit) {
         time_t curr_time = time(NULL);
         if (curr_time - last_update_time >= ctx->global_stat->output_interval_s) {
-            shaper_global_stat_refresh(ctx->global_stat);
+            shaper_global_stat_refresh(ctx);
             last_update_time = curr_time;
         }
         sleep(ctx->global_stat->output_interval_s);
