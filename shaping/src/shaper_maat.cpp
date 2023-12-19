@@ -53,7 +53,6 @@ void shaper_rule_ex_new(const char *table_name, int table_id, const char *key, c
     }
 
     s_rule = (struct shaping_rule*)calloc(1, sizeof(struct shaping_rule));
-    s_rule->ref_cnt = 1;
 
     ret = sscanf(table_line, "%d\t%*d\t%*d\t%*d\t%*d\t%*s\t%s\t", &s_rule->id, user_region);
     if (ret != 2) {
@@ -119,33 +118,22 @@ END:
 
 void shaper_rule_ex_dup(int table_id, void **to, void **from, long argl, void *argp)
 {
-    struct shaping_rule *s_rule;
-
     if (*from == NULL) {
         return;
     }
 
-    s_rule = (struct shaping_rule*)*from;
-    __atomic_add_fetch(&s_rule->ref_cnt, 1, __ATOMIC_SEQ_CST);
-    *to = s_rule;
+    *to = *from;
 
     return;
 }
 
 void shaper_rule_ex_free(int table_id, void **ad, long argl, void *argp)
 {
-    struct shaping_rule *s_rule;
-
     if (*ad == NULL) {
         return;
     }
 
-    s_rule = (struct shaping_rule*)*ad;
-    if (__atomic_sub_fetch(&s_rule->ref_cnt, 1, __ATOMIC_SEQ_CST) > 0) {
-        return;
-    }
-
-    free(s_rule);
+    free(*ad);
     *ad = NULL;
 
     return;
@@ -172,7 +160,6 @@ void shaper_profile_ex_new(const char *table_name, int table_id, const char *key
     }
 
     s_pf = (struct shaping_profile*)calloc(1, sizeof(struct shaping_profile));
-    s_pf->ref_cnt = 1;
 
     ret = sscanf(table_line, "%d\t%63s\t%63s\t%127s\t%63s\t%63s\t%63s\t%d",
             &s_pf->id, profile_type, type_arg, limits, aqm_options, dscp_marking, volume_based_shaping, &s_pf->valid);
@@ -245,29 +232,22 @@ END:
 
 void shaper_profile_ex_dup(int table_id, void **to, void **from, long argl, void *argp)
 {
-    struct shaping_profile *s_pf;
-
     if (*from == NULL) {
         return;
     }
 
-    s_pf = (struct shaping_profile*)*from;
-    __atomic_add_fetch(&s_pf->ref_cnt, 1, __ATOMIC_SEQ_CST);
-    *to = s_pf;
+    *to = *from;
 
     return;
 }
 
 void shaper_profile_ex_free(int table_id, void **ad, long argl, void *argp)
 {
-    struct shaping_profile *s_pf;
-    
-    s_pf = (struct shaping_profile*)*ad;
-    if (__atomic_sub_fetch(&s_pf->ref_cnt, 1, __ATOMIC_SEQ_CST) > 0) {
+    if (*ad == NULL) {
         return;
     }
 
-    free(s_pf);
+    free(*ad);
     *ad = NULL;
 
     return;
@@ -277,8 +257,6 @@ void shaper_profile_update(struct shaping_profile_info *s_pf_info, struct shapin
 {
     s_pf_info->id = s_pf_ex->id;
     s_pf_info->type = s_pf_ex->type;
-
-    shaper_profile_ex_free(0, (void **)&s_pf_ex, 0, NULL);
 
     return;
 }
@@ -333,9 +311,6 @@ static void shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_fl
     }
 
 END:
-    if (s_rule) {
-        shaper_rule_ex_free(ctx->maat_info->rule_table_id, (void **)&s_rule, 0, NULL);
-    }
     return;
 }
 
@@ -357,7 +332,6 @@ int shaper_rule_is_enabled(struct shaping_thread_ctx *ctx, long long rule_id)
     struct shaping_rule *s_rule = (struct shaping_rule*)maat_plugin_table_get_ex_data(g_maat_instance, ctx->maat_info->rule_table_id, (char *)&rule_id, sizeof(rule_id));
 
     if (s_rule) {
-        shaper_rule_ex_free(ctx->maat_info->rule_table_id, (void **)&s_rule, 0, NULL);
         return 1;
     }
 
