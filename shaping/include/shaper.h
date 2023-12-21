@@ -143,13 +143,13 @@ struct metadata
 };
 
 struct shaping_flow {
-    struct addr_tuple4 tuple4;
     char *src_ip_str;
     size_t src_ip_str_len;
     struct delay_queue packet_queue;
+    int rule_num;
     struct shaping_rule_info matched_rule_infos[SHAPING_RULE_NUM_MAX];
     int priority;
-    int rule_num;
+    struct addr_tuple4 tuple4;
     int anchor;//rule_idx
     int ref_cnt;
     unsigned int queue_len;
