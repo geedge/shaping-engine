@@ -14,6 +14,10 @@ extern "C"
 	(type *)( (char *)__mptr - offsetof(type,member) );})
 #endif
 
+#define likely(x) __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+#define prefetch(x) __builtin_prefetch(x)
+
 #define LOG_TAG_SHAPING "SHAPING"
 #define LOG_TAG_SWARMKV "SWARMKV"
 #define LOG_TAG_STAT    "STAT"

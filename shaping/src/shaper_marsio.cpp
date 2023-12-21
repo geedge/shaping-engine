@@ -34,7 +34,7 @@ static int shaper_marsio_config_load(struct shaper_marsio_config *conf)
         return ret;
     }
 
-    ret = MESA_load_profile_int_def(SHAPING_GLOBAL_CONF_FILE, "SYSTEM", "RX_BRUST_MAX", &conf->rx_brust_max, 1);
+    ret = MESA_load_profile_int_def(SHAPING_GLOBAL_CONF_FILE, "MARSIO", "RX_BRUST_MAX", &conf->rx_brust_max, 1);
     conf->rx_brust_max = conf->rx_brust_max <= SHAPER_MARSIO_RX_BRUST_MAX ? conf->rx_brust_max : SHAPER_MARSIO_RX_BRUST_MAX;
     
     return 0;
