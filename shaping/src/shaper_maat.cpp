@@ -338,12 +338,48 @@ int shaper_rule_is_enabled(struct shaping_thread_ctx *ctx, long long rule_id)
     return 0;
 }
 
+static int shaper_rules_dup_remove(struct shaping_flow *sf, long long *rule_compile_ids, int rule_num, long long *rule_ids_remove_dup)
+{
+    int i, j;
+    int rule_num_remove_dup = 0;
+
+    for (i = 0; i < rule_num; i++) {
+        for (j = 0; j < sf->rule_num; j++) {
+            if (rule_compile_ids[i] == sf->matched_rule_infos[j].id) {
+                break;
+            }
+        }
+        if (j == sf->rule_num) {
+            rule_ids_remove_dup[rule_num_remove_dup] = rule_compile_ids[i];
+            rule_num_remove_dup++;
+        }
+    }
+
+    return rule_num_remove_dup;
+}
+
 void shaper_rules_update(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, long long *rule_compile_ids, int rule_num)
 {
     int i, j;
     int priority_changed = 0;
+    long long rule_ids_remove_dup[SHAPING_RULE_NUM_MAX] = {0};
+    int rule_num_remove_dup = 0;
 
-    if (sf->rule_num + rule_num > SHAPING_RULE_NUM_MAX) {
+    if (rule_num > SHAPING_RULE_NUM_MAX) {
+        char *addr_str = addr_tuple4_to_str(&sf->tuple4);
+        LOG_ERROR("%s: ctrl_active has too many rules %d exceed limit %d for flow: %s", LOG_TAG_MAAT, rule_num, SHAPING_RULE_NUM_MAX, addr_str);
+        if (addr_str) {
+            free(addr_str);
+        }
+        return;
+    }
+
+    rule_num_remove_dup = shaper_rules_dup_remove(sf, rule_compile_ids, rule_num, rule_ids_remove_dup);
+    if (rule_num_remove_dup == 0) {
+        return;
+    }
+
+    if (sf->rule_num + rule_num_remove_dup > SHAPING_RULE_NUM_MAX) {
         char *addr_str = addr_tuple4_to_str(&sf->tuple4);
         LOG_ERROR("%s: shaping exceed maat rule num limit %d for flow: %s", LOG_TAG_MAAT, SHAPING_RULE_NUM_MAX, addr_str);
         if (addr_str) {
@@ -352,15 +388,15 @@ void shaper_rules_update(struct shaping_thread_ctx *ctx, struct shaping_flow *sf
         return;
     }
 
-    for (i = sf->rule_num, j = 0; i < sf->rule_num + rule_num; i++, j++) {
-        shaper_rule_update(ctx, sf, &sf->matched_rule_infos[i], rule_compile_ids[j], &priority_changed);
+    for (i = sf->rule_num, j = 0; i < sf->rule_num + rule_num_remove_dup; i++, j++) {
+        shaper_rule_update(ctx, sf, &sf->matched_rule_infos[i], rule_ids_remove_dup[j], &priority_changed);
     }
 
     if (sf->rule_num > 0 && priority_changed) {
         shaper_stat_refresh(ctx, sf, ctx->thread_index, 1);
     }
 
-    sf->rule_num += rule_num;  
+    sf->rule_num += rule_num_remove_dup;  
     shaper_profiles_priority_update(sf);
 
     return;

@@ -113,6 +113,71 @@ TEST(shaping_flow, update_rule)
     free(ctx.maat_info);
 }
 
+TEST(shaping_flow, update_rule_dup)
+{
+    struct shaping_thread_ctx ctx;
+    struct shaping_flow sf;
+    struct shaping_rule_info *rule_info;
+    long long rule_ids[] = {1, 2, 3, 4};
+    int prioritys[] = {1, 2, 3, 4};
+    int profile_nums[] = {1, 2, 3, 1};
+    int profile_ids[][MAX_REF_PROFILE] = {{1}, {2, 3}, {4, 5, 6}, {7}};
+
+    stub_init();
+
+    stub_set_matched_shaping_rules(4, rule_ids, prioritys, profile_nums, profile_ids);
+
+    ctx.maat_info = (struct shaping_maat_info *)calloc(1, sizeof(struct shaping_maat_info));
+    ctx.maat_info->rule_table_id = STUB_MAAT_SHAPING_RULE_TABLE_ID;
+    ctx.maat_info->profile_table_id = STUB_MAAT_SHAPING_PROFILE_TABLE_ID;
+
+    memset(&sf, 0, sizeof(sf));
+    sf.priority = SHAPING_PRIORITY_NUM_MAX;
+
+    long long rule_id1[] = {1, 2, 3};
+    shaper_rules_update(&ctx, &sf, rule_id1, 3);
+
+    EXPECT_EQ(sf.rule_num, 3);
+
+    rule_info = &sf.matched_rule_infos[0];
+    EXPECT_EQ(rule_info->id, 1);
+    EXPECT_EQ(rule_info->primary.id, 1);
+    EXPECT_EQ(rule_info->primary.priority, 1);
+    EXPECT_EQ(rule_info->borrowing_num, 0);
+
+    rule_info = &sf.matched_rule_infos[1];
+    EXPECT_EQ(rule_info->id, 2);
+    EXPECT_EQ(rule_info->primary.id, 2);
+    EXPECT_EQ(rule_info->primary.priority, 1);
+    EXPECT_EQ(rule_info->borrowing_num, 1);
+    EXPECT_EQ(rule_info->borrowing[0].id, 3);
+    EXPECT_EQ(rule_info->borrowing[0].priority, 2);
+
+    rule_info = &sf.matched_rule_infos[2];
+    EXPECT_EQ(rule_info->id, 3);
+    EXPECT_EQ(rule_info->primary.id, 4);
+    EXPECT_EQ(rule_info->primary.priority, 1);
+    EXPECT_EQ(rule_info->borrowing_num, 2);
+    EXPECT_EQ(rule_info->borrowing[0].id, 5);
+    EXPECT_EQ(rule_info->borrowing[0].priority, 2);
+    EXPECT_EQ(rule_info->borrowing[1].id, 6);
+    EXPECT_EQ(rule_info->borrowing[1].priority, 3);
+
+    long long rule_id2[] = {1};
+    shaper_rules_update(&ctx, &sf, rule_id2, 1);
+    EXPECT_EQ(sf.rule_num, 3);
+
+    long long rule_id3[] = {2, 3, 4};
+    shaper_rules_update(&ctx, &sf, rule_id3, 3);
+    EXPECT_EQ(sf.rule_num, 4);
+    rule_info = &sf.matched_rule_infos[3];
+    EXPECT_EQ(rule_info->id, 4);
+    EXPECT_EQ(rule_info->primary.id, 7);
+    EXPECT_EQ(rule_info->primary.priority, 1);
+
+    free(ctx.maat_info);
+}
+
 TEST(shaping_flow, update_rule_after_priority_confirmed)
 {
     struct shaping_thread_ctx ctx;
