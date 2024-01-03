@@ -170,6 +170,10 @@ struct swarmkv* shaper_swarmkv_init(int caller_thread_num)
     }
 
     LOG_DEBUG("%s: shaping open swarmkv: %s", LOG_TAG_SWARMKV, conf.swarmkv_cluster_name);
+
+    char cmd[256] = {0};//重启之后自动执行一次heal
+    snprintf(cmd, sizeof(cmd), "/opt/tsg/framework/bin/swarmkv-cli -n %s -c %s:%d --exec CLUSTER SANITY heal", conf.swarmkv_cluster_name, conf.swarmkv_consul_ip, conf.swarmkv_consul_port);
+    system(cmd);
     
     return swarmkv_db;
 }
