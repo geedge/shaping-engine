@@ -25,7 +25,7 @@ extern "C" {
 
 #define TOKEN_ENLARGE_TIMES 10
 #define TOKEN_GET_FAILED_INTERVAL_MS 1
-#define HMGET_REQUEST_INTERVAL_MS 1000
+#define HMGET_REQUEST_INTERVAL_MS 10
 
 #define SWARMKV_QUEUE_LEN_GET_CMD_PRIORITY_1 "HMGET tsg-shaping-%d priority-0"
 #define SWARMKV_QUEUE_LEN_GET_CMD_PRIORITY_2 SWARMKV_QUEUE_LEN_GET_CMD_PRIORITY_1 " priority-1"
@@ -657,7 +657,7 @@ static int shaper_profile_is_priority_blocked(struct shaping_thread_ctx *ctx, st
         return 0;
     }
 
-    if (curr_time_ms - profile->hash_node->last_hmget_ms[priority] < HMGET_REQUEST_INTERVAL_MS) {//don't send hmget command in 1s
+    if (curr_time_ms - profile->hash_node->last_hmget_ms[priority] < HMGET_REQUEST_INTERVAL_MS) {//don't send hmget command in 10 ms
         goto END;
     }
 

@@ -14,7 +14,7 @@
 
 #define SHAPER_STAT_ROW_NAME "traffic_shaping_rule_hits"
 
-#define SHAPER_STAT_REFRESH_TIME_NS 100000000  //0.1s
+#define SHAPER_STAT_REFRESH_TIME_NS 10000000  //10 ms
 
 struct shaper_stat_conf {
     int enable_backgroud_thread;
