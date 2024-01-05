@@ -124,6 +124,7 @@ struct shaping_packet_wrapper {
     unsigned long long income_time_ns;
     unsigned long long enqueue_time_us;//first enqueue time
     unsigned int length;
+    int rule_anchor;
     unsigned char direction;
     TAILQ_ENTRY(shaping_packet_wrapper) node;
 };

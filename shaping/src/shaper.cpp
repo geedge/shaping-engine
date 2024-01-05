@@ -217,6 +217,7 @@ static int shaper_packet_enqueue(struct shaping_thread_ctx *ctx, struct shaping_
     s_pkt->pkt_buff = pkt_buff;
     s_pkt->direction = meta->dir;
     s_pkt->length = meta->raw_len;
+    s_pkt->rule_anchor = sf->anchor;
     s_pkt->income_time_ns = curr_time.tv_sec * NANO_SECONDS_PER_SEC + curr_time.tv_nsec;
     s_pkt->enqueue_time_us = curr_time.tv_sec * MICRO_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MICRO_SEC;
     TAILQ_INSERT_TAIL(&sf->packet_queue, s_pkt, node);
@@ -307,6 +308,7 @@ int shaper_flow_push(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, un
 END:
     if (ret == 0) {//all avl tree success
         s_rule_info->primary.enqueue_time_us = enqueue_time;
+        shaper_stat_queueing_pkt_inc(&s_rule_info->primary.stat, pkt_wrapper->direction, ctx->thread_index);
     }
 
     return ret;
@@ -874,7 +876,6 @@ static enum shaping_packet_action shaper_pkt_action_decide_queueing(struct shapi
     clock_gettime(CLOCK_MONOTONIC, &curr_time);
     enqueue_time = curr_time.tv_sec * MICRO_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MICRO_SEC;
     if (0 == shaper_flow_push(ctx, sf, enqueue_time)) {
-        shaper_stat_queueing_pkt_inc(&sf->matched_rule_infos[sf->anchor].primary.stat, pkt_wrapper->direction, ctx->thread_index);
         return SHAPING_QUEUED;
     } else {
         goto DROP;
@@ -923,7 +924,6 @@ FLOW_PUSH:
     clock_gettime(CLOCK_MONOTONIC, &curr_time);
     enqueue_time = curr_time.tv_sec * MICRO_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MICRO_SEC;
     if (0 == shaper_flow_push(ctx, sf, enqueue_time)) {
-        shaper_stat_queueing_pkt_inc(&sf->matched_rule_infos[sf->anchor].primary.stat, meta->dir, ctx->thread_index);
         return SHAPING_QUEUED;
     } else {
         goto DROP;
@@ -989,12 +989,10 @@ static int shaper_polling_first_pkt_token_get(struct shaper *sp, struct shaping_
         return 0;
     } else {
         pkt_wrapper = shaper_first_pkt_get(sf);
-        sf->anchor = 0;
+        shaper_stat_queueing_pkt_dec(&sf->matched_rule_infos[pkt_wrapper->rule_anchor].primary.stat, pkt_wrapper->direction, ctx->thread_index);
 
-        if (0 == shaper_flow_push(ctx, sf, pkt_wrapper->enqueue_time_us)) {
-            /*in pkt process, when queue not empty, new pkt's queueing stat was added to primary profile of first rule. 
-            so don't need add queueing stat here*/
-        } else {
+        sf->anchor = 0;
+        if (shaper_flow_push(ctx, sf, pkt_wrapper->enqueue_time_us) != 0) {
             shaper_queue_clear(sf, ctx);//first packet fail, then every packet will fail
             if (sf->flag & SESSION_CLOSE) {
                 sf->flag &= (~SESSION_CLOSE);
@@ -1037,7 +1035,7 @@ void shaping_packet_process(struct shaping_thread_ctx *ctx, marsio_buff_t *rx_bu
     }
 
     if (!shaper_queue_empty(sf)) {//already have queueing pkt, enqueue directly
-        s_rule = &sf->matched_rule_infos[0];
+        s_rule = &sf->matched_rule_infos[sf->anchor];
         if (0 == shaper_packet_enqueue(ctx, sf, rx_buff, meta)) {
             shaper_stat_queueing_pkt_inc(&s_rule->primary.stat, meta->dir, ctx->thread_index);
             shaper_global_stat_queueing_inc(&ctx->thread_global_stat, meta->raw_len);
