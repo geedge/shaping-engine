@@ -675,6 +675,7 @@ static int shaper_profile_is_priority_blocked(struct shaping_thread_ctx *ctx, st
 
 END:
     if (profile->hash_node->is_priority_blocked[priority] == 1) {
+        sf->flag |= SESSION_BORROW;
         return 1;
     } else {
         return 0;

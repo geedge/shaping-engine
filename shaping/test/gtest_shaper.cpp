@@ -1579,6 +1579,79 @@ TEST(two_sessions, priority_non_block)
     stub_clear_matched_shaping_rules();
 }
 
+/*session1 match rule1; session2 match rule2
+  rule1:
+      priority:1
+      primary profile_a: (priority 1)
+  rule2:
+      priority:2
+      primary profile_a: (priority 2)
+      borrow  profile_b: (priority 3)
+
+profile_a(id 0): limit 1000
+profile_b(id 1): limit 1000
+*/
+TEST(two_sessions, priority_block_borrow)
+{
+    struct stub_pkt_queue expec_tx_queue1;
+    struct stub_pkt_queue expec_tx_queue2;
+    struct stub_pkt_queue *actual_tx_queue;
+    struct shaping_ctx *ctx = NULL;
+    struct shaping_flow *sf1 = NULL;
+    struct shaping_flow *sf2 = NULL;
+    long long rule_ids[] = {1, 2};
+    long long rule_id1[] = {1};
+    long long rule_id2[] = {2};
+    int profile_nums[] = {1, 2};
+    int prioritys[] = {1, 2};
+    int profile_id[][MAX_REF_PROFILE] = {{0}, {0, 1}};
+    
+
+    TAILQ_INIT(&expec_tx_queue1);
+    TAILQ_INIT(&expec_tx_queue2);
+    stub_init();
+    
+    ctx = shaping_engine_init();
+    ASSERT_TRUE(ctx != NULL);
+    sf1 = shaping_flow_new(&ctx->thread_ctx[0]);
+    ASSERT_TRUE(sf1 != NULL);
+    sf2 = shaping_flow_new(&ctx->thread_ctx[1]);
+    ASSERT_TRUE(sf2 != NULL);
+
+    stub_set_matched_shaping_rules(2, rule_ids, prioritys, profile_nums, profile_id);
+
+    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT);
+    stub_set_token_bucket_avl_per_sec(1, 1000, SHAPING_DIR_OUT);
+    actual_tx_queue = stub_get_tx_queue();
+    shaper_rules_update(&ctx->thread_ctx[0], sf1, rule_id1, 1);
+    shaper_rules_update(&ctx->thread_ctx[1], sf2, rule_id2, 1);
+
+    /*******send packets***********/
+    send_packets(&ctx->thread_ctx[0], sf1, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue1, 1, 0);
+    send_packets(&ctx->thread_ctx[1], sf2, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue2, 1, 0);
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 10));
+
+    while (!TAILQ_EMPTY(&expec_tx_queue2)) {
+        stub_refresh_token_bucket(1);
+        polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);//primary profile blocked by priority, send by borrow profile
+
+        ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 1));
+    }
+
+    while (!TAILQ_EMPTY(&expec_tx_queue1)) {
+        stub_refresh_token_bucket(0);
+        polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
+
+        ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 1));
+    }
+
+    shaping_flow_free(&ctx->thread_ctx[0], sf1);
+    shaping_flow_free(&ctx->thread_ctx[1], sf2);
+    fieldstat_global_disable_prometheus_endpoint();
+    shaper_thread_resource_clear();
+    shaping_engine_destroy(ctx);
+    stub_clear_matched_shaping_rules();
+}
 
 /*session1 match rule1
   rule1:
@@ -1748,6 +1821,6 @@ TEST(statistics, udp_queueing_pkt)
 int main(int argc, char **argv) 
 {
     testing::InitGoogleTest(&argc, argv);
-    //testing::GTEST_FLAG(filter) = "two_sessions.priority_non_block";
+    //testing::GTEST_FLAG(filter) = "two_sessions.priority_block_borrow";
     return RUN_ALL_TESTS();
 }
