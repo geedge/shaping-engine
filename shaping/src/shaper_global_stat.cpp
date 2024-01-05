@@ -127,6 +127,10 @@ void shaper_global_stat_destroy(struct shaping_global_stat *stat)
         return;
     }
 
+    if (stat->stat_data) {
+        free(stat->stat_data);
+    }
+
     if (stat->instance) {
         fieldstat_instance_free(stat->instance);
     }
