@@ -1075,7 +1075,7 @@ END:
     shaper_stat_refresh(ctx, sf, ctx->thread_index, 0);
     time_t curr_time = time(NULL);
     if (curr_time > sf->last_update_timeout_sec) {
-        timeouts_add(ctx->expires, &sf->timeout_handle, curr_time + SHAPING_STAT_REFRESH_INTERVAL_SEC);
+        timeouts_add(ctx->expires, &sf->timeout_handle, curr_time + SHAPING_STAT_REFRESH_INTERVAL_SEC);//timeouts_add will delete if sf exist, then add
         sf->last_update_timeout_sec = curr_time;
     }
 
@@ -1100,7 +1100,6 @@ void polling_entry(struct shaper *sp, struct shaping_stat *stat, struct shaping_
 {
     swarmkv_caller_loop(ctx->swarmkv_db, SWARMKV_LOOP_NONBLOCK, NULL);
 
-    struct timeout *t = NULL;
     struct shaping_flow *sf = NULL;
     time_t curr_time = time(NULL);
     int cnt = 0;
@@ -1110,12 +1109,16 @@ void polling_entry(struct shaper *sp, struct shaping_stat *stat, struct shaping_
         ctx->last_update_timeout_sec = curr_time;
     }
     
-    t = timeouts_get(ctx->expires);
-    while (t && cnt < SHAPING_STAT_REFRESH_MAX_PER_POLLING) {
+    while (cnt < SHAPING_STAT_REFRESH_MAX_PER_POLLING) {
+        struct timeout *t = NULL;
+        t = timeouts_get(ctx->expires);
+        if (!t) {
+            break;
+        }
+
         sf = container_of(t, struct shaping_flow, timeout_handle);
         shaper_stat_refresh(ctx, sf, ctx->thread_index, 0);
-        timeouts_add(ctx->expires, &sf->timeout_handle, time(NULL) + SHAPING_STAT_REFRESH_INTERVAL_SEC);
-        t = timeouts_get(ctx->expires);
+        timeouts_add(ctx->expires, &sf->timeout_handle, time(NULL) + SHAPING_STAT_REFRESH_INTERVAL_SEC);//timeouts_get will delete sf from queue, add it back
         cnt++;
     }
 

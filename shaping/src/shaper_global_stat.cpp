@@ -260,7 +260,7 @@ void shaper_global_stat_tconsume_callback_inc(struct shaping_global_stat_data *t
 
 void shaper_global_stat_hincrby_invoke_inc(struct shaping_global_stat_data *thread_global_stat)
 {
-    thread_global_stat->async_hmget_invoke++;
+    thread_global_stat->async_hincrby_invoke++;
 
     return;
 }
