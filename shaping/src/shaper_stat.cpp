@@ -278,10 +278,6 @@ void shaper_stat_forward_all_rule_inc(struct shaping_stat *stat, struct shaping_
 
     for (i = 0; i < sf->rule_num; i++) {
         rule = &sf->matched_rule_infos[i];
-        if (rule->has_dup_profile || !rule->is_enabled) {
-            continue;
-        }
-        
         shaper_stat_forward_inc(&rule->primary.stat, direction, pkt_len, thread_id);
     }
 
