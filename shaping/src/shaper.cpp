@@ -300,8 +300,7 @@ int shaper_flow_push(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, un
         avl_tree_node_key_set(s_node->avl_node[priority], pkt_wrapper->income_time_ns);
         if (0 == avl_tree_node_insert(sp->priority_trees[priority], s_node->avl_node[priority])) {
             ret = 0;
-            //TODO: calculate queue_len for borrow profile and add judge when refresh stat????
-            //shaper_stat_queueing_pkt_inc(&s_rule_info->borrowing[i].stat, pkt_wrapper->direction, ctx->thread_index);
+            shaper_stat_queueing_pkt_inc(&s_rule_info->borrowing[i].stat, pkt_wrapper->direction, ctx->thread_index);
         }
     }
 
@@ -352,7 +351,7 @@ void shaper_flow_pop(struct shaping_thread_ctx *ctx, struct shaping_flow *sf)
         priority = s_rule_info->borrowing[i].priority;
         if (avl_node_in_tree(s_node->avl_node[priority])) {
             avl_tree_node_remove(sp->priority_trees[priority], s_node->avl_node[priority]);
-            //TODO: calculate queue_len for borrow profile and add judge when refresh stat????
+            shaper_stat_queueing_pkt_dec(&s_rule_info->borrowing[i].stat, pkt_wrapper->direction, ctx->thread_index);
         }
     }
 
@@ -993,7 +992,7 @@ static int shaper_polling_first_pkt_token_get(struct shaper *sp, struct shaping_
         return 0;
     } else {
         pkt_wrapper = shaper_first_pkt_get(sf);
-        shaper_stat_queueing_pkt_dec(&sf->matched_rule_infos[pkt_wrapper->rule_anchor].primary.stat, pkt_wrapper->direction, ctx->thread_index);
+        shaper_stat_queueing_pkt_dec_for_rule(&sf->matched_rule_infos[pkt_wrapper->rule_anchor], pkt_wrapper->direction, ctx->thread_index);
 
         sf->anchor = 0;
         if (shaper_flow_push(ctx, sf, pkt_wrapper->enqueue_time_us) != 0) {
@@ -1041,7 +1040,7 @@ void shaping_packet_process(struct shaping_thread_ctx *ctx, marsio_buff_t *rx_bu
     if (!shaper_queue_empty(sf)) {//already have queueing pkt, enqueue directly
         s_rule = &sf->matched_rule_infos[sf->anchor];
         if (0 == shaper_packet_enqueue(ctx, sf, rx_buff, meta)) {
-            shaper_stat_queueing_pkt_inc(&s_rule->primary.stat, meta->dir, ctx->thread_index);
+            shaper_stat_queueing_pkt_inc_for_rule(s_rule, meta->dir, ctx->thread_index);
             shaper_global_stat_queueing_inc(&ctx->thread_global_stat, meta->raw_len);
         } else {
             shaper_stat_drop_inc(&s_rule->primary.stat, meta->dir, ctx->thread_index);
