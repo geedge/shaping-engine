@@ -1731,62 +1731,6 @@ TEST(two_sessions, primary_profile_priority_blocked_by_borrow_profile)
 
 /*session1 match rule1
   rule1:
-      profile_a
-  rule2:
-      profile_a
-
-  profile_a(id 0): limit 1000
-*/
-TEST(single_session, dup_primary_profile)//dup primary profile, just process the first rule and ignore others
-{
-    struct stub_pkt_queue expec_tx_queue;
-    struct stub_pkt_queue *actual_tx_queue;
-    struct shaping_ctx *ctx = NULL;
-    struct shaping_flow *sf = NULL;
-    long long rule_ids[] = {1, 2};
-    int profile_nums[] = {1, 1};
-    int prioritys[] = {1, 2};
-    int profile_id[][MAX_REF_PROFILE] = {{0}, {0}};
-    
-
-    TAILQ_INIT(&expec_tx_queue);
-    stub_init();
-    
-    ctx = shaping_engine_init();
-    ASSERT_TRUE(ctx != NULL);
-    sf = shaping_flow_new(&ctx->thread_ctx[0]);
-    ASSERT_TRUE(sf != NULL);
-
-    stub_set_matched_shaping_rules(2, rule_ids, prioritys, profile_nums, profile_id);
-
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT);
-    actual_tx_queue = stub_get_tx_queue();
-    shaper_rules_update(&ctx->thread_ctx[0], sf, rule_ids, 2);
-
-    /*******send packets***********/
-    send_packets(&ctx->thread_ctx[0], sf, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue, 2, 0);
-    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
-    ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
-
-    while (!TAILQ_EMPTY(&expec_tx_queue)) {//last 90 packets
-        stub_refresh_token_bucket(0);
-        for (int i = 0; i < 20; i++) {
-            polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-            stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
-        }
-        ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
-        ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
-    }
-
-    shaping_flow_free(&ctx->thread_ctx[0], sf);
-    fieldstat_global_disable_prometheus_endpoint();
-    shaper_thread_resource_clear();
-    shaping_engine_destroy(ctx);
-    stub_clear_matched_shaping_rules();
-}
-
-/*session1 match rule1
-  rule1:
       profile: limit 1000*/
 TEST(statistics, udp_drop_pkt)
 {

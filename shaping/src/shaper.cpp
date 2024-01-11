@@ -728,9 +728,6 @@ static int shaper_token_consume(struct shaping_thread_ctx *ctx, struct shaping_f
     }
 
     struct shaping_rule_info *rule = &sf->matched_rule_infos[sf->anchor];
-    if (rule->has_dup_profile) {
-        return SHAPER_TOKEN_GET_PASS;//dup profile, don't need to get token and forward packet
-    }
 
     time_t curr_time = time(NULL);
     if (curr_time - sf->check_rule_time >= ctx->conf.check_rule_enable_interval_sec) {

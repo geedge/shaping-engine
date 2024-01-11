@@ -358,20 +358,6 @@ static int shaper_rules_dup_remove(struct shaping_flow *sf, long long *rule_comp
     return rule_num_remove_dup;
 }
 
-static void shaper_rules_dup_profile_check(struct shaping_flow *sf)
-{
-    for (int i = 0; i < sf->rule_num; i++) {
-        for (int j = i + 1; j < sf->rule_num; j++) {
-            if (sf->matched_rule_infos[i].primary.id == sf->matched_rule_infos[j].primary.id) {
-                sf->matched_rule_infos[j].has_dup_profile = 1;
-                LOG_INFO("%s: shaping rule %d and %d have same primary profile %d", LOG_TAG_MAAT, sf->matched_rule_infos[i].id, sf->matched_rule_infos[j].id, sf->matched_rule_infos[i].primary.id);
-            }
-        }
-    }
-
-    return;
-}
-
 void shaper_rules_update(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, long long *rule_compile_ids, int rule_num)
 {
     int i, j;
@@ -412,8 +398,6 @@ void shaper_rules_update(struct shaping_thread_ctx *ctx, struct shaping_flow *sf
 
     sf->rule_num += rule_num_remove_dup;  
     shaper_profiles_priority_update(sf);
-
-    shaper_rules_dup_profile_check(sf);
 
     return;
 }
