@@ -1201,6 +1201,7 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
     }
     shaper_stat_refresh(&ctx->thread_ctx[0], sf2, 0, 1);//refresh stat, to ensure priority queue_len in swarmkv is correct
 
+    stub_curr_time_s_inc(1);//inc time to refresh hmget interval
     while (!TAILQ_EMPTY(&expec_tx_queue1)) {//last 90 delay packets
         stub_refresh_token_bucket(2);
         for (int i = 0; i < 20; i++) {//even though invoke polling more than 10 times, there should be only 10 pkts be sent
@@ -1229,7 +1230,7 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 1, primary
-    shaping_stat_judge(line, 1, 1, 1, 0, 0, 0, 0, 470000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(line, 1, 1, 1, 0, 0, 0, 0, 1470000, SHAPING_DIR_OUT, profile_type_primary);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2, borrow
     shaping_stat_judge(line, 1, 2, 2, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
@@ -1714,6 +1715,7 @@ TEST(two_sessions, primary_profile_priority_blocked_by_borrow_profile)
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 1));
     }
 
+    stub_curr_time_s_inc(1);//inc time to refresh hmget interval
     while (!TAILQ_EMPTY(&expec_tx_queue2)) {
         stub_refresh_token_bucket(1);
         polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);
