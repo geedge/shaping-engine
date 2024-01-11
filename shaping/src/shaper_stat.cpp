@@ -182,8 +182,10 @@ static void shaper_stat_profile_metirc_refresh(struct shaping_thread_ctx *ctx, i
     }
 
     if (need_update_guage) {
-        fieldstat_dynamic_table_metric_value_incrby(stat->instance, stat->table_id, stat->column_ids[IN_QUEUE_LEN_IDX], SHAPER_STAT_ROW_NAME, profile_stat->in.queue_len, tags, TAG_IDX_MAX, thread_id);
-        fieldstat_dynamic_table_metric_value_incrby(stat->instance, stat->table_id, stat->column_ids[OUT_QUEUE_LEN_IDX], SHAPER_STAT_ROW_NAME, profile_stat->out.queue_len, tags, TAG_IDX_MAX, thread_id);
+        if (profile_type == PROFILE_IN_RULE_TYPE_PRIMARY) {
+            fieldstat_dynamic_table_metric_value_incrby(stat->instance, stat->table_id, stat->column_ids[IN_QUEUE_LEN_IDX], SHAPER_STAT_ROW_NAME, profile_stat->in.queue_len, tags, TAG_IDX_MAX, thread_id);
+            fieldstat_dynamic_table_metric_value_incrby(stat->instance, stat->table_id, stat->column_ids[OUT_QUEUE_LEN_IDX], SHAPER_STAT_ROW_NAME, profile_stat->out.queue_len, tags, TAG_IDX_MAX, thread_id);
+        }
 
         struct shaping_hincrby_cb_arg *arg = (struct shaping_hincrby_cb_arg *)calloc(1, sizeof(struct shaping_hincrby_cb_arg));
         struct timespec curr_time;
@@ -221,7 +223,7 @@ void shaper_stat_refresh(struct shaping_thread_ctx *ctx, struct shaping_flow *sf
         need_refresh = 1;
     } else {
         clock_gettime(CLOCK_MONOTONIC, &curr_time);
-        if (curr_time.tv_sec - sf->stat_update_time.tv_sec > 0 || curr_time.tv_nsec - sf->stat_update_time.tv_nsec > SHAPER_STAT_REFRESH_TIME_NS) {
+        if (curr_time.tv_sec - sf->stat_update_time.tv_sec > 0 || curr_time.tv_nsec - sf->stat_update_time.tv_nsec >= SHAPER_STAT_REFRESH_TIME_NS) {
             need_refresh = 1;
             memcpy(&sf->stat_update_time, &curr_time, sizeof(struct timespec));
         }
@@ -303,6 +305,26 @@ void shaper_stat_queueing_pkt_dec(struct shaping_stat_for_profile *profile_stat,
         profile_stat->in.queue_len--;
     } else {
         profile_stat->out.queue_len--;
+    }
+
+    return;
+}
+
+void shaper_stat_queueing_pkt_inc_for_rule(struct shaping_rule_info *rule, unsigned char direction, int thread_id)
+{
+    shaper_stat_queueing_pkt_inc(&rule->primary.stat, direction, thread_id);
+    for (int i = 0; i < rule->borrowing_num; i++) {
+        shaper_stat_queueing_pkt_inc(&rule->borrowing[i].stat, direction, thread_id);
+    }
+
+    return;
+}
+
+void shaper_stat_queueing_pkt_dec_for_rule(struct shaping_rule_info *rule, unsigned char direction, int thread_id)
+{
+    shaper_stat_queueing_pkt_dec(&rule->primary.stat, direction, thread_id);
+    for (int i = 0; i < rule->borrowing_num; i++) {
+        shaper_stat_queueing_pkt_dec(&rule->borrowing[i].stat, direction, thread_id);
     }
 
     return;
