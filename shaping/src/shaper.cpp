@@ -26,6 +26,7 @@ extern "C" {
 #define TOKEN_ENLARGE_TIMES 10
 #define TOKEN_GET_FAILED_INTERVAL_MS 1
 #define HMGET_REQUEST_INTERVAL_MS 10
+#define PRIORITY_BLOCK_MIN_TIME_MS 500
 
 #define SWARMKV_QUEUE_LEN_GET_CMD_PRIORITY_1 "HMGET tsg-shaping-%d priority-0"
 #define SWARMKV_QUEUE_LEN_GET_CMD_PRIORITY_2 SWARMKV_QUEUE_LEN_GET_CMD_PRIORITY_1 " priority-1"
@@ -67,7 +68,7 @@ struct shaping_profile_hash_node {
     int out_deposit_token_bits[SHAPING_PRIORITY_NUM_MAX];
     long long last_failed_get_token_ms;
     long long last_hmget_ms[SHAPING_PRIORITY_NUM_MAX];
-    unsigned char is_priority_blocked[SHAPING_PRIORITY_NUM_MAX];
+    long long priority_blocked_time_ms[SHAPING_PRIORITY_NUM_MAX];
     unsigned char is_invalid;
     UT_hash_handle hh;
 };
@@ -608,15 +609,15 @@ static void shaper_queue_len_get_cb(const struct swarmkv_reply *reply, void * cb
     int priority = arg->priority;
     struct timespec curr_time;
     long long curr_time_us;
+    long long curr_time_ms;
 
     clock_gettime(CLOCK_MONOTONIC, &curr_time);
     curr_time_us = curr_time.tv_sec * MICRO_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MICRO_SEC;
+    curr_time_ms = curr_time_us / 1000;
     shaper_global_stat_swarmkv_latency_update(ctx->ref_ctx->global_stat, curr_time_us - arg->start_time_us);
 
     shaper_global_stat_async_callback_inc(&ctx->thread_global_stat);
     shaper_global_stat_hmget_callback_inc(&ctx->thread_global_stat);
-
-    pf_hash_node->is_priority_blocked[priority] = 0;
 
     if (!reply || (reply->type != SWARMKV_REPLY_NIL && reply->type != SWARMKV_REPLY_ARRAY)) {
         shaper_global_stat_async_hmget_failed_inc(&ctx->thread_global_stat);
@@ -632,14 +633,14 @@ static void shaper_queue_len_get_cb(const struct swarmkv_reply *reply, void * cb
             char tmp_str[32] = {0};
             memcpy(tmp_str, reply->elements[i]->str, reply->elements[i]->len);
             if (strtoll(tmp_str, NULL, 10) > 0) {
-                pf_hash_node->is_priority_blocked[priority] = 1;
+                pf_hash_node->priority_blocked_time_ms[priority] = curr_time_ms;
                 break;
             }
         }
     }
 
 END:
-    pf_hash_node->last_hmget_ms[priority] = curr_time.tv_sec * MILLI_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MILLI_SEC;
+    pf_hash_node->last_hmget_ms[priority] = curr_time_ms;
 
     free(cb_arg);
     cb_arg = NULL;
@@ -673,7 +674,7 @@ static int shaper_profile_is_priority_blocked(struct shaping_thread_ctx *ctx, st
     swarmkv_async_command(ctx->swarmkv_db, shaper_queue_len_get_cb, arg, swarmkv_queue_len_get_cmd[priority], profile->id);
 
 END:
-    if (profile->hash_node->is_priority_blocked[priority] == 1) {
+    if (curr_time_ms - profile->hash_node->priority_blocked_time_ms[priority] < PRIORITY_BLOCK_MIN_TIME_MS) {
         sf->flag |= SESSION_BORROW;
         return 1;
     } else {
