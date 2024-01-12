@@ -149,6 +149,14 @@ static void shaper_stat_swarmkv_hincrby_cb(const struct swarmkv_reply *reply, vo
 
     if (reply->type != SWARMKV_REPLY_INTEGER) {
         shaper_global_stat_async_hincrby_failed_inc(&ctx->thread_global_stat);
+
+        shaper_global_stat_async_invoke_inc(&ctx->thread_global_stat);//hincrby failed, retry
+        shaper_global_stat_hincrby_invoke_inc(&ctx->thread_global_stat);
+
+        LOG_INFO("%s: shaping stat hincrby failed, retry for profile id %d priority %d, operate queue_len %lld", LOG_TAG_STAT, arg->profile_id, arg->priority, arg->queue_len);
+        swarmkv_async_command(ctx->swarmkv_db, shaper_stat_swarmkv_hincrby_cb, arg, "HINCRBY tsg-shaping-%d priority-%d %lld", arg->profile_id, arg->priority, arg->queue_len);
+        
+        return;
     }
 
     free(cb_arg);
@@ -193,9 +201,12 @@ static void shaper_stat_profile_metirc_refresh(struct shaping_thread_ctx *ctx, i
         clock_gettime(CLOCK_MONOTONIC, &curr_time);
         arg->ctx = ctx;
         arg->start_time_us = curr_time.tv_sec * MICRO_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MICRO_SEC;
+        arg->profile_id = profile->id;
+        arg->priority = profile->priority;
+        arg->queue_len = profile_stat->in.queue_len + profile_stat->out.queue_len;
         shaper_global_stat_async_invoke_inc(&ctx->thread_global_stat);
         shaper_global_stat_hincrby_invoke_inc(&ctx->thread_global_stat);
-        swarmkv_async_command(ctx->swarmkv_db, shaper_stat_swarmkv_hincrby_cb, arg, "HINCRBY tsg-shaping-%d priority-%d %lld", profile->id, profile->priority, profile_stat->in.queue_len + profile_stat->out.queue_len);
+        swarmkv_async_command(ctx->swarmkv_db, shaper_stat_swarmkv_hincrby_cb, arg, "HINCRBY tsg-shaping-%d priority-%d %lld", arg->profile_id, arg->priority, arg->queue_len);
 
         memset(profile_stat, 0, sizeof(struct shaping_stat_for_profile));
     } else {

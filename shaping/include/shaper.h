@@ -186,6 +186,9 @@ struct shaping_hmget_cb_arg {
 struct shaping_hincrby_cb_arg {
     struct shaping_thread_ctx *ctx;
     long long start_time_us;
+    long long queue_len;
+    int profile_id;
+    int priority;
 };
 
 struct shaper;//instance of shaping, thread unsafe
