@@ -97,6 +97,33 @@ enum shaping_profile_type {
     PROFILE_TYPE_SPLIT_BY_LOCAL_HOST
 };
 
+enum shaper_aqm_type {
+    AQM_TYPE_NONE = 0,
+    AQM_TYPE_BLUE,
+    AQM_TYPE_CODEL,
+    AQM_TYPE_MAX
+};
+
+struct shaper_aqm_blue_para {
+    time_t update_time;
+    int probability;
+};
+
+struct shaping_profile_hash_node {
+    int id;
+    enum shaper_aqm_type aqm_type;
+    int in_deposit_token_bits[SHAPING_PRIORITY_NUM_MAX];
+    int out_deposit_token_bits[SHAPING_PRIORITY_NUM_MAX];
+    long long last_failed_get_token_ms;
+    long long last_hmget_ms;
+    long long queue_len[SHAPING_PRIORITY_NUM_MAX];
+    long long priority_blocked_time_ms[SHAPING_PRIORITY_NUM_MAX];
+    int ref_cnt;
+    struct shaper_aqm_blue_para aqm_blue_para;
+    unsigned char is_invalid;
+    UT_hash_handle hh;
+};
+
 struct shaping_profile_info {
     int id;//profile_id
     enum shaping_profile_type type;
@@ -126,6 +153,7 @@ struct shaping_packet_wrapper {
     unsigned int length;
     int rule_anchor;
     unsigned char direction;
+    unsigned char aqm_processed;
     TAILQ_ENTRY(shaping_packet_wrapper) node;
 };
 TAILQ_HEAD(delay_queue, shaping_packet_wrapper);
@@ -179,7 +207,6 @@ struct shaping_tconsume_cb_arg {
 struct shaping_hmget_cb_arg {
     struct shaping_thread_ctx *ctx;
     struct shaping_profile_hash_node *pf_hash_node;
-    int priority;
     long long start_time_us;
 };
 
@@ -202,10 +229,7 @@ bool shaper_queue_empty(struct shaping_flow *sf);
 void shaper_packet_dequeue(struct shaping_flow *sf);
 struct shaping_packet_wrapper* shaper_first_pkt_get(struct shaping_flow *sf);
 void shaper_queue_clear(struct shaping_flow *sf, struct shaping_thread_ctx *ctx);
-/*return value: 0 for success, -1 for failed*/
-int shaper_flow_push(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, unsigned long long enqueue_time);
-/*return num of sf_ins*/
-void shaper_flow_pop(struct shaping_thread_ctx *ctx, struct shaping_flow *sf);
+
 int shaper_flow_in_order_get(struct shaper *sp, struct shaper_flow_instance sf_ins[], int priority, int max_sf_num);
 
 //enum shaping_packet_action shaper_pkt_action_decide(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, int priority, int sf_in_queue);
