@@ -6,7 +6,7 @@
 #include "utils.h"
 #include "shaper_swarmkv.h"
 
-#define PROBABILITY_MAX 100
+#define PROBABILITY_MAX 500
 #define INCREMENT 10
 #define DECREMENT 1
 #define FREEZE_TIME 1 //unit:s

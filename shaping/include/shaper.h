@@ -117,8 +117,11 @@ struct shaping_profile_hash_node {
     long long last_failed_get_token_ms;
     long long last_hmget_ms;
     long long queue_len[SHAPING_PRIORITY_NUM_MAX];
+    long long local_queue_len[SHAPING_PRIORITY_NUM_MAX];
+    long long local_queue_len_update_time_us[SHAPING_PRIORITY_NUM_MAX];
     long long priority_blocked_time_ms[SHAPING_PRIORITY_NUM_MAX];
-    int ref_cnt;
+    int hmget_ref_cnt;
+    int tconsume_ref_cnt;
     struct shaper_aqm_blue_para aqm_blue_para;
     unsigned char is_invalid;
     UT_hash_handle hh;
@@ -185,7 +188,7 @@ struct shaping_flow {
     unsigned int flag;
     struct metadata ctrl_meta;
     unsigned long long processed_pkts;
-    struct timespec stat_update_time;
+    unsigned long long stat_update_time_us;
     time_t check_rule_time;
     struct timeout timeout_handle;
     time_t last_update_timeout_sec;
@@ -231,8 +234,7 @@ struct shaping_packet_wrapper* shaper_first_pkt_get(struct shaping_flow *sf);
 void shaper_queue_clear(struct shaping_flow *sf, struct shaping_thread_ctx *ctx);
 
 int shaper_flow_in_order_get(struct shaper *sp, struct shaper_flow_instance sf_ins[], int priority, int max_sf_num);
-
-//enum shaping_packet_action shaper_pkt_action_decide(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, int priority, int sf_in_queue);
+void shaper_profile_hash_node_update(struct shaping_profile_info *profile);
 
 int shaper_global_conf_init(struct shaping_system_conf *conf);
 

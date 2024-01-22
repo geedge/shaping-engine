@@ -11,10 +11,6 @@ static int shaper_aqm_blue_need_drop(struct shaping_packet_wrapper *pkt_wrapper,
 {
     time_t curr_time;
 
-    if (pkt_wrapper->aqm_processed) {
-        return 0;
-    }
-
     if (time(&curr_time) - para->update_time >= FREEZE_TIME) {
         para->update_time = curr_time;
         if (curr_queue_len >= QUEUE_LEN_MAX) {
@@ -33,20 +29,28 @@ static int shaper_aqm_blue_need_drop(struct shaping_packet_wrapper *pkt_wrapper,
 
 int shaper_aqm_need_drop(struct shaping_profile_info *profile, struct shaping_packet_wrapper *pkt_wrapper)
 {
-    //TODO: judge if this packet is aqm processed
+    int ret = 0;
+    
+    if (profile->hash_node->aqm_type == AQM_TYPE_NONE) {
+        return 0;
+    }
+
+    //TODO: judge if this packet is aqm processed for this profile
     if (pkt_wrapper->aqm_processed) {
         return 0;
     }
     
     switch (profile->hash_node->aqm_type) {
         case AQM_TYPE_BLUE:
-            return shaper_aqm_blue_need_drop(pkt_wrapper, &profile->hash_node->aqm_blue_para, profile->hash_node->queue_len[profile->priority]);
+            ret = shaper_aqm_blue_need_drop(pkt_wrapper, &profile->hash_node->aqm_blue_para, profile->hash_node->queue_len[profile->priority]);
             break;
         case AQM_TYPE_CODEL:
             break;
         default:
-            return 0;
+            break;
     }
 
-    return 0;
+    pkt_wrapper->aqm_processed = 1;
+
+    return ret;
 }

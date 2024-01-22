@@ -122,11 +122,16 @@ static void shaper_session_log_send(struct shaping_thread_ctx *ctx, struct shapi
     int pkt_header_len = sf->ctrl_meta.l7_offset;
     struct metadata *ctrl_meta = &sf->ctrl_meta;
     struct sids sids;
+    char *dst = NULL;
     char *addr_str = addr_tuple4_to_str(&sf->tuple4);
 
-    marsio_buff_malloc_global(ctx->marsio_info->instance, &tx_buff, 1, 0, ctx->thread_index);
+    if (marsio_buff_malloc_global(ctx->marsio_info->instance, &tx_buff, 1, 0, ctx->thread_index) < 0) {
+        LOG_ERROR("%s: marsio_buff_malloc_global failed for session %s", LOG_TAG_SHAPING, addr_str);
+        goto END;
+    }
+
     marsio_buff_set_ctrlbuf(tx_buff);
-    char *dst = marsio_buff_append(tx_buff, pkt_header_len + mpack_size);
+    dst = marsio_buff_append(tx_buff, pkt_header_len + mpack_size);
     memcpy(dst, pkt_header_data, pkt_header_len);
     memcpy(dst + pkt_header_len, mpack_data, mpack_size);
 

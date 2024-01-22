@@ -257,6 +257,7 @@ void shaper_profile_update(struct shaping_profile_info *s_pf_info, struct shapin
 {
     s_pf_info->id = s_pf_ex->id;
     s_pf_info->type = s_pf_ex->type;
+    shaper_profile_hash_node_update(s_pf_info);
 
     return;
 }
