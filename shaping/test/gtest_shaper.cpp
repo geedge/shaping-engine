@@ -419,7 +419,7 @@ TEST(single_session, tcp_tx_in_order)
 
 
     /***********send stat data here********************/
-    shaper_stat_refresh(&ctx->thread_ctx[0], sf, ctx->thread_ctx[0].thread_index, 1);
+    shaper_stat_refresh(&ctx->thread_ctx[0], sf, 1);
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
     sleep(2);//wait telegraf generate metric
 
@@ -1199,7 +1199,7 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 10));
         ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
     }
-    shaper_stat_refresh(&ctx->thread_ctx[0], sf2, 0, 1);//refresh stat, to ensure priority queue_len in swarmkv is correct
+    shaper_stat_refresh(&ctx->thread_ctx[0], sf2, 1);//refresh stat, to ensure priority queue_len in swarmkv is correct
 
     stub_curr_time_s_inc(1);//inc time to refresh hmget interval
     while (!TAILQ_EMPTY(&expec_tx_queue1)) {//last 90 delay packets
@@ -1373,7 +1373,7 @@ TEST(two_session_diff_priority_same_profile, two_thread_udp_tx_in_order)
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 10));
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
-    shaper_stat_refresh(&ctx->thread_ctx[0], sf1, 0, 1);//刷新线程0中的优先级队列长度到swarmkv中
+    shaper_stat_refresh(&ctx->thread_ctx[0], sf1, 1);//刷新线程0中的优先级队列长度到swarmkv中
     stub_curr_time_s_inc(1);//inc time to refresh hmget interval
     for (int i = 0; i < 10; i++) {//线程1中的session优先级为2，被线程0中优先级为1的session阻断
         stub_refresh_token_bucket(0);
@@ -1388,7 +1388,7 @@ TEST(two_session_diff_priority_same_profile, two_thread_udp_tx_in_order)
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 1));//sf1 priority 1
     }
 
-    shaper_stat_refresh(&ctx->thread_ctx[0], sf1, 0, 1);//刷新线程0中的优先级队列长度到swarmkv中
+    shaper_stat_refresh(&ctx->thread_ctx[0], sf1, 1);//刷新线程0中的优先级队列长度到swarmkv中
     stub_curr_time_s_inc(1);//inc time to refresh hmget interval
     while (!TAILQ_EMPTY(&expec_tx_queue2)) {
         stub_refresh_token_bucket(0);
@@ -1837,7 +1837,7 @@ TEST(statistics, udp_queueing_pkt)
 
 
     /***********send stat data here********************/
-    shaper_stat_refresh(&ctx->thread_ctx[0], sf, ctx->thread_ctx[0].thread_index, 1);
+    shaper_stat_refresh(&ctx->thread_ctx[0], sf, 1);
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
     shaper_global_stat_refresh(ctx);
     sleep(2);//wait telegraf generate metric

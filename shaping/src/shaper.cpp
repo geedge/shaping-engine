@@ -24,7 +24,7 @@ extern "C" {
 #include "shaper_global_stat.h"
 #include "shaper_aqm.h"
 
-#define TOKEN_ENLARGE_TIMES 10
+#define TOKEN_ENLARGE_TIMES 10//TODO
 #define TOKEN_GET_FAILED_INTERVAL_MS 1
 #define HMGET_REQUEST_INTERVAL_MS 10
 #define PRIORITY_BLOCK_MIN_TIME_MS 500
@@ -138,8 +138,6 @@ struct shaping_flow* shaping_flow_new(struct shaping_thread_ctx *ctx)
 
     TAILQ_INIT(&s_node->shaping_flow.packet_queue);
     s_node->shaping_flow.priority = SHAPING_PRIORITY_NUM_MAX - 1;
-    timeout_init(&s_node->shaping_flow.timeout_handle, TIMEOUT_ABS);
-    timeouts_add(ctx->expires, &s_node->shaping_flow.timeout_handle, time(NULL) + SHAPING_STAT_REFRESH_INTERVAL_SEC);
 
     s_node->shaping_flow.ref_cnt = 1;
 
@@ -159,8 +157,7 @@ void shaping_flow_free(struct shaping_thread_ctx *ctx, struct shaping_flow *sf)
 
     struct shaping_node *s_node = (struct shaping_node*)sf;
 
-    timeouts_del(ctx->expires, &sf->timeout_handle);
-    shaper_stat_refresh(ctx, sf, ctx->thread_index, 1);
+    shaper_stat_refresh(ctx, sf, 1);
     shaping_node_free(s_node);
     
     return;
@@ -182,7 +179,7 @@ static int shaper_packet_enqueue(struct shaping_thread_ctx *ctx, struct shaping_
     struct shaping_packet_wrapper *s_pkt = NULL;
     struct timespec curr_time;
 
-    if (sf->queue_len == ctx->conf.session_queue_len_max) {
+    if (sf->queue_len == ctx->conf.session_queue_len_max) {//TODO: profile queue_len???
         return -1;
     }
 
@@ -386,7 +383,7 @@ int shaper_flow_in_order_get(struct shaper *sp, struct shaper_flow_instance sf_i
 
 static void shaper_deposit_token_add(struct shaping_profile_info *profile, int req_token_bits, unsigned char direction, int priority)
 {
-    int *deposit_token;
+    long long *deposit_token;
     struct shaping_profile_hash_node *pf_hash_node = profile->hash_node;
 
     switch (profile->type) {
@@ -431,7 +428,7 @@ static void shaper_token_get_cb(const struct swarmkv_reply *reply, void * cb_arg
     shaper_global_stat_async_callback_inc(&ctx->thread_global_stat);
     shaper_global_stat_tconsume_callback_inc(&ctx->thread_global_stat);
 
-    LOG_INFO("Swarmkv reply type =%d, profile_id %d, direction =%d, integer =%llu",reply->type, profile->id, arg->direction, reply->integer);
+    LOG_INFO("Swarmkv reply type =%d, profile_id %d, profile_consume_ref = %d, direction =%d, integer =%llu",reply->type, profile->id, pf_hash_node->tconsume_ref_cnt, arg->direction, reply->integer);
 
     if (reply->type != SWARMKV_REPLY_INTEGER) {
         shaper_global_stat_async_tconsume_failed_inc(&ctx->thread_global_stat);
@@ -482,7 +479,7 @@ END:
 
 static void shaper_deposit_token_sub(struct shaping_profile_info *profile, int req_token_bits, unsigned char direction, int priority)
 {
-    int *deposit_token;
+    long long *deposit_token;
     struct shaping_profile_hash_node *pf_hash_node = profile->hash_node;
 
     switch (profile->type) {
@@ -551,23 +548,10 @@ static int shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct 
     struct shaping_tconsume_cb_arg *arg = NULL;
     char key[32] = {0};
 
-    switch (pf_info->type) {
-        case PROFILE_TYPE_GENERIC:
-            if (pf_info->hash_node->tconsume_ref_cnt > 0) {
-                goto END;
-            }
-            break;
-        case PROFILE_TYPE_HOST_FARINESS:
-        case PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS:
-        case PROFILE_TYPE_SPLIT_BY_LOCAL_HOST:
-            if (sf->ref_cnt > 1) {
-                goto END;
-            }
-            break;
-        default:
-            break;
+    if (pf_info->hash_node->tconsume_ref_cnt > 0) {
+        goto END;
     }
-
+            
     snprintf(key, sizeof(key), "tsg-shaping-%d-%s", pf_info->id, direction == SHAPING_DIR_OUT ? "outgoing" : "incoming");
     arg = (struct shaping_tconsume_cb_arg *)calloc(1, sizeof(struct shaping_tconsume_cb_arg));
     arg->ctx = ctx;
@@ -580,10 +564,10 @@ static int shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct 
     sheper_global_stat_tconsume_invoke_inc(&ctx->thread_global_stat);
 
     sf->ref_cnt++;
+    pf_info->hash_node->tconsume_ref_cnt++;
 
     switch (pf_info->type) {
         case PROFILE_TYPE_GENERIC:
-            pf_info->hash_node->tconsume_ref_cnt++;
             swarmkv_tconsume(ctx->swarmkv_db, key, strlen(key), req_token_bits * TOKEN_ENLARGE_TIMES, shaper_token_get_cb, arg);
             break;
         case PROFILE_TYPE_HOST_FARINESS:
@@ -711,7 +695,7 @@ END:
     }
 }
 
-void shaper_profile_hash_node_update(struct shaping_profile_info *profile)
+void shaper_profile_hash_node_update(struct shaping_thread_ctx *ctx, struct shaping_profile_info *profile)
 {
     if (profile->hash_node == NULL) {
         struct shaping_profile_hash_node *hash_node = NULL;
@@ -722,6 +706,8 @@ void shaper_profile_hash_node_update(struct shaping_profile_info *profile)
             profile->hash_node = (struct shaping_profile_hash_node*)calloc(1, sizeof(struct shaping_profile_hash_node));
             profile->hash_node->id = profile->id;
             HASH_ADD_INT(thread_sp_hashtbl, id, profile->hash_node);
+            timeout_init(&profile->hash_node->timeout_handle, TIMEOUT_ABS);
+            timeouts_add(ctx->expires, &profile->hash_node->timeout_handle, time(NULL) + SHAPING_STAT_REFRESH_INTERVAL_SEC);
         }
     }
 
@@ -784,11 +770,6 @@ static int shaper_token_consume(struct shaping_thread_ctx *ctx, struct shaping_f
     long long curr_time_ms = curr_timespec.tv_sec * MILLI_SECONDS_PER_SEC + curr_timespec.tv_nsec / NANO_SECONDS_PER_MILLI_SEC;
 
     if (shaping_swarmkv_is_too_short_interval(curr_time_ms, profile)) {
-        return SHAPER_TOKEN_GET_FAILED;
-    }
-
-    if (shaper_swarmkv_pending_queue_aqm_drop(ctx) == 1) {
-        profile->hash_node->last_failed_get_token_ms = curr_time_ms;
         return SHAPER_TOKEN_GET_FAILED;
     }
 
@@ -1018,7 +999,7 @@ static int shaper_polling_first_pkt_token_get(struct shaper *sp, struct shaping_
             break;
     }
 
-    shaper_stat_refresh(ctx, sf, ctx->thread_index, 0);
+    shaper_stat_refresh(ctx, sf, 0);
 
     if (shaper_queue_empty(sf)) {
         if (sf->flag & SESSION_CLOSE) {
@@ -1068,6 +1049,7 @@ void shaping_packet_process(struct shaping_thread_ctx *ctx, marsio_buff_t *rx_bu
         marsio_send_burst(marsio_info->mr_path, ctx->thread_index, &rx_buff, 1);
         shaper_global_stat_throughput_tx_inc(&ctx->thread_global_stat, meta->raw_len);
         shaper_global_stat_hit_policy_throughput_tx_inc(&ctx->thread_global_stat, meta->raw_len);
+        shaper_global_stat_hit_policy_throughput_tx_syn_ack_inc(&ctx->thread_global_stat);
         shaper_stat_forward_all_rule_inc(stat, sf, meta->dir, meta->raw_len, ctx->thread_index);
         goto END;//for tcp pure control pkt, transmit it directly
     }
@@ -1109,12 +1091,7 @@ void shaping_packet_process(struct shaping_thread_ctx *ctx, marsio_buff_t *rx_bu
     }
 
 END:
-    shaper_stat_refresh(ctx, sf, ctx->thread_index, 0);
-    time_t curr_time = time(NULL);
-    if (curr_time > sf->last_update_timeout_sec) {
-        timeouts_add(ctx->expires, &sf->timeout_handle, curr_time + SHAPING_STAT_REFRESH_INTERVAL_SEC);//timeouts_add will delete if sf exist, then add
-        sf->last_update_timeout_sec = curr_time;
-    }
+    shaper_stat_refresh(ctx, sf, 0);
 
     if(sf->flag & SESSION_CLOSE) {
         if (shaper_queue_empty(sf)) {
@@ -1137,11 +1114,11 @@ void polling_entry(struct shaper *sp, struct shaping_stat *stat, struct shaping_
 {
     swarmkv_caller_loop(ctx->swarmkv_db, SWARMKV_LOOP_NONBLOCK, NULL);
 
-    struct shaping_flow *sf = NULL;
+    struct shaping_profile_hash_node *hash_node = NULL;
     time_t curr_time = time(NULL);
     int cnt = 0;
 
-    /*if (curr_time > ctx->last_update_timeout_sec) {
+    if (curr_time > ctx->last_update_timeout_sec) {
         timeouts_update(ctx->expires, curr_time);
         ctx->last_update_timeout_sec = curr_time;
     }
@@ -1153,11 +1130,11 @@ void polling_entry(struct shaper *sp, struct shaping_stat *stat, struct shaping_
             break;
         }
 
-        sf = container_of(t, struct shaping_flow, timeout_handle);
-        shaper_stat_refresh(ctx, sf, ctx->thread_index, 0);
-        timeouts_add(ctx->expires, &sf->timeout_handle, time(NULL) + SHAPING_STAT_REFRESH_INTERVAL_SEC);//timeouts_get will delete sf from queue, add it back
+        hash_node = container_of(t, struct shaping_profile_hash_node, timeout_handle);
+        shaper_stat_priority_queue_len_refresh_all(ctx, hash_node);
+        timeouts_add(ctx->expires, &hash_node->timeout_handle, time(NULL) + SHAPING_STAT_REFRESH_INTERVAL_SEC);//timeouts_get will delete item from queue, add it back
         cnt++;
-    }*/
+    }
 
     if (shaper_global_stat_queueing_pkts_get(&ctx->thread_global_stat) == 0) {
         return;

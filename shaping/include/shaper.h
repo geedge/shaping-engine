@@ -59,8 +59,6 @@ struct shaping_thread_ctx {
     struct shaping_stat *stat;
     struct shaping_marsio_info *marsio_info;
     struct swarmkv *swarmkv_db;//handle of swarmkv 
-    int swarmkv_aqm_prob;
-    time_t swarmkv_aqm_update_time;
     struct shaping_maat_info *maat_info;
     struct session_table *session_table;
     struct timeouts *expires;
@@ -112,8 +110,8 @@ struct shaper_aqm_blue_para {
 struct shaping_profile_hash_node {
     int id;
     enum shaper_aqm_type aqm_type;
-    int in_deposit_token_bits[SHAPING_PRIORITY_NUM_MAX];
-    int out_deposit_token_bits[SHAPING_PRIORITY_NUM_MAX];
+    long long in_deposit_token_bits[SHAPING_PRIORITY_NUM_MAX];
+    long long out_deposit_token_bits[SHAPING_PRIORITY_NUM_MAX];
     long long last_failed_get_token_ms;
     long long last_hmget_ms;
     long long queue_len[SHAPING_PRIORITY_NUM_MAX];
@@ -124,6 +122,7 @@ struct shaping_profile_hash_node {
     int tconsume_ref_cnt;
     struct shaper_aqm_blue_para aqm_blue_para;
     unsigned char is_invalid;
+    struct timeout timeout_handle;
     UT_hash_handle hh;
 };
 
@@ -131,8 +130,8 @@ struct shaping_profile_info {
     int id;//profile_id
     enum shaping_profile_type type;
     int priority;
-    int in_deposit_token_bits;
-    int out_deposit_token_bits;
+    long long in_deposit_token_bits;
+    long long out_deposit_token_bits;
     long long last_failed_get_token_ms;
     unsigned long long enqueue_time_us;//to calculate max latency
     struct shaping_stat_for_profile stat;
@@ -190,8 +189,6 @@ struct shaping_flow {
     unsigned long long processed_pkts;
     unsigned long long stat_update_time_us;
     time_t check_rule_time;
-    struct timeout timeout_handle;
-    time_t last_update_timeout_sec;
 };
 
 struct shaper_flow_instance {
@@ -234,7 +231,7 @@ struct shaping_packet_wrapper* shaper_first_pkt_get(struct shaping_flow *sf);
 void shaper_queue_clear(struct shaping_flow *sf, struct shaping_thread_ctx *ctx);
 
 int shaper_flow_in_order_get(struct shaper *sp, struct shaper_flow_instance sf_ins[], int priority, int max_sf_num);
-void shaper_profile_hash_node_update(struct shaping_profile_info *profile);
+void shaper_profile_hash_node_update(struct shaping_thread_ctx *ctx, struct shaping_profile_info *profile);
 
 int shaper_global_conf_init(struct shaping_system_conf *conf);
 

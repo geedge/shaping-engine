@@ -165,9 +165,13 @@ static void shaper_stat_swarmkv_hincrby_cb(const struct swarmkv_reply *reply, vo
     return;
 }
 
-static void shaper_stat_priority_queue_len_refresh(struct shaping_thread_ctx *ctx, struct shaping_profile_info *profile, int priority, long long curr_time_us)
+static void shaper_stat_priority_queue_len_refresh(struct shaping_thread_ctx *ctx, struct shaping_profile_hash_node *profile_hash_node, int priority, long long curr_time_us)
 {
-    if (curr_time_us - profile->hash_node->local_queue_len_update_time_us[priority] < SHAPER_STAT_REFRESH_TIME_US) {
+    if (profile_hash_node->queue_len[priority] == 0) {
+        return;
+    }
+
+    if (curr_time_us - profile_hash_node->local_queue_len_update_time_us[priority] < SHAPER_STAT_REFRESH_TIME_US) {
         return;
     }
 
@@ -175,24 +179,40 @@ static void shaper_stat_priority_queue_len_refresh(struct shaping_thread_ctx *ct
 
     arg->ctx = ctx;
     arg->start_time_us = curr_time_us;
-    arg->profile_id = profile->id;
+    arg->profile_id = profile_hash_node->id;
     arg->priority = priority;
-    arg->queue_len = profile->hash_node->queue_len[priority];
+    arg->queue_len = profile_hash_node->queue_len[priority];
     shaper_global_stat_async_invoke_inc(&ctx->thread_global_stat);
     shaper_global_stat_hincrby_invoke_inc(&ctx->thread_global_stat);
     swarmkv_async_command(ctx->swarmkv_db, shaper_stat_swarmkv_hincrby_cb, arg, "HINCRBY tsg-shaping-%d priority-%d %lld", arg->profile_id, arg->priority, arg->queue_len);
 
-    profile->hash_node->local_queue_len_update_time_us[priority] = curr_time_us;
-    profile->hash_node->queue_len[priority] = 0;
+    profile_hash_node->local_queue_len_update_time_us[priority] = curr_time_us;
+    profile_hash_node->queue_len[priority] = 0;
 
     return;
 }
 
-static void shaper_stat_profile_metirc_refresh(struct shaping_thread_ctx *ctx, struct shaping_rule_info *rule, int thread_id, struct shaping_profile_info *profile, int profile_type, int need_update_guage, long long curr_time_us)
+void shaper_stat_priority_queue_len_refresh_all(struct shaping_thread_ctx *ctx, struct shaping_profile_hash_node *profile_hash_node)
+{
+    struct timespec curr_time;
+    long long curr_time_us;
+
+    clock_gettime(CLOCK_MONOTONIC, &curr_time);
+    curr_time_us = curr_time.tv_sec * MICRO_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MICRO_SEC;
+
+    for (int i = 0; i < SHAPING_PRIORITY_NUM_MAX; i++) {
+        shaper_stat_priority_queue_len_refresh(ctx, profile_hash_node, i, curr_time_us);
+    }
+
+    return;
+}
+
+static void shaper_stat_profile_metirc_refresh(struct shaping_thread_ctx *ctx, struct shaping_rule_info *rule, struct shaping_profile_info *profile, int profile_type, int need_update_guage, long long curr_time_us)
 {
     struct shaping_stat_for_profile *profile_stat = &profile->stat;
     struct shaping_stat *stat = ctx->stat;
     int priority = profile->priority;
+    int thread_id = ctx->thread_index;
     unsigned long long old_latency;
     
     shaper_stat_tags_build(rule->vsys_id, rule->id, profile->id, priority, profile_type);
@@ -221,7 +241,7 @@ static void shaper_stat_profile_metirc_refresh(struct shaping_thread_ctx *ctx, s
         }
 
         profile->hash_node->queue_len[priority] += profile_stat->in.queue_len + profile_stat->out.queue_len;
-        shaper_stat_priority_queue_len_refresh(ctx, profile, priority, curr_time_us);
+        shaper_stat_priority_queue_len_refresh(ctx, profile->hash_node, priority, curr_time_us);
 
         memset(profile_stat, 0, sizeof(struct shaping_stat_for_profile));
     } else {
@@ -239,7 +259,7 @@ static void shaper_stat_profile_metirc_refresh(struct shaping_thread_ctx *ctx, s
     return;
 }
 
-void shaper_stat_refresh(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, int thread_id, int force)
+void shaper_stat_refresh(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, int force)
 {
     struct shaping_rule_info *rule;
     struct timespec curr_time;
@@ -258,7 +278,7 @@ void shaper_stat_refresh(struct shaping_thread_ctx *ctx, struct shaping_flow *sf
         }
     }
 
-    if (!need_refresh) {
+    if (!need_refresh) {//TODO: add queue_len to profile???
         return;
     }
 
@@ -266,10 +286,10 @@ void shaper_stat_refresh(struct shaping_thread_ctx *ctx, struct shaping_flow *sf
 
     for (int i = 0; i < sf->rule_num; i++) {
         rule = &sf->matched_rule_infos[i];
-        shaper_stat_profile_metirc_refresh(ctx, rule, thread_id, &rule->primary, PROFILE_IN_RULE_TYPE_PRIMARY, need_update_guage, curr_time_us);
+        shaper_stat_profile_metirc_refresh(ctx, rule, &rule->primary, PROFILE_IN_RULE_TYPE_PRIMARY, need_update_guage, curr_time_us);
 
         for (int j = 0; j < rule->borrowing_num; j++) {
-            shaper_stat_profile_metirc_refresh(ctx, rule, thread_id, &rule->borrowing[j], PROFILE_IN_RULE_TYPE_BORROW, need_update_guage, curr_time_us);
+            shaper_stat_profile_metirc_refresh(ctx, rule, &rule->borrowing[j], PROFILE_IN_RULE_TYPE_BORROW, need_update_guage, curr_time_us);
         }
     }
 

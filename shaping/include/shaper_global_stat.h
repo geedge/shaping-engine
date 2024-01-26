@@ -38,6 +38,7 @@ enum shaping_global_stat_column_index {
     HIT_POLICY_RX_BYTES_IDX,
     HIT_POLICY_TX_PKTS_IDX,
     HIT_POLICY_TX_BYTES_IDX,
+    HIT_POLICY_TX_SYN_ACK_PKTS_IDX,
     HIT_POLICY_DROP_PKTS_IDX,
     HIT_POLICY_DROP_BYTES_IDX,
 
@@ -49,6 +50,7 @@ struct shaping_global_stat_traffic_data {
     long long rx_bytes;
     long long tx_pkts;
     long long tx_bytes;
+    long long tx_syn_ack_pkts;
     long long drop_pkts;
     long long drop_bytes;
 };
@@ -127,6 +129,7 @@ void shaper_global_stat_throughput_tx_inc(struct shaping_global_stat_data *threa
 
 void shaper_global_stat_hit_policy_throughput_rx_inc(struct shaping_global_stat_data *thread_global_stat, int pkt_len);
 void shaper_global_stat_hit_policy_throughput_tx_inc(struct shaping_global_stat_data *thread_global_stat, int pkt_len);
+void shaper_global_stat_hit_policy_throughput_tx_syn_ack_inc(struct shaping_global_stat_data *thread_global_stat);
 void shaper_global_stat_hit_policy_drop_inc(struct shaping_global_stat_data *thread_global_stat, int pkt_len);
 
 void shaper_global_stat_refresh(struct shaping_ctx *ctx);
