@@ -27,6 +27,33 @@ static int shaper_aqm_blue_need_drop(struct shaping_packet_wrapper *pkt_wrapper,
     return 0;
 }
 
+static int shaper_aqm_have_processed(struct shaping_packet_wrapper *pkt_wrapper, int profile_id)
+{
+    int i = 0;
+
+    for (i = 0; i < SHAPING_REF_PROFILE_NUM_MAX; i++) {
+        if (pkt_wrapper->aqm_processed_pf_ids[i] == profile_id) {
+            return 1;
+        } else if (pkt_wrapper->aqm_processed_pf_ids[i] == 0) {
+            break;
+        }
+    }
+
+    return 0;
+}
+
+static void shaper_aqm_mark_processed(struct shaping_packet_wrapper *pkt_wrapper, int profile_id)
+{
+    int i = 0;
+
+    for (i = 0; i < SHAPING_REF_PROFILE_NUM_MAX; i++) {
+        if (pkt_wrapper->aqm_processed_pf_ids[i] == 0) {
+            pkt_wrapper->aqm_processed_pf_ids[i] = profile_id;
+            break;
+        }
+    }
+}
+
 int shaper_aqm_need_drop(struct shaping_profile_info *profile, struct shaping_packet_wrapper *pkt_wrapper)
 {
     int ret = 0;
@@ -35,8 +62,7 @@ int shaper_aqm_need_drop(struct shaping_profile_info *profile, struct shaping_pa
         return 0;
     }
 
-    //TODO: judge if this packet is aqm processed for this profile
-    if (pkt_wrapper->aqm_processed) {
+    if (shaper_aqm_have_processed(pkt_wrapper, profile->id)) {
         return 0;
     }
     
@@ -50,7 +76,7 @@ int shaper_aqm_need_drop(struct shaping_profile_info *profile, struct shaping_pa
             break;
     }
 
-    pkt_wrapper->aqm_processed = 1;
+    shaper_aqm_mark_processed(pkt_wrapper, profile->id);
 
     return ret;
 }

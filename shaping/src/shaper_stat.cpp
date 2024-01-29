@@ -154,7 +154,7 @@ static void shaper_stat_swarmkv_hincrby_cb(const struct swarmkv_reply *reply, vo
         shaper_global_stat_async_invoke_inc(&ctx->thread_global_stat);//hincrby failed, retry
         shaper_global_stat_hincrby_invoke_inc(&ctx->thread_global_stat);
 
-        LOG_INFO("%s: shaping stat hincrby failed, retry for profile id %d priority %d, operate queue_len %lld", LOG_TAG_STAT, arg->profile_id, arg->priority, arg->queue_len);
+        LOG_DEBUG("%s: shaping stat hincrby failed, retry for profile id %d priority %d, operate queue_len %lld", LOG_TAG_STAT, arg->profile_id, arg->priority, arg->queue_len);
         swarmkv_async_command(ctx->swarmkv_db, shaper_stat_swarmkv_hincrby_cb, arg, "HINCRBY tsg-shaping-%d priority-%d %lld", arg->profile_id, arg->priority, arg->queue_len);
         
         return;
@@ -207,13 +207,24 @@ void shaper_stat_priority_queue_len_refresh_all(struct shaping_thread_ctx *ctx, 
     return;
 }
 
-static void shaper_stat_profile_metirc_refresh(struct shaping_thread_ctx *ctx, struct shaping_rule_info *rule, struct shaping_profile_info *profile, int profile_type, int need_update_guage, long long curr_time_us)
+static void shaper_stat_profile_metirc_refresh(struct shaping_thread_ctx *ctx, struct shaping_rule_info *rule, struct shaping_profile_info *profile, int profile_type, int need_refresh_stat, int need_update_guage, long long curr_time_us)
 {
     struct shaping_stat_for_profile *profile_stat = &profile->stat;
     struct shaping_stat *stat = ctx->stat;
     int priority = profile->priority;
     int thread_id = ctx->thread_index;
     unsigned long long old_latency;
+
+    if (need_update_guage) {
+        profile->hash_node->queue_len[priority] += profile_stat->priority_queue_len;
+        profile_stat->priority_queue_len = 0;
+        shaper_stat_priority_queue_len_refresh(ctx, profile->hash_node, priority, curr_time_us);
+        return;
+    }
+
+    if (!need_refresh_stat) {
+        return;
+    }
     
     shaper_stat_tags_build(rule->vsys_id, rule->id, profile->id, priority, profile_type);
     fieldstat_dynamic_table_metric_value_incrby(stat->instance, stat->table_id, stat->column_ids[IN_DROP_PKTS_IDX], SHAPER_STAT_ROW_NAME, profile_stat->in.drop_pkts, tags, TAG_IDX_MAX, thread_id);
@@ -239,9 +250,6 @@ static void shaper_stat_profile_metirc_refresh(struct shaping_thread_ctx *ctx, s
             fieldstat_dynamic_table_metric_value_incrby(stat->instance, stat->table_id, stat->column_ids[IN_QUEUE_LEN_IDX], SHAPER_STAT_ROW_NAME, profile_stat->in.queue_len, tags, TAG_IDX_MAX, thread_id);
             fieldstat_dynamic_table_metric_value_incrby(stat->instance, stat->table_id, stat->column_ids[OUT_QUEUE_LEN_IDX], SHAPER_STAT_ROW_NAME, profile_stat->out.queue_len, tags, TAG_IDX_MAX, thread_id);
         }
-
-        profile->hash_node->queue_len[priority] += profile_stat->in.queue_len + profile_stat->out.queue_len;
-        shaper_stat_priority_queue_len_refresh(ctx, profile->hash_node, priority, curr_time_us);
 
         memset(profile_stat, 0, sizeof(struct shaping_stat_for_profile));
     } else {
@@ -278,18 +286,18 @@ void shaper_stat_refresh(struct shaping_thread_ctx *ctx, struct shaping_flow *sf
         }
     }
 
-    if (!need_refresh) {//TODO: add queue_len to profile???
+    int need_update_guage = sf->processed_pkts > CONFIRM_PRIORITY_PKTS ? 1 : 0;
+
+    if (!need_refresh && !need_update_guage) {
         return;
     }
 
-    int need_update_guage = sf->processed_pkts > CONFIRM_PRIORITY_PKTS ? 1 : 0;
-
     for (int i = 0; i < sf->rule_num; i++) {
         rule = &sf->matched_rule_infos[i];
-        shaper_stat_profile_metirc_refresh(ctx, rule, &rule->primary, PROFILE_IN_RULE_TYPE_PRIMARY, need_update_guage, curr_time_us);
+        shaper_stat_profile_metirc_refresh(ctx, rule, &rule->primary, PROFILE_IN_RULE_TYPE_PRIMARY, need_refresh, need_update_guage, curr_time_us);
 
         for (int j = 0; j < rule->borrowing_num; j++) {
-            shaper_stat_profile_metirc_refresh(ctx, rule, &rule->borrowing[j], PROFILE_IN_RULE_TYPE_BORROW, need_update_guage, curr_time_us);
+            shaper_stat_profile_metirc_refresh(ctx, rule, &rule->borrowing[j], PROFILE_IN_RULE_TYPE_BORROW, need_refresh, need_update_guage, curr_time_us);
         }
     }
 
@@ -341,6 +349,8 @@ void shaper_stat_queueing_pkt_inc(struct shaping_stat_for_profile *profile_stat,
         profile_stat->out.queue_len++;
     }
 
+    profile_stat->priority_queue_len++;
+
     return;
 }
 
@@ -351,6 +361,8 @@ void shaper_stat_queueing_pkt_dec(struct shaping_stat_for_profile *profile_stat,
     } else {
         profile_stat->out.queue_len--;
     }
+
+    profile_stat->priority_queue_len--;
 
     return;
 }

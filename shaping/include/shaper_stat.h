@@ -37,6 +37,7 @@ struct shaping_stat_for_profile_dir {
 struct shaping_stat_for_profile {
     struct shaping_stat_for_profile_dir in;
     struct shaping_stat_for_profile_dir out;
+    long long priority_queue_len;
 };
 
 struct shaping_stat {

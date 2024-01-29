@@ -107,6 +107,13 @@ struct shaper_aqm_blue_para {
     int probability;
 };
 
+struct shaper_token_multiple {
+    int token_get_multiple;
+    unsigned char has_drop_by_queue_full;
+    unsigned char has_failed_get_token;
+    time_t token_multiple_update_time_s;
+};
+
 struct shaping_profile_hash_node {
     int id;
     enum shaper_aqm_type aqm_type;
@@ -120,6 +127,7 @@ struct shaping_profile_hash_node {
     long long priority_blocked_time_ms[SHAPING_PRIORITY_NUM_MAX];
     int hmget_ref_cnt;
     int tconsume_ref_cnt;
+    struct shaper_token_multiple token_multiple;
     struct shaper_aqm_blue_para aqm_blue_para;
     unsigned char is_invalid;
     struct timeout timeout_handle;
@@ -143,7 +151,7 @@ struct shaping_rule_info {
     int id;//rule_id
     int fair_factor;
     struct shaping_profile_info primary;
-    struct shaping_profile_info borrowing[SHAPING_REF_PROFILE_NUM_MAX];
+    struct shaping_profile_info borrowing[SHAPING_REF_PROFILE_NUM_MAX - 1];
     int borrowing_num;
     int is_enabled;
 };
@@ -154,8 +162,8 @@ struct shaping_packet_wrapper {
     unsigned long long enqueue_time_us;//first enqueue time
     unsigned int length;
     int rule_anchor;
+    int aqm_processed_pf_ids[SHAPING_REF_PROFILE_NUM_MAX];
     unsigned char direction;
-    unsigned char aqm_processed;
     TAILQ_ENTRY(shaping_packet_wrapper) node;
 };
 TAILQ_HEAD(delay_queue, shaping_packet_wrapper);

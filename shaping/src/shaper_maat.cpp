@@ -388,7 +388,7 @@ void shaper_rules_update(struct shaping_thread_ctx *ctx, struct shaping_flow *sf
         return;
     }
 
-    for (int i = 0; rule_num_remove_dup; i++) {
+    for (int i = 0; i < rule_num_remove_dup; i++) {
         if (shaper_rule_update(ctx, sf, &sf->matched_rule_infos[sf->rule_num], rule_ids_remove_dup[i], &priority_changed) == 0) {
             sf->rule_num++;
         }
