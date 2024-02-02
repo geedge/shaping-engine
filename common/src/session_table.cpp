@@ -204,11 +204,11 @@ struct session_node *session_table_search_by_id(struct session_table *table, uin
 {
     struct session_node *temp = NULL;
     HASH_FIND(hh1, table->root_by_id, &session_id, sizeof(session_id), temp);
-    if (!temp)
-    {
+    //if (!temp)
+    //{
         //LOG_DEBUG("%s: search: key %lu not exists", LOG_TAG_STABLE, session_id);
-        return NULL;
-    }
+    //    return NULL;
+    //}
 
     //LOG_DEBUG("%s: search: key %lu success", LOG_TAG_STABLE, session_id);
 
