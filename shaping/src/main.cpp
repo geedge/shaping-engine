@@ -58,7 +58,7 @@ static void sig_handler(int signo)
         swarmkv_reload_log_level();
     }
 
-    if (signo == SIGQUIT) {
+    if (signo == SIGQUIT || signo == SIGTERM) {
         quit = 1;
     }
 
@@ -82,7 +82,7 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    if (signal(SIGQUIT, sig_handler) == SIG_ERR)
+    if (signal(SIGQUIT, sig_handler) == SIG_ERR || signal(SIGTERM, sig_handler) == SIG_ERR)
     {
         LOG_ERROR("%s: unable to register SIGQUIT signal handler, error %d: %s", LOG_TAG_SHAPING, errno, strerror(errno));
         LOG_CLOSE();

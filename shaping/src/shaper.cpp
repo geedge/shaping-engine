@@ -486,9 +486,7 @@ static void shaper_token_get_cb(const struct swarmkv_reply *reply, void * cb_arg
     }
 
 END:
-    if (profile->type == PROFILE_TYPE_GENERIC) {
-        pf_hash_node->tconsume_ref_cnt--;
-    }
+    pf_hash_node->tconsume_ref_cnt--;
 
     if (reply->type != SWARMKV_REPLY_INTEGER || reply->integer == 0) {
         switch (profile->type) {
@@ -588,6 +586,7 @@ static int shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct 
     }
             
     snprintf(key, sizeof(key), "tsg-shaping-%d-%s", pf_info->id, direction == SHAPING_DIR_OUT ? "outgoing" : "incoming");
+
     arg = (struct shaping_tconsume_cb_arg *)calloc(1, sizeof(struct shaping_tconsume_cb_arg));
     arg->ctx = ctx;
     arg->profile = pf_info;
@@ -758,7 +757,7 @@ static int shaping_swarmkv_is_too_short_interval(long long curr_time_ms, struct 
 
 static int shaper_token_consume(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, struct shaping_profile_info *profile, int profile_type, int req_token_bytes, unsigned char direction, struct timespec *curr_timespec)
 {
-    if (profile_type == PROFILE_IN_RULE_TYPE_BORROW && !(sf->flag & SESSION_BORROW)) {
+    if (profile_type == PROFILE_IN_RULE_TYPE_BORROW && !(sf->flag & SESSION_BORROW)) {//TODO: 会减慢swarmkv请求速度
         return SHAPER_TOKEN_GET_FAILED;
     }
 

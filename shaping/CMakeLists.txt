@@ -17,4 +17,8 @@ target_link_libraries(shaping_engine PUBLIC jemalloc)
 
 install(TARGETS shaping_engine RUNTIME DESTINATION bin COMPONENT Program)
 
+# 在安装时创建一个子目录log
+install(DIRECTORY DESTINATION ${CMAKE_INSTALL_PREFIX}/log)
+
+
 add_subdirectory(test)
