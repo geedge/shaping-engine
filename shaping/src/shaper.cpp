@@ -474,10 +474,15 @@ static void shaper_token_get_cb(const struct swarmkv_reply *reply, void * cb_arg
     }
 
     if (reply->integer > 0) {
-        sf->flag &= (~SESSION_BORROW);
         shaper_deposit_token_add(profile, reply->integer, arg->direction, profile->priority);//deposit tokens to profile
-    } else {
-        sf->flag |= SESSION_BORROW;
+    }
+
+    if (arg->is_primary_pf) {
+        if (reply->integer > 0) {
+            sf->flag &= (~SESSION_BORROW);
+        } else {
+            sf->flag |= SESSION_BORROW;
+        }
     }
 
     if (reply->integer == 0 && profile->type == PROFILE_TYPE_GENERIC) {
@@ -593,6 +598,9 @@ static int shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct 
     arg->sf = sf;
     arg->direction = direction;
     arg->start_time_us = curr_timespec->tv_sec * MICRO_SECONDS_PER_SEC + curr_timespec->tv_nsec / NANO_SECONDS_PER_MICRO_SEC;
+    if (profile_type == PROFILE_IN_RULE_TYPE_PRIMARY) {
+        arg->is_primary_pf = 1;
+    }
 
     shaper_global_stat_async_invoke_inc(&ctx->thread_global_stat);
     sheper_global_stat_tconsume_invoke_inc(&ctx->thread_global_stat);

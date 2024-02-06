@@ -211,6 +211,7 @@ struct shaping_tconsume_cb_arg {
     struct shaping_profile_info *profile;
     struct shaping_flow *sf;
     unsigned char direction;
+    unsigned char is_primary_pf;
     long long start_time_us;
 };
 
