@@ -37,6 +37,7 @@ struct shaping_stat_for_profile_dir {
 struct shaping_stat_for_profile {
     struct shaping_stat_for_profile_dir in;
     struct shaping_stat_for_profile_dir out;
+    long long priority_queue_len;
 };
 
 struct shaping_stat {
@@ -57,4 +58,5 @@ void shaper_stat_forward_all_rule_inc(struct shaping_stat *stat, struct shaping_
 void shaper_stat_drop_inc(struct shaping_stat_for_profile *profile_stat, unsigned char direction, int thread_id);
 void shaper_stat_max_latency_update(struct shaping_stat_for_profile *profile_stat, unsigned char direction, unsigned long long latency, int thread_id);
 
-void shaper_stat_refresh(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, int thread_id, int force);
+void shaper_stat_refresh(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, int force);
+void shaper_stat_priority_queue_len_refresh_all(struct shaping_thread_ctx *ctx, struct shaping_profile_hash_node *profile_hash_node);

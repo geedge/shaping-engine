@@ -6,7 +6,7 @@
 #include "utils.h"
 #include "shaper_swarmkv.h"
 
-#define PROBABILITY_MAX 100
+#define PROBABILITY_MAX 500
 #define INCREMENT 10
 #define DECREMENT 1
 #define FREEZE_TIME 1 //unit:s
@@ -104,36 +104,6 @@ void swarmkv_reload_log_level()
     MESA_load_profile_short_def(SHAPING_GLOBAL_CONF_FILE, "SWARMKV", "SWARMKV_LOG_LEVEL", &log_level, 4);
 #endif
     return;
-}
-
-int shaper_swarmkv_pending_queue_aqm_drop(struct shaping_thread_ctx *ctx)
-{
-    long long pending_queue_len = swarmkv_caller_get_pending_commands(ctx->swarmkv_db);
-    time_t now = time(NULL);
-
-    if (now - ctx->swarmkv_aqm_update_time < FREEZE_TIME) {
-        goto END;
-    }
-
-    if (pending_queue_len > PENDING_QUEUE_LEN_MAX) {
-        if (ctx->swarmkv_aqm_prob < PROBABILITY_MAX) {
-            ctx->swarmkv_aqm_prob += INCREMENT;
-        }
-        LOG_DEBUG("%s: shaping pending queue len %lld, aqm prob %d", LOG_TAG_SWARMKV, pending_queue_len, ctx->swarmkv_aqm_prob);
-    } else {
-        if (ctx->swarmkv_aqm_prob >= DECREMENT) {
-            ctx->swarmkv_aqm_prob -= DECREMENT;
-        }
-        LOG_DEBUG("%s: shaping pending queue len %lld, aqm prob %d", LOG_TAG_SWARMKV, pending_queue_len, ctx->swarmkv_aqm_prob);
-    }
-    ctx->swarmkv_aqm_update_time = now;
-
-END:
-    if (rand() % PROBABILITY_MAX < ctx->swarmkv_aqm_prob) {
-        return 1;
-    }
-
-    return 0;
 }
 
 struct swarmkv* shaper_swarmkv_init(int caller_thread_num)

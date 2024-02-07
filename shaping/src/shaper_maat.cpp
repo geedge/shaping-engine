@@ -253,15 +253,16 @@ void shaper_profile_ex_free(int table_id, void **ad, long argl, void *argp)
     return;
 }
 
-void shaper_profile_update(struct shaping_profile_info *s_pf_info, struct shaping_profile *s_pf_ex)
+void shaper_profile_update(struct shaping_thread_ctx *ctx, struct shaping_profile_info *s_pf_info, struct shaping_profile *s_pf_ex)
 {
     s_pf_info->id = s_pf_ex->id;
     s_pf_info->type = s_pf_ex->type;
+    shaper_profile_hash_node_update(ctx, s_pf_info);
 
     return;
 }
 
-static void shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, struct shaping_rule_info *s_rule_info, long long rule_compile_id, int *priority_changed)
+static int shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, struct shaping_rule_info *s_rule_info, long long rule_compile_id, int *priority_changed)
 {
     struct shaping_rule *s_rule = NULL;
     struct shaping_profile *s_pf = NULL;
@@ -270,7 +271,7 @@ static void shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_fl
     s_rule = (struct shaping_rule*)maat_plugin_table_get_ex_data(g_maat_instance, ctx->maat_info->rule_table_id, (char *)&rule_compile_id, sizeof(rule_compile_id));
     if (!s_rule) {
         LOG_ERROR("%s maat_plugin_table_get_ex_data get rule failed for compile id %lld", LOG_TAG_MAAT, rule_compile_id);
-        goto END;
+        return -1;
     }
     s_rule_info->id = s_rule->id;
     s_rule_info->fair_factor = s_rule->fair_factor;
@@ -282,9 +283,9 @@ static void shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_fl
     s_pf = (struct shaping_profile *)maat_plugin_table_get_ex_data(g_maat_instance, ctx->maat_info->profile_table_id, pf_id_key, strlen(pf_id_key));
     if (!s_pf) {
         LOG_ERROR("%s maat_plugin_table_get_ex_data get profile failed for key %s", LOG_TAG_MAAT, pf_id_key);
-        goto END;
+        return -1;
     }
-    shaper_profile_update(&s_rule_info->primary, s_pf);
+    shaper_profile_update(ctx, &s_rule_info->primary, s_pf);
     
     if (sf->processed_pkts <= CONFIRM_PRIORITY_PKTS) {
         if (sf->priority > s_rule->priority) {
@@ -294,7 +295,7 @@ static void shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_fl
     }
 
     if (s_rule->borrow_pf_num == 0) {
-        goto END;
+        return 0;
     }
 
     for (int i = 0; i < s_rule->borrow_pf_num; i++) {
@@ -303,15 +304,14 @@ static void shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_fl
         s_pf = (struct shaping_profile *)maat_plugin_table_get_ex_data(g_maat_instance, ctx->maat_info->profile_table_id, pf_id_key, strlen(pf_id_key));
         if (!s_pf) {
             LOG_ERROR("%s maat_plugin_table_get_ex_data get profile failed for key %s", LOG_TAG_MAAT, pf_id_key);
-            goto END;
+            return -1;
         }
 
-        shaper_profile_update(&s_rule_info->borrowing[i], s_pf);
+        shaper_profile_update(ctx, &s_rule_info->borrowing[i], s_pf);
         s_rule_info->borrowing_num++;
     }
 
-END:
-    return;
+    return 0;
 }
 
 static void shaper_profiles_priority_update(struct shaping_flow *sf)
@@ -360,10 +360,10 @@ static int shaper_rules_dup_remove(struct shaping_flow *sf, long long *rule_comp
 
 void shaper_rules_update(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, long long *rule_compile_ids, int rule_num)
 {
-    int i, j;
     int priority_changed = 0;
     long long rule_ids_remove_dup[SHAPING_RULE_NUM_MAX] = {0};
     int rule_num_remove_dup = 0;
+    int old_rule_num = sf->rule_num;
 
     if (rule_num > SHAPING_RULE_NUM_MAX) {
         char *addr_str = addr_tuple4_to_str(&sf->tuple4);
@@ -388,15 +388,16 @@ void shaper_rules_update(struct shaping_thread_ctx *ctx, struct shaping_flow *sf
         return;
     }
 
-    for (i = sf->rule_num, j = 0; i < sf->rule_num + rule_num_remove_dup; i++, j++) {
-        shaper_rule_update(ctx, sf, &sf->matched_rule_infos[i], rule_ids_remove_dup[j], &priority_changed);
+    for (int i = 0; i < rule_num_remove_dup; i++) {
+        if (shaper_rule_update(ctx, sf, &sf->matched_rule_infos[sf->rule_num], rule_ids_remove_dup[i], &priority_changed) == 0) {
+            sf->rule_num++;
+        }
     }
 
-    if (sf->rule_num > 0 && priority_changed) {
-        shaper_stat_refresh(ctx, sf, ctx->thread_index, 1);
+    if (old_rule_num > 0 && priority_changed) {
+        shaper_stat_refresh(ctx, sf, 1);
     }
 
-    sf->rule_num += rule_num_remove_dup;  
     shaper_profiles_priority_update(sf);
 
     return;

@@ -3,6 +3,7 @@
 #include <MESA/maat.h>
 
 #include <cstdio>
+#include <cstring>
 #include <marsio.h>
 #include <vector>
 #include <stdlib.h>
@@ -194,6 +195,7 @@ void stub_init()
         pf_array[i].in_limit_bandwidth = DEFAULT_AVALIABLE_TOKEN_PER_SEC;
         pf_array[i].out_limit_bandwidth = DEFAULT_AVALIABLE_TOKEN_PER_SEC;
         pf_async_times[i] = 0;
+        memset(profile_priority_len[i], 0, 10 * sizeof(int)); 
     }
     return;
 }

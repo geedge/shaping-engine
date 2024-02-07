@@ -287,7 +287,7 @@ TEST(single_session, udp_tx_in_order)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, 170000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
+    shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
     fclose(stat_file);
@@ -366,7 +366,7 @@ TEST(max_min_host_fairness_profile, udp_tx_in_order)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, 170000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
+    shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
     fclose(stat_file);
@@ -419,7 +419,7 @@ TEST(single_session, tcp_tx_in_order)
 
 
     /***********send stat data here********************/
-    shaper_stat_refresh(&ctx->thread_ctx[0], sf, ctx->thread_ctx[0].thread_index, 1);
+    shaper_stat_refresh(&ctx->thread_ctx[0], sf, 1);
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
     sleep(2);//wait telegraf generate metric
 
@@ -432,7 +432,7 @@ TEST(single_session, tcp_tx_in_order)
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));//pure ctrl pkts force consume 1000 tokens, current token: -1000--->0, so no pkt can be sent
 
     stub_refresh_token_bucket(0);
-    for (int i = 0; i < 10; i++) {//10 pkts which is not pure control
+    for (int i = 0; i < 11; i++) {//10 pkts which is not pure control, first polling request 10 times token, then 10 loops send 10 pkts
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
         stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
     }
@@ -459,7 +459,7 @@ TEST(single_session, tcp_tx_in_order)
     shaping_stat_judge(line, 0, 0, 1, 20, 2000, 0, 10, 0, SHAPING_DIR_OUT, profile_type_primary);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 0, 0, 1, 10, 1000, 0, 0, 30000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(line, 0, 0, 1, 10, 1000, 0, 0, 31000, SHAPING_DIR_OUT, profile_type_primary);
 
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
@@ -506,7 +506,7 @@ TEST(single_session, udp_diff_direction)
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
 
     stub_refresh_token_bucket(0);
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < 22; i++) {//first polling just request token and don't send pkt
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
         stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
     }
@@ -534,9 +534,9 @@ TEST(single_session, udp_diff_direction)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 0, 0, 1, 20, 2000, 0, 0, 20000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(line, 0, 0, 1, 20, 2000, 0, 0, 21000, SHAPING_DIR_OUT, profile_type_primary);
 
-    shaping_stat_judge(line, 0, 0, 1, 20, 2000, 0, 0, 20000, SHAPING_DIR_IN, profile_type_primary);
+    shaping_stat_judge(line, 0, 0, 1, 20, 2000, 0, 0, 22000, SHAPING_DIR_IN, profile_type_primary);
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
     fclose(stat_file);
@@ -575,7 +575,7 @@ TEST(single_session, udp_multi_rules)
     shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 3);
 
     /*******send packets***********/
-    send_packets(&ctx->thread_ctx[0], sf, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue, 2, 0);
+    send_packets(&ctx->thread_ctx[0], sf, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue, 5, 0);
 
 
     //first 10 packets
@@ -612,13 +612,13 @@ TEST(single_session, udp_multi_rules)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 0
-    shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, 506000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, 507000, SHAPING_DIR_OUT, profile_type_primary);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 1 
-    shaping_stat_judge(line, 1, 1, 1, 100, 10000, 0, 0, 1000, SHAPING_DIR_OUT, profile_type_primary);//latency of every queued pkt is 1
+    shaping_stat_judge(line, 1, 1, 1, 100, 10000, 0, 0, 2000, SHAPING_DIR_OUT, profile_type_primary);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2
-    shaping_stat_judge(line, 2, 2, 1, 100, 10000, 0, 0, 90000, SHAPING_DIR_OUT, profile_type_primary);//max latency is first queued pkt
+    shaping_stat_judge(line, 2, 2, 1, 100, 10000, 0, 0, 91000, SHAPING_DIR_OUT, profile_type_primary);//max latency is first queued pkt
 
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
@@ -687,7 +687,7 @@ TEST(single_session, udp_borrow)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 1, primary
-    shaping_stat_judge(line, 1, 1, 1, 0, 0, 0, 0, 170000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(line, 1, 1, 1, 0, 0, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2, borrow
     shaping_stat_judge(line, 1, 2, 2, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
@@ -762,7 +762,7 @@ TEST(single_session, udp_borrow_same_priority_9)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 1, primary
-    shaping_stat_judge(line, 1, 1, 9, 0, 0, 0, 0, 170000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(line, 1, 1, 9, 0, 0, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);
 
 #if 0 //fieldstat don't output a row when all values is zero
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2, borrow
@@ -772,312 +772,6 @@ TEST(single_session, udp_borrow_same_priority_9)
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 3, borrow
     shaping_stat_judge(line, 1, 3, 9, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
-    fclose(stat_file);
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
-    fclose(stat_file);
-}
-
-/*session1 match rule1, session2 match rule2
-  rule1:
-      priority:2
-      profile1: limit 1000
-  rule2:
-      priority:1
-      profile2: limit 1000*/
-TEST(two_session_diff_priority, udp_in_order)
-{
-    struct stub_pkt_queue expec_tx_queue1;
-    struct stub_pkt_queue expec_tx_queue2;
-    struct stub_pkt_queue *actual_tx_queue;
-    struct shaping_ctx *ctx = NULL;
-    struct shaping_flow *sf1 = NULL;
-    struct shaping_flow *sf2 = NULL;
-    long long rule_ids[] = {0, 1};
-    long long rule_id1[] = {0};
-    long long rule_id2[] = {1};
-    int profile_nums[] = {1, 1};
-    int prioritys[] = {2, 1};
-    int profile_ids[][MAX_REF_PROFILE] = {{0}, {1}};
-    
-    stub_init();
-    TAILQ_INIT(&expec_tx_queue1);
-    TAILQ_INIT(&expec_tx_queue2);
-    ctx = shaping_engine_init();
-    ASSERT_TRUE(ctx != NULL);
-    sf1 = shaping_flow_new(&ctx->thread_ctx[0]);
-    ASSERT_TRUE(sf1 != NULL);
-    sf2 = shaping_flow_new(&ctx->thread_ctx[0]);
-    ASSERT_TRUE(sf2 != NULL);
-
-    stub_set_matched_shaping_rules(2, rule_ids, prioritys, profile_nums, profile_ids);
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT);
-    stub_set_token_bucket_avl_per_sec(1, 1000, SHAPING_DIR_OUT);
-
-    actual_tx_queue = stub_get_tx_queue();
-    shaper_rules_update(&ctx->thread_ctx[0], sf1, rule_id1, 1);
-    shaper_rules_update(&ctx->thread_ctx[0], sf2, rule_id2, 1);
-    
-
-    /*******send packets***********/
-    send_packets(&ctx->thread_ctx[0], sf1, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue1, 1, 0);
-    send_packets(&ctx->thread_ctx[0], sf2, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue2, 1, 0);
-
-
-    //first 10 packets for stream1
-    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 10));
-
-    //first 10 packets for stream2
-    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 10));
-
-    ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
-
-    while (!TAILQ_EMPTY(&expec_tx_queue2)) {//last 90 delay packets
-        stub_refresh_token_bucket(0);
-        stub_refresh_token_bucket(1);
-        for (int i = 0; i < 10; i++) {
-            polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-            stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
-        }
-        ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 10));//stream2 priority 1, first
-        ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
-    }
-
-    while (!TAILQ_EMPTY(&expec_tx_queue1)) {//last 90 delay packets
-        stub_refresh_token_bucket(0);
-        stub_refresh_token_bucket(1);
-        for (int i = 0; i < 10; i++) {
-            polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-            stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
-        }
-        ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 10));//stream1 priority 2
-        ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
-    }
-
-    shaping_flow_free(&ctx->thread_ctx[0], sf1);
-    shaping_flow_free(&ctx->thread_ctx[0], sf2);
-    fieldstat_global_disable_prometheus_endpoint();
-
-    /***********send stat data here********************/
-    fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
-
-    shaper_thread_resource_clear();
-    shaping_engine_destroy(ctx);
-    stub_clear_matched_shaping_rules();
-
-    /*******test statistics***********/
-    sleep(2);//wait telegraf to output
-    FILE *stat_file;
-
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
-    memset(line, 0, sizeof(line));
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 0
-    shaping_stat_judge(line, 0, 0, 2, 100, 10000, 0, 0, 280000, SHAPING_DIR_OUT, profile_type_primary);//max latency is every queued pkts
-
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 1
-    shaping_stat_judge(line, 1, 1, 1, 100, 10000, 0, 0, 90000, SHAPING_DIR_OUT, profile_type_primary);//max latency is every queued pkts
-
-    fclose(stat_file);
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
-    fclose(stat_file);
-}
-
-/*session1 match rule1,rule2,rule4; session2 match rule3
-  rule1:
-      priority:1
-      profile1: limit 1000
-  rule2:
-      priority:2
-      profile2: limit 1000
-  rule3:
-      priority:3
-      profile3: limit 1000
-  rule4:
-      priority:4
-      profile4: limit 1000*/
-TEST(two_session_diff_priority, udp_in_order_multi_rule)
-{
-    struct stub_pkt_queue expec_tx_queue1;
-    struct stub_pkt_queue expec_tx_queue2;
-    struct stub_pkt_queue *actual_tx_queue;
-    struct shaping_ctx *ctx = NULL;
-    struct shaping_flow *sf1 = NULL;
-    struct shaping_flow *sf2 = NULL;
-    long long rule_ids[] = {1, 2, 3, 4};
-    long long rule_id1[] = {1, 2, 4};
-    long long rule_id2[] = {3};
-    int profile_nums[] = {1, 1, 1, 1};
-    int prioritys[] = {1, 2, 3, 4};
-    int profile_ids[][MAX_REF_PROFILE] = {{1}, {2}, {3}, {4}};
-
-
-    TAILQ_INIT(&expec_tx_queue1);
-    TAILQ_INIT(&expec_tx_queue2);
-    stub_init();
-    
-    ctx = shaping_engine_init();
-    ASSERT_TRUE(ctx != NULL);
-    sf1 = shaping_flow_new(&ctx->thread_ctx[0]);
-    ASSERT_TRUE(sf1 != NULL);
-    sf2 = shaping_flow_new(&ctx->thread_ctx[0]);
-    ASSERT_TRUE(sf2 != NULL);
-
-    stub_set_matched_shaping_rules(4, rule_ids, prioritys, profile_nums, profile_ids);
-
-    stub_set_token_bucket_avl_per_sec(1, 1000, SHAPING_DIR_OUT);
-    stub_set_token_bucket_avl_per_sec(2, 1000, SHAPING_DIR_OUT);
-    stub_set_token_bucket_avl_per_sec(3, 1000, SHAPING_DIR_OUT);
-    stub_set_token_bucket_avl_per_sec(4, 1000, SHAPING_DIR_OUT);
-
-    actual_tx_queue = stub_get_tx_queue();
-    shaper_rules_update(&ctx->thread_ctx[0], sf1, rule_id1, 3);
-    shaper_rules_update(&ctx->thread_ctx[0], sf2, rule_id2, 1);
-    
-
-    /*******send packets***********/
-    send_packets(&ctx->thread_ctx[0], sf1, 20, 100, SHAPING_DIR_OUT, &expec_tx_queue1, 2, 0);
-    send_packets(&ctx->thread_ctx[0], sf2, 20, 100, SHAPING_DIR_OUT, &expec_tx_queue2, 1, 0);
-
-
-    //first 10 packets for stream1
-    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 10));
-
-    //first 10 packets for stream2
-    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 10));
-
-    ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
-    
-    while (!TAILQ_EMPTY(&expec_tx_queue1)) {//stream1, priority 1, last 10 packets
-        stub_refresh_token_bucket(1);
-        stub_refresh_token_bucket(2);
-        stub_refresh_token_bucket(3);
-        stub_refresh_token_bucket(4);
-        for (int i = 0; i < 30; i++) {
-            polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-            stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
-        }
-        ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 10));
-        ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
-    }
-
-    while (!TAILQ_EMPTY(&expec_tx_queue2)) {
-        stub_refresh_token_bucket(1);
-        stub_refresh_token_bucket(2);
-        stub_refresh_token_bucket(3);
-        stub_refresh_token_bucket(4);
-        for (int i = 0; i < 10; i++) {
-            polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-            stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
-        }
-        ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 10));//stream2 priority 3
-        ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
-    }
-
-    shaping_flow_free(&ctx->thread_ctx[0], sf1);
-    shaping_flow_free(&ctx->thread_ctx[0], sf2);
-    fieldstat_global_disable_prometheus_endpoint();
-
-    /***********send stat data here********************/
-    fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
-
-    shaper_thread_resource_clear();
-    shaping_engine_destroy(ctx);
-    stub_clear_matched_shaping_rules();
-
-    /*******test statistics***********/
-    sleep(2);//wait telegraf to output
-    FILE *stat_file;
-
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
-    memset(line, 0, sizeof(line));
-
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 1, 1, 1, 20, 2000, 0, 0, 48000, SHAPING_DIR_OUT, profile_type_primary);//profile_id 1, max latency is last pkt
-
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 2, 2, 1, 20, 2000, 0, 0, 1000, SHAPING_DIR_OUT, profile_type_primary);//profile_id 2, evevy queued pkt's latency is 1
-
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 4, 4, 1, 20, 2000, 0, 0, 1000, SHAPING_DIR_OUT, profile_type_primary);//profile_id 4, max latency is first queued pkt
-
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 3, 3, 3, 20, 2000, 0, 0, 40000, SHAPING_DIR_OUT, profile_type_primary);//profile_id 3, every queued pkt's latency is 40
-
-    fclose(stat_file);
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
-    fclose(stat_file);
-}
-
-/*session1 match rule1
-  rule1:
-      priority:1
-      profile1: limit 1000, first 20 pkts async, then sync
-*/
-TEST(single_session_async, udp_tx_in_order)
-{
-    struct stub_pkt_queue expec_tx_queue;
-    struct stub_pkt_queue *actual_tx_queue;
-    struct shaping_ctx *ctx = NULL;
-    struct shaping_flow *sf = NULL;
-    long long rule_id[] = {0};
-    int priority[] = {1};
-    int profile_num[] = {1};
-    int profile_id[][MAX_REF_PROFILE] = {{0}};
-
-
-    TAILQ_INIT(&expec_tx_queue);
-    stub_init();
-    ctx = shaping_engine_init();
-    ASSERT_TRUE(ctx != NULL);
-    sf = shaping_flow_new(&ctx->thread_ctx[0]);
-    ASSERT_TRUE(sf != NULL);
-    
-    stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT);
-    stub_set_async_token_get_times(0, 20);
-    actual_tx_queue = stub_get_tx_queue();
-    shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
-    
-
-    /*******packets, OP_STATE_DATA***********/
-    send_packets(&ctx->thread_ctx[0], sf, 20, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
-
-    sleep(1);//wait stub async thread complete
-
-    send_packets(&ctx->thread_ctx[0], sf, 80, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
-
-
-    //first 10 packets, got token
-    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
-    ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
-
-    while (!TAILQ_EMPTY(&expec_tx_queue)) {//last 90 delay packets
-        stub_refresh_token_bucket(0);
-        for (int i = 0; i < 20; i++) {//even though invoke polling more than 10 times, there should be only 10 pkts be sent
-            polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-            stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
-        }
-        ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
-        ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
-    }
-
-    shaping_flow_free(&ctx->thread_ctx[0], sf);
-    fieldstat_global_disable_prometheus_endpoint();
-
-    /***********send stat data here********************/
-    fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
-
-    shaper_thread_resource_clear();
-    shaping_engine_destroy(ctx);
-    stub_clear_matched_shaping_rules();
-
-    /*******test statistics***********/
-    sleep(2);//wait telegraf to output
-    FILE *stat_file;
-
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
-    memset(line, 0, sizeof(line));
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, 170000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
     fclose(stat_file);
@@ -1199,7 +893,7 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 10));
         ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
     }
-    shaper_stat_refresh(&ctx->thread_ctx[0], sf2, 0, 1);//refresh stat, to ensure priority queue_len in swarmkv is correct
+    shaper_stat_refresh(&ctx->thread_ctx[0], sf2, 1);//refresh stat, to ensure priority queue_len in swarmkv is correct
 
     stub_curr_time_s_inc(1);//inc time to refresh hmget interval
     while (!TAILQ_EMPTY(&expec_tx_queue1)) {//last 90 delay packets
@@ -1230,94 +924,14 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 1, primary
-    shaping_stat_judge(line, 1, 1, 1, 0, 0, 0, 0, 1470000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(line, 1, 1, 1, 0, 0, 0, 0, 1471000, SHAPING_DIR_OUT, profile_type_primary);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2, borrow
     shaping_stat_judge(line, 1, 2, 2, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2, primary
-    shaping_stat_judge(line, 2, 2, 1, 100, 10000, 0, 0, 190000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(line, 2, 2, 1, 100, 10000, 0, 0, 191000, SHAPING_DIR_OUT, profile_type_primary);
 
-    fclose(stat_file);
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
-    fclose(stat_file);
-}
-
-/*session1 match rule1; session2 match rule1
-  rule1:
-      priority:1
-      primary profile_a:
-
-profile_a: limit 1000
-*/
-TEST(two_session_same_rule, udp_tx_in_order)
-{
-    struct stub_pkt_queue expec_tx_queue;
-    struct stub_pkt_queue *actual_tx_queue;
-    struct shaping_ctx *ctx = NULL;
-    struct shaping_flow *sf1 = NULL;
-    struct shaping_flow *sf2 = NULL;
-    long long rule_id[] = {1};
-    int profile_num[] = {1};
-    int priority[] = {1};
-    int profile_id[][MAX_REF_PROFILE] = {{1}};
-    
-
-    TAILQ_INIT(&expec_tx_queue);
-    stub_init();
-    
-    ctx = shaping_engine_init();
-    ASSERT_TRUE(ctx != NULL);
-    sf1 = shaping_flow_new(&ctx->thread_ctx[0]);
-    ASSERT_TRUE(sf1 != NULL);
-    sf2 = shaping_flow_new(&ctx->thread_ctx[0]);
-    ASSERT_TRUE(sf2 != NULL);
-
-    stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
-
-    stub_set_token_bucket_avl_per_sec(1, 1000, SHAPING_DIR_OUT);
-    actual_tx_queue = stub_get_tx_queue();
-
-    shaper_rules_update(&ctx->thread_ctx[0], sf1, rule_id, 1);
-    shaper_rules_update(&ctx->thread_ctx[0], sf2, rule_id, 1);
-
-    /*******packets, OP_STATE_DATA***********/
-    send_packets(&ctx->thread_ctx[0], sf1, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
-    send_packets(&ctx->thread_ctx[0], sf2, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
-
-    //first 10 packets
-    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
-    ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
-
-    while (!TAILQ_EMPTY(&expec_tx_queue)) {//last 190 delay packets
-        stub_refresh_token_bucket(1);
-        for (int i = 0; i < 20; i++) {//even though invoke polling more than 10 times, there should be only 10 pkts be sent
-            polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-            stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
-        }
-        ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
-        ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
-    }
-
-    shaping_flow_free(&ctx->thread_ctx[0], sf1);
-    shaping_flow_free(&ctx->thread_ctx[0], sf2);
-    fieldstat_global_disable_prometheus_endpoint();
-
-    /***********send stat data here********************/
-    fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
-
-    shaper_thread_resource_clear();
-    shaping_engine_destroy(ctx);
-    stub_clear_matched_shaping_rules();
-
-    /*******test statistics***********/
-    sleep(2);//wait telegraf to output
-    FILE *stat_file;
-
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
-    memset(line, 0, sizeof(line));
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 1, 1, 1, 200, 20000, 0, 0, 370000, SHAPING_DIR_OUT, profile_type_primary);
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
     fclose(stat_file);
@@ -1373,7 +987,7 @@ TEST(two_session_diff_priority_same_profile, two_thread_udp_tx_in_order)
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 10));
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
-    shaper_stat_refresh(&ctx->thread_ctx[0], sf1, 0, 1);//刷新线程0中的优先级队列长度到swarmkv中
+    shaper_stat_refresh(&ctx->thread_ctx[0], sf1, 1);//刷新线程0中的优先级队列长度到swarmkv中
     stub_curr_time_s_inc(1);//inc time to refresh hmget interval
     for (int i = 0; i < 10; i++) {//线程1中的session优先级为2，被线程0中优先级为1的session阻断
         stub_refresh_token_bucket(0);
@@ -1383,15 +997,17 @@ TEST(two_session_diff_priority_same_profile, two_thread_udp_tx_in_order)
 
     while (!TAILQ_EMPTY(&expec_tx_queue1)) {
         stub_refresh_token_bucket(0);
-        polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
+        polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);//require tokens
+        polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);//send pkt
 
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 1));//sf1 priority 1
     }
 
-    shaper_stat_refresh(&ctx->thread_ctx[0], sf1, 0, 1);//刷新线程0中的优先级队列长度到swarmkv中
     stub_curr_time_s_inc(1);//inc time to refresh hmget interval
+    shaper_stat_refresh(&ctx->thread_ctx[0], sf1, 1);//刷新线程0中的优先级队列长度到swarmkv中
     while (!TAILQ_EMPTY(&expec_tx_queue2)) {
         stub_refresh_token_bucket(0);
+        polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);
         polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);
 
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 1));//sf2 priority 2
@@ -1417,7 +1033,7 @@ TEST(two_session_diff_priority_same_profile, two_thread_udp_tx_in_order)
 
 profile_a: limit 1000
 */
-TEST(two_session_diff_priority_same_profile, session_timer_test)
+TEST(two_session_diff_priority_same_profile, profile_timer_test)
 {
     struct stub_pkt_queue expec_tx_queue1;
     struct stub_pkt_queue expec_tx_queue2;
@@ -1457,7 +1073,7 @@ TEST(two_session_diff_priority_same_profile, session_timer_test)
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 10));
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
-    sleep(3);//wait session timer to expire, to refresh priority queue_len to swarmkv
+    sleep(3);//wait profile timer to expire, to refresh priority queue_len to swarmkv
     for (int i = 0; i < 500; i++) {
         stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);//inc time to refresh stat in timer
     }
@@ -1475,7 +1091,8 @@ TEST(two_session_diff_priority_same_profile, session_timer_test)
 
     while (!TAILQ_EMPTY(&expec_tx_queue1)) {
         stub_refresh_token_bucket(0);
-        polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
+        polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);//first polling request token
+        polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);//then send pkt
         stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
 
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 1));//sf1 priority 1
@@ -1491,7 +1108,8 @@ TEST(two_session_diff_priority_same_profile, session_timer_test)
     stub_curr_time_s_inc(1);//inc time to refresh hmget interval
     while (!TAILQ_EMPTY(&expec_tx_queue2)) {
         stub_refresh_token_bucket(0);
-        polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);
+        polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);//first polling request token
+        polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);//then send pkt
         stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
 
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 1));//sf2 priority 2
@@ -1557,7 +1175,7 @@ TEST(two_sessions, priority_non_block)
     shaper_rules_update(&ctx->thread_ctx[1], sf2, rule_id2, 1);
 
     /*******send packets***********/
-    send_packets(&ctx->thread_ctx[0], sf1, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue1, 2, 0);//sf1 blocked by rule2(profile id 1), while rule3(profile id 0) still has 1000 token
+    send_packets(&ctx->thread_ctx[0], sf1, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue1, 3, 0);//sf1 blocked by rule2(profile id 1), while rule3(profile id 0) still has 1000 token
     send_packets(&ctx->thread_ctx[1], sf2, 10, 100, SHAPING_DIR_OUT, &expec_tx_queue2, 1, 0);
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 10));//sf1 should send 10 pkts
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 10));//sf2 should send 10 pkts cause rule3(profile id 0) has 1000 token
@@ -1566,8 +1184,10 @@ TEST(two_sessions, priority_non_block)
     while (!TAILQ_EMPTY(&expec_tx_queue1)) {
         stub_refresh_token_bucket(0);
         stub_refresh_token_bucket(1);
-        polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-        polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);//tow rules per pkt need two polling
+
+        for (int i = 0; i < 4; i++) {
+            polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);//two rules, one rule need two polling, request token and send pkt
+        }
 
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 1));//sf1 remaining 90 pkts
     }
@@ -1642,6 +1262,7 @@ TEST(two_sessions, borrow_when_primary_profile_priority_blocked)
     while (!TAILQ_EMPTY(&expec_tx_queue1)) {
         stub_refresh_token_bucket(0);
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
+        polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
 
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 1));
     }
@@ -1709,6 +1330,7 @@ TEST(two_sessions, primary_profile_priority_blocked_by_borrow_profile)
     while (!TAILQ_EMPTY(&expec_tx_queue1)) {
         stub_refresh_token_bucket(1);
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
+        polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
         polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);//blocked by priority, sf1 has priority 2 for profile_b(id 1)
         stub_curr_time_ns_inc(STUB_TIME_INC_FOR_HMGET);
 
@@ -1718,6 +1340,7 @@ TEST(two_sessions, primary_profile_priority_blocked_by_borrow_profile)
     stub_curr_time_s_inc(1);//inc time to refresh hmget interval
     while (!TAILQ_EMPTY(&expec_tx_queue2)) {
         stub_refresh_token_bucket(1);
+        polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);
         polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);
 
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 1));
@@ -1767,6 +1390,7 @@ TEST(statistics, udp_drop_pkt)
 
     while (!TAILQ_EMPTY(&expec_tx_queue)) {
         stub_refresh_token_bucket(0);
+        polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
         stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 1));
@@ -1837,7 +1461,7 @@ TEST(statistics, udp_queueing_pkt)
 
 
     /***********send stat data here********************/
-    shaper_stat_refresh(&ctx->thread_ctx[0], sf, ctx->thread_ctx[0].thread_index, 1);
+    shaper_stat_refresh(&ctx->thread_ctx[0], sf, 1);
     fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
     shaper_global_stat_refresh(ctx);
     sleep(2);//wait telegraf generate metric
@@ -1855,6 +1479,7 @@ TEST(statistics, udp_queueing_pkt)
 
     while (!TAILQ_EMPTY(&expec_tx_queue)) {//last 90 delay packets
         stub_refresh_token_bucket(0);
+        polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
         stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 1));
@@ -1899,6 +1524,6 @@ TEST(statistics, udp_queueing_pkt)
 int main(int argc, char **argv) 
 {
     testing::InitGoogleTest(&argc, argv);
-    //testing::GTEST_FLAG(filter) = "two_sessions.primary_profile_priority_blocked_by_borrow_profile";
+    //testing::GTEST_FLAG(filter) = "single_session.udp_tx_in_order";
     return RUN_ALL_TESTS();
 }

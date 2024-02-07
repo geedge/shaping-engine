@@ -42,6 +42,8 @@ struct shaping_system_conf {
     unsigned int session_queue_len_max;
     unsigned int priority_queue_len_max;
     unsigned int pkt_max_delay_time_us;
+    int token_multiple_min;
+    int token_multiple_max;
     int polling_node_num_max[SHAPING_PRIORITY_NUM_MAX];
     int work_thread_num;
     int cpu_affinity_enable;
@@ -59,8 +61,6 @@ struct shaping_thread_ctx {
     struct shaping_stat *stat;
     struct shaping_marsio_info *marsio_info;
     struct swarmkv *swarmkv_db;//handle of swarmkv 
-    int swarmkv_aqm_prob;
-    time_t swarmkv_aqm_update_time;
     struct shaping_maat_info *maat_info;
     struct session_table *session_table;
     struct timeouts *expires;
@@ -97,12 +97,51 @@ enum shaping_profile_type {
     PROFILE_TYPE_SPLIT_BY_LOCAL_HOST
 };
 
+enum shaper_aqm_type {
+    AQM_TYPE_NONE = 0,
+    AQM_TYPE_BLUE,
+    AQM_TYPE_CODEL,
+    AQM_TYPE_MAX
+};
+
+struct shaper_aqm_blue_para {
+    time_t update_time;
+    int probability;
+};
+
+struct shaper_token_multiple {
+    int token_get_multiple;
+    unsigned char has_drop_by_queue_full;
+    unsigned char has_failed_get_token;
+    time_t token_multiple_update_time_s;
+};
+
+struct shaping_profile_hash_node {
+    int id;
+    enum shaper_aqm_type aqm_type;
+    long long in_deposit_token_bits[SHAPING_PRIORITY_NUM_MAX];
+    long long out_deposit_token_bits[SHAPING_PRIORITY_NUM_MAX];
+    long long last_failed_get_token_ms;
+    long long last_hmget_ms;
+    long long queue_len[SHAPING_PRIORITY_NUM_MAX];
+    long long local_queue_len[SHAPING_PRIORITY_NUM_MAX];
+    long long local_queue_len_update_time_us[SHAPING_PRIORITY_NUM_MAX];
+    long long priority_blocked_time_ms[SHAPING_PRIORITY_NUM_MAX];
+    int hmget_ref_cnt;
+    int tconsume_ref_cnt;
+    struct shaper_token_multiple token_multiple;
+    struct shaper_aqm_blue_para aqm_blue_para;
+    unsigned char is_invalid;
+    struct timeout timeout_handle;
+    UT_hash_handle hh;
+};
+
 struct shaping_profile_info {
     int id;//profile_id
     enum shaping_profile_type type;
     int priority;
-    int in_deposit_token_bits;
-    int out_deposit_token_bits;
+    long long in_deposit_token_bits;
+    long long out_deposit_token_bits;
     long long last_failed_get_token_ms;
     unsigned long long enqueue_time_us;//to calculate max latency
     struct shaping_stat_for_profile stat;
@@ -114,7 +153,7 @@ struct shaping_rule_info {
     int id;//rule_id
     int fair_factor;
     struct shaping_profile_info primary;
-    struct shaping_profile_info borrowing[SHAPING_REF_PROFILE_NUM_MAX];
+    struct shaping_profile_info borrowing[SHAPING_REF_PROFILE_NUM_MAX - 1];
     int borrowing_num;
     int is_enabled;
 };
@@ -125,6 +164,7 @@ struct shaping_packet_wrapper {
     unsigned long long enqueue_time_us;//first enqueue time
     unsigned int length;
     int rule_anchor;
+    int aqm_processed_pf_ids[SHAPING_REF_PROFILE_NUM_MAX];
     unsigned char direction;
     TAILQ_ENTRY(shaping_packet_wrapper) node;
 };
@@ -157,10 +197,8 @@ struct shaping_flow {
     unsigned int flag;
     struct metadata ctrl_meta;
     unsigned long long processed_pkts;
-    struct timespec stat_update_time;
+    unsigned long long stat_update_time_us;
     time_t check_rule_time;
-    struct timeout timeout_handle;
-    time_t last_update_timeout_sec;
 };
 
 struct shaper_flow_instance {
@@ -173,13 +211,13 @@ struct shaping_tconsume_cb_arg {
     struct shaping_profile_info *profile;
     struct shaping_flow *sf;
     unsigned char direction;
+    unsigned char is_primary_pf;
     long long start_time_us;
 };
 
 struct shaping_hmget_cb_arg {
     struct shaping_thread_ctx *ctx;
     struct shaping_profile_hash_node *pf_hash_node;
-    int priority;
     long long start_time_us;
 };
 
@@ -202,13 +240,9 @@ bool shaper_queue_empty(struct shaping_flow *sf);
 void shaper_packet_dequeue(struct shaping_flow *sf);
 struct shaping_packet_wrapper* shaper_first_pkt_get(struct shaping_flow *sf);
 void shaper_queue_clear(struct shaping_flow *sf, struct shaping_thread_ctx *ctx);
-/*return value: 0 for success, -1 for failed*/
-int shaper_flow_push(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, unsigned long long enqueue_time);
-/*return num of sf_ins*/
-void shaper_flow_pop(struct shaping_thread_ctx *ctx, struct shaping_flow *sf);
-int shaper_flow_in_order_get(struct shaper *sp, struct shaper_flow_instance sf_ins[], int priority, int max_sf_num);
 
-//enum shaping_packet_action shaper_pkt_action_decide(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, int priority, int sf_in_queue);
+int shaper_flow_in_order_get(struct shaper *sp, struct shaper_flow_instance sf_ins[], int priority, int max_sf_num);
+void shaper_profile_hash_node_update(struct shaping_thread_ctx *ctx, struct shaping_profile_info *profile);
 
 int shaper_global_conf_init(struct shaping_system_conf *conf);
 
