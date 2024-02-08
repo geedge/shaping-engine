@@ -1,3 +1,4 @@
+#include <math.h>
 #include <time.h>
 #include "shaper.h"
 #include "shaper_aqm.h"
@@ -26,6 +27,45 @@ static int shaper_aqm_blue_need_drop(struct shaping_packet_wrapper *pkt_wrapper,
 
     return 0;
 }
+
+
+#define CODEL_MAX_LATENCY 5 //unit:ms
+#define CODEL_DROP_INTERVAL 100 //unit:ms
+static int shaper_aqm_codel_need_drop(struct shaping_packet_wrapper *pkt_wrapper, struct shaper_aqm_codel_para *para, unsigned long long curr_time_ms, unsigned long long latency)
+{
+    if (latency < CODEL_MAX_LATENCY) {
+        para->state = CODEL_STATE_NORMAL;
+        return 0;
+    } 
+
+    int ret = 0;
+    switch (para->state) {
+        case CODEL_STATE_NORMAL:
+            para->start_drop_time_ms = curr_time_ms + CODEL_DROP_INTERVAL;
+            para->state = CODEL_STATE_DROPPING_TIMER;
+            break;
+        case CODEL_STATE_DROPPING_TIMER:
+            if (curr_time_ms >= para->next_drop_time_ms) {
+                para->state = CODEL_STATE_DROPPING_PHASE;
+                para->drop_count = 1;
+                para->next_drop_time_ms = curr_time_ms + CODEL_DROP_INTERVAL / sqrt(para->drop_count);
+                ret = 1;
+            }
+            break;
+        case CODEL_STATE_DROPPING_PHASE:
+            if (curr_time_ms >= para->next_drop_time_ms) {
+                para->drop_count++;
+                para->next_drop_time_ms = curr_time_ms + CODEL_DROP_INTERVAL / sqrt(para->drop_count);
+                ret = 1;
+            }
+            break;
+        default:
+            break;
+    }
+
+    return ret;
+}
+
 
 static int shaper_aqm_have_processed(struct shaping_packet_wrapper *pkt_wrapper, int profile_id)
 {
