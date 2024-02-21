@@ -7,6 +7,7 @@
 #include "utils.h"
 #include "shaper_stat.h"
 #include "shaper_global_stat.h"
+#include "shaper_aqm.h"
 extern "C" {
 #include "timeout.h"
 }
@@ -97,18 +98,6 @@ enum shaping_profile_type {
     PROFILE_TYPE_SPLIT_BY_LOCAL_HOST
 };
 
-enum shaper_aqm_type {
-    AQM_TYPE_NONE = 0,
-    AQM_TYPE_BLUE,
-    AQM_TYPE_CODEL,
-    AQM_TYPE_MAX
-};
-
-struct shaper_aqm_blue_para {
-    time_t update_time;
-    int probability;
-};
-
 struct shaper_token_multiple {
     int token_get_multiple;
     unsigned char has_drop_by_queue_full;
@@ -131,6 +120,7 @@ struct shaping_profile_hash_node {
     int tconsume_ref_cnt;
     struct shaper_token_multiple token_multiple;
     struct shaper_aqm_blue_para aqm_blue_para;
+    struct shaper_aqm_codel_para aqm_codel_para;
     unsigned char is_invalid;
     struct timeout timeout_handle;
     UT_hash_handle hh;

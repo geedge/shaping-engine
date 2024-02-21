@@ -18,6 +18,7 @@ struct shaping_rule {
 struct shaping_profile {
     int id;
     enum shaping_profile_type type;
+    enum shaper_aqm_type aqm_type;
     int in_limit_bandwidth;
     int out_limit_bandwidth;
     int valid;

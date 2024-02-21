@@ -54,6 +54,7 @@ TEST(shaping_profile, parse)
     EXPECT_EQ(s_pf->in_limit_bandwidth, 1024);
     EXPECT_EQ(s_pf->out_limit_bandwidth, 2048);
     EXPECT_EQ(s_pf->type, PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS);
+    EXPECT_EQ(s_pf->aqm_type, AQM_TYPE_CODEL);
 
     shaper_profile_ex_dup(0, (void**)&s_pf_dup, (void**)&s_pf, 0, NULL);
     EXPECT_EQ(s_pf, s_pf_dup);
@@ -64,7 +65,7 @@ TEST(shaping_profile, parse)
 
 TEST(shaping_flow, update_rule)
 {
-    struct shaping_thread_ctx ctx;
+    struct shaping_ctx *ctx = NULL;
     struct shaping_flow sf;
     struct shaping_rule_info *rule_info;
     long long rule_ids[] = {1, 2, 3};
@@ -74,15 +75,16 @@ TEST(shaping_flow, update_rule)
 
     stub_init();
 
+    ctx = shaping_engine_init();
+
     stub_set_matched_shaping_rules(3, rule_ids, prioritys, profile_nums, profile_ids);
 
-    ctx.maat_info = (struct shaping_maat_info *)calloc(1, sizeof(struct shaping_maat_info));
-    ctx.maat_info->rule_table_id = STUB_MAAT_SHAPING_RULE_TABLE_ID;
-    ctx.maat_info->profile_table_id = STUB_MAAT_SHAPING_PROFILE_TABLE_ID;
+    ctx->maat_info->rule_table_id = STUB_MAAT_SHAPING_RULE_TABLE_ID;
+    ctx->maat_info->profile_table_id = STUB_MAAT_SHAPING_PROFILE_TABLE_ID;
 
     memset(&sf, 0, sizeof(sf));
     sf.priority = SHAPING_PRIORITY_NUM_MAX;
-    shaper_rules_update(&ctx, &sf, rule_ids, 3);
+    shaper_rules_update(&ctx->thread_ctx[0], &sf, rule_ids, 3);
 
     EXPECT_EQ(sf.rule_num, 3);
 
@@ -110,12 +112,12 @@ TEST(shaping_flow, update_rule)
     EXPECT_EQ(rule_info->borrowing[1].id, 6);
     EXPECT_EQ(rule_info->borrowing[1].priority, 3);
 
-    free(ctx.maat_info);
+    shaping_engine_destroy(ctx);
 }
 
 TEST(shaping_flow, update_rule_dup)
 {
-    struct shaping_thread_ctx ctx;
+    struct shaping_ctx *ctx = NULL;
     struct shaping_flow sf;
     struct shaping_rule_info *rule_info;
     long long rule_ids[] = {1, 2, 3, 4};
@@ -125,17 +127,18 @@ TEST(shaping_flow, update_rule_dup)
 
     stub_init();
 
+    ctx = shaping_engine_init();
+
     stub_set_matched_shaping_rules(4, rule_ids, prioritys, profile_nums, profile_ids);
 
-    ctx.maat_info = (struct shaping_maat_info *)calloc(1, sizeof(struct shaping_maat_info));
-    ctx.maat_info->rule_table_id = STUB_MAAT_SHAPING_RULE_TABLE_ID;
-    ctx.maat_info->profile_table_id = STUB_MAAT_SHAPING_PROFILE_TABLE_ID;
+    ctx->maat_info->rule_table_id = STUB_MAAT_SHAPING_RULE_TABLE_ID;
+    ctx->maat_info->profile_table_id = STUB_MAAT_SHAPING_PROFILE_TABLE_ID;
 
     memset(&sf, 0, sizeof(sf));
     sf.priority = SHAPING_PRIORITY_NUM_MAX;
 
     long long rule_id1[] = {1, 2, 3};
-    shaper_rules_update(&ctx, &sf, rule_id1, 3);
+    shaper_rules_update(&ctx->thread_ctx[0], &sf, rule_id1, 3);
 
     EXPECT_EQ(sf.rule_num, 3);
 
@@ -164,23 +167,23 @@ TEST(shaping_flow, update_rule_dup)
     EXPECT_EQ(rule_info->borrowing[1].priority, 3);
 
     long long rule_id2[] = {1};
-    shaper_rules_update(&ctx, &sf, rule_id2, 1);
+    shaper_rules_update(&ctx->thread_ctx[0], &sf, rule_id2, 1);
     EXPECT_EQ(sf.rule_num, 3);
 
     long long rule_id3[] = {2, 3, 4};
-    shaper_rules_update(&ctx, &sf, rule_id3, 3);
+    shaper_rules_update(&ctx->thread_ctx[0], &sf, rule_id3, 3);
     EXPECT_EQ(sf.rule_num, 4);
     rule_info = &sf.matched_rule_infos[3];
     EXPECT_EQ(rule_info->id, 4);
     EXPECT_EQ(rule_info->primary.id, 7);
     EXPECT_EQ(rule_info->primary.priority, 1);
 
-    free(ctx.maat_info);
+    shaping_engine_destroy(ctx);
 }
 
 TEST(shaping_flow, update_rule_after_priority_confirmed)
 {
-    struct shaping_thread_ctx ctx;
+    struct shaping_ctx *ctx = NULL;
     struct shaping_flow sf;
     struct shaping_rule_info *rule_info;
     long long rule_ids[] = {1, 2, 3};
@@ -190,20 +193,21 @@ TEST(shaping_flow, update_rule_after_priority_confirmed)
 
     stub_init();
 
+    ctx = shaping_engine_init();
+
     stub_set_matched_shaping_rules(3, rule_ids, prioritys, profile_nums, profile_ids);
 
-    ctx.maat_info = (struct shaping_maat_info *)calloc(1, sizeof(struct shaping_maat_info));
-    ctx.maat_info->rule_table_id = STUB_MAAT_SHAPING_RULE_TABLE_ID;
-    ctx.maat_info->profile_table_id = STUB_MAAT_SHAPING_PROFILE_TABLE_ID;
+    ctx->maat_info->rule_table_id = STUB_MAAT_SHAPING_RULE_TABLE_ID;
+    ctx->maat_info->profile_table_id = STUB_MAAT_SHAPING_PROFILE_TABLE_ID;
 
     memset(&sf, 0, sizeof(sf));
     sf.priority = SHAPING_PRIORITY_NUM_MAX;
     long long first_rule_ids[] = {2, 3};
-    shaper_rules_update(&ctx, &sf, first_rule_ids, 2);
+    shaper_rules_update(&ctx->thread_ctx[0], &sf, first_rule_ids, 2);
 
     sf.processed_pkts = CONFIRM_PRIORITY_PKTS + 1;
     long long after_confirm_priority_rule_ids[] = {1};
-    shaper_rules_update(&ctx, &sf, after_confirm_priority_rule_ids, 1);
+    shaper_rules_update(&ctx->thread_ctx[0], &sf, after_confirm_priority_rule_ids, 1);
 
     EXPECT_EQ(sf.rule_num, 3);
     EXPECT_EQ(sf.priority, 2);
@@ -232,7 +236,7 @@ TEST(shaping_flow, update_rule_after_priority_confirmed)
     EXPECT_EQ(rule_info->primary.priority, 2);
     EXPECT_EQ(rule_info->borrowing_num, 0);
 
-    free(ctx.maat_info);
+    shaping_engine_destroy(ctx);
 }
 
 int main(int argc, char **argv)
