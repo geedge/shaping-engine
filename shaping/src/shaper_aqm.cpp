@@ -3,37 +3,30 @@
 #include "shaper.h"
 #include "shaper_aqm.h"
 
-#define PROBABILITY_MAX 100
-#define INCREMENT 10
-#define DECREMENT 1
-#define FREEZE_TIME 2 //unit:s
-#define QUEUE_LEN_MAX 100
-static int shaper_aqm_blue_need_drop(struct shaping_packet_wrapper *pkt_wrapper, struct shaper_aqm_blue_para *para, int curr_queue_len)
+thread_local unsigned int seed = 0;
+int shaper_aqm_blue_need_drop(struct shaper_aqm_blue_para *para, int curr_queue_len)
 {
     time_t curr_time;
 
-    if (time(&curr_time) - para->update_time >= FREEZE_TIME) {
+    if (time(&curr_time) - para->update_time >= BLUE_FREEZE_TIME) {
         para->update_time = curr_time;
-        if (curr_queue_len >= QUEUE_LEN_MAX) {
-            para->probability = (para->probability + INCREMENT) > PROBABILITY_MAX ? PROBABILITY_MAX : (para->probability + INCREMENT);
+        if (curr_queue_len >= BLUE_QUEUE_LEN_MAX) {
+            para->probability = (para->probability + BLUE_INCREMENT) > BLUE_PROBABILITY_MAX ? BLUE_PROBABILITY_MAX : (para->probability + BLUE_INCREMENT);
         } else if (curr_queue_len == 0) {
-            para->probability = (para->probability - DECREMENT) >= 0 ? (para->probability - DECREMENT) : 0;
+            para->probability = (para->probability - BLUE_DECREMENT) >= 0 ? (para->probability - BLUE_DECREMENT) : 0;
         }
     }
 
-    if (rand() % PROBABILITY_MAX < para->probability) {
+    if (rand_r(&seed) % BLUE_PROBABILITY_MAX < para->probability) {
         return 1;
     }
 
     return 0;
 }
 
-
-#define CODEL_MAX_LATENCY 5 //unit:ms
-#define CODEL_DROP_INTERVAL 100 //unit:ms
-static int shaper_aqm_codel_need_drop(struct shaping_packet_wrapper *pkt_wrapper, struct shaper_aqm_codel_para *para, unsigned long long curr_time_ms, unsigned long long latency)
+int shaper_aqm_codel_need_drop(struct shaper_aqm_codel_para *para, unsigned long long curr_time_ms, unsigned long long latency_ms)
 {
-    if (latency < CODEL_MAX_LATENCY) {
+    if (latency_ms < CODEL_MAX_LATENCY) {
         para->state = CODEL_STATE_NORMAL;
         return 0;
     } 
@@ -45,7 +38,7 @@ static int shaper_aqm_codel_need_drop(struct shaping_packet_wrapper *pkt_wrapper
             para->state = CODEL_STATE_DROPPING_TIMER;
             break;
         case CODEL_STATE_DROPPING_TIMER:
-            if (curr_time_ms >= para->next_drop_time_ms) {
+            if (curr_time_ms >= para->start_drop_time_ms) {
                 para->state = CODEL_STATE_DROPPING_PHASE;
                 para->drop_count = 1;
                 para->next_drop_time_ms = curr_time_ms + CODEL_DROP_INTERVAL / sqrt(para->drop_count);
@@ -94,9 +87,10 @@ static void shaper_aqm_mark_processed(struct shaping_packet_wrapper *pkt_wrapper
     }
 }
 
-int shaper_aqm_need_drop(struct shaping_profile_info *profile, struct shaping_packet_wrapper *pkt_wrapper)
+int shaper_aqm_need_drop(struct shaping_profile_info *profile, struct shaping_packet_wrapper *pkt_wrapper, struct timespec *curr_time, unsigned long long latency_us)
 {
     int ret = 0;
+    unsigned long long curr_time_ms;
     
     if (profile->hash_node->aqm_type == AQM_TYPE_NONE) {
         return 0;
@@ -108,9 +102,11 @@ int shaper_aqm_need_drop(struct shaping_profile_info *profile, struct shaping_pa
     
     switch (profile->hash_node->aqm_type) {
         case AQM_TYPE_BLUE:
-            ret = shaper_aqm_blue_need_drop(pkt_wrapper, &profile->hash_node->aqm_blue_para, profile->hash_node->queue_len[profile->priority]);
+            ret = shaper_aqm_blue_need_drop(&profile->hash_node->aqm_blue_para, profile->hash_node->queue_len[profile->priority]);
             break;
         case AQM_TYPE_CODEL:
+            curr_time_ms = curr_time->tv_sec * MILLI_SECONDS_PER_SEC + curr_time->tv_nsec / NANO_SECONDS_PER_MILLI_SEC;
+            ret = shaper_aqm_codel_need_drop(&profile->hash_node->aqm_codel_para, curr_time_ms, latency_us / 1000);
             break;
         default:
             break;

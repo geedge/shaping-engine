@@ -120,6 +120,7 @@ struct shaping_profile_hash_node {
     int tconsume_ref_cnt;
     struct shaper_token_multiple token_multiple;
     struct shaper_aqm_blue_para aqm_blue_para;
+    struct shaper_aqm_codel_para aqm_codel_para;
     unsigned char is_invalid;
     struct timeout timeout_handle;
     UT_hash_handle hh;

@@ -246,7 +246,7 @@ void shaper_queue_clear(struct shaping_flow *sf, struct shaping_thread_ctx *ctx)
 }
 
 //return success(0) while any avl tree insert success
-static int shaper_flow_push(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, unsigned long long enqueue_time)
+static int shaper_flow_push(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, unsigned long long enqueue_time_us)
 {
     struct shaping_node *s_node = (struct shaping_node*)sf;
     struct shaping_rule_info *s_rule_info = &sf->matched_rule_infos[sf->anchor];
@@ -277,7 +277,7 @@ static int shaper_flow_push(struct shaping_thread_ctx *ctx, struct shaping_flow 
     }
 
 END:
-    s_rule_info->primary.enqueue_time_us = enqueue_time;
+    s_rule_info->primary.enqueue_time_us = enqueue_time_us;
     shaper_stat_queueing_pkt_inc(&s_rule_info->primary.stat, pkt_wrapper->direction, ctx->thread_index);
 
     return 0;
@@ -580,14 +580,14 @@ static int shaper_deposit_token_is_enough(struct shaping_profile_info *profile, 
     }
 }
 
-static int shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, struct shaping_profile_info *pf_info, int profile_type, int req_token_bits, unsigned char direction, struct timespec *curr_timespec)
+static void shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, struct shaping_profile_info *pf_info, int profile_type, int req_token_bits, unsigned char direction, struct timespec *curr_timespec)
 {
     struct shaping_tconsume_cb_arg *arg = NULL;
     struct shaping_profile_hash_node *pf_hash_node = pf_info->hash_node;
     char key[32] = {0};
 
     if (pf_hash_node->tconsume_ref_cnt > 0) {
-        return SHAPER_TOKEN_GET_FAILED;
+        return;
     }
             
     snprintf(key, sizeof(key), "tsg-shaping-%d-%s", pf_info->id, direction == SHAPING_DIR_OUT ? "outgoing" : "incoming");
@@ -626,7 +626,7 @@ static int shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct 
             break;
     }
 
-    return SHAPER_TOKEN_GET_FAILED;
+    return;
 }
 
 static void shaper_queue_len_get_cb(const struct swarmkv_reply *reply, void * cb_arg)
@@ -799,9 +799,15 @@ static int shaper_token_consume(struct shaping_thread_ctx *ctx, struct shaping_f
 
     if (shaper_profile_is_priority_blocked(ctx, sf, profile, curr_timespec, curr_time_ms)) {
         return SHAPER_TOKEN_GET_FAILED;
+    }
+
+    int req_token_bits = req_token_bytes * 8;
+    shaper_token_get_from_profile(ctx, sf, profile, profile_type, req_token_bits, direction, curr_timespec);
+
+    if (profile->hash_node->is_invalid && profile_type == PROFILE_IN_RULE_TYPE_PRIMARY) {//for primary, means this rule don't need get token
+        return SHAPER_TOKEN_GET_SUCCESS;
     } else {
-        int req_token_bits = req_token_bytes * 8;
-        return shaper_token_get_from_profile(ctx, sf, profile, profile_type, req_token_bits, direction, curr_timespec);
+        return SHAPER_TOKEN_GET_FAILED;
     }
 }
 
@@ -863,7 +869,8 @@ static enum shaping_packet_action shaper_pkt_action_decide_queueing(struct shapi
     struct shaping_packet_wrapper *pkt_wrapper = NULL;
     struct shaping_profile_container pf_container[SHAPING_PRIORITY_NUM_MAX];
     struct timespec curr_time;
-    unsigned long long enqueue_time;
+    unsigned long long enqueue_time_us;
+    unsigned long long latency_us;
     int get_token_success = 0;
     int profile_num;
 
@@ -875,8 +882,9 @@ static enum shaping_packet_action shaper_pkt_action_decide_queueing(struct shapi
 
     clock_gettime(CLOCK_MONOTONIC, &curr_time);
 
+    latency_us = shaper_pkt_latency_us_calculate(&rule->primary, &curr_time);
     if (pf_container[0].pf_type == PROFILE_IN_RULE_TYPE_PRIMARY) {
-        if (shaper_pkt_latency_us_calculate(pf_container[0].pf_info, &curr_time) > ctx->conf.pkt_max_delay_time_us) {
+        if (latency_us > ctx->conf.pkt_max_delay_time_us) {
             shaper_flow_pop(ctx, sf, &curr_time);
             goto DROP;
         }
@@ -887,7 +895,7 @@ static enum shaping_packet_action shaper_pkt_action_decide_queueing(struct shapi
         profile_type = pf_container[i].pf_type;
 
         /*AQM process, if aqm not pass, for primary profile drop packet, for borrow profile just don't give token to this packet*/
-        if (shaper_aqm_need_drop(profile, pkt_wrapper)) {
+        if (shaper_aqm_need_drop(profile, pkt_wrapper, &curr_time, latency_us)) {
             if (profile_type == PROFILE_IN_RULE_TYPE_PRIMARY) {
                 shaper_flow_pop(ctx, sf, &curr_time);
                 goto DROP;
@@ -918,8 +926,8 @@ static enum shaping_packet_action shaper_pkt_action_decide_queueing(struct shapi
     }
 
     //push sf for next rule
-    enqueue_time = curr_time.tv_sec * MICRO_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MICRO_SEC;
-    if (0 == shaper_flow_push(ctx, sf, enqueue_time)) {
+    enqueue_time_us = curr_time.tv_sec * MICRO_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MICRO_SEC;
+    if (0 == shaper_flow_push(ctx, sf, enqueue_time_us)) {
         return SHAPING_QUEUED;
     } else {
         goto DROP;
@@ -936,7 +944,7 @@ static enum shaping_packet_action shaper_pkt_action_decide_no_queue(struct shapi
 {
     int profile_type = PROFILE_IN_RULE_TYPE_PRIMARY;
     struct timespec curr_time;
-    unsigned long long enqueue_time;
+    unsigned long long enqueue_time_us;
     int enqueue_success = 0;
 
     clock_gettime(CLOCK_MONOTONIC, &curr_time);
@@ -964,8 +972,8 @@ static enum shaping_packet_action shaper_pkt_action_decide_no_queue(struct shapi
         goto DROP;
     }
 
-    enqueue_time = curr_time.tv_sec * MICRO_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MICRO_SEC;
-    if (0 == shaper_flow_push(ctx, sf, enqueue_time)) {
+    enqueue_time_us = curr_time.tv_sec * MICRO_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MICRO_SEC;
+    if (0 == shaper_flow_push(ctx, sf, enqueue_time_us)) {
         return SHAPING_QUEUED;
     } else {
         goto DROP;
