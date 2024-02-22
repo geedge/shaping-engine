@@ -30,7 +30,7 @@ struct stub_packet_node {
 TAILQ_HEAD(stub_pkt_queue, stub_packet_node);
 
 
-void stub_set_token_bucket_avl_per_sec(int profile_id, unsigned int tokens, unsigned char direction);
+void stub_set_token_bucket_avl_per_sec(int profile_id, unsigned int tokens, unsigned char direction, enum shaping_profile_limit_direction limit_direction);
 void stub_refresh_token_bucket(int profile_id);
 void stub_set_profile_type(int profile_id, enum shaping_profile_type type);
 void stub_set_async_token_get_times(int profile_id, int times);

@@ -14,6 +14,7 @@
 #include <string.h>
 #include <assert.h>
 #include <pthread.h>
+#include "shaper.h"
 #include "stub.h"
 #include "shaper_maat.h"
 #include "log.h"
@@ -40,6 +41,7 @@ struct stub_token_thread_arg {
 struct stub_avaliable_token {
     int in_limit_bandwidth;
     int out_limit_bandwidth;
+    int bidirection_limit_bandwidth;
 };
 
 struct stub_pkt_queue tx_queue;
@@ -65,14 +67,21 @@ void * stub_get_token_thread_func(void *data)
     return NULL;
 }
 
-void stub_set_token_bucket_avl_per_sec(int profile_id, unsigned int tokens, unsigned char direction)
+void stub_set_token_bucket_avl_per_sec(int profile_id, unsigned int tokens, unsigned char direction, enum shaping_profile_limit_direction limit_direction)
 {
-    if (direction == SHAPING_DIR_IN) {
-        pf_array[profile_id].in_limit_bandwidth = tokens * 8;
-        pf_curr_avl_token[profile_id].in_limit_bandwidth = tokens * 8;
+    pf_array[profile_id].limit_direction = limit_direction;
+
+    if (limit_direction == PROFILE_LIMIT_DIRECTION_BIDIRECTION) {
+        pf_array[profile_id].bidirection_limit_bandwidth = tokens * 8;
+        pf_curr_avl_token[profile_id].bidirection_limit_bandwidth = tokens * 8;
     } else {
-        pf_array[profile_id].out_limit_bandwidth = tokens * 8;
-        pf_curr_avl_token[profile_id].out_limit_bandwidth = tokens * 8;
+        if (direction == SHAPING_DIR_IN) {
+            pf_array[profile_id].in_limit_bandwidth = tokens * 8;
+            pf_curr_avl_token[profile_id].in_limit_bandwidth = tokens * 8;
+        } else {
+            pf_array[profile_id].out_limit_bandwidth = tokens * 8;
+            pf_curr_avl_token[profile_id].out_limit_bandwidth = tokens * 8;
+        }
     }
 
     return;
@@ -80,6 +89,7 @@ void stub_set_token_bucket_avl_per_sec(int profile_id, unsigned int tokens, unsi
 
 void stub_refresh_token_bucket(int profile_id)
 {
+    pf_curr_avl_token[profile_id].bidirection_limit_bandwidth = pf_array[profile_id].bidirection_limit_bandwidth;
     pf_curr_avl_token[profile_id].in_limit_bandwidth = pf_array[profile_id].in_limit_bandwidth;
     pf_curr_avl_token[profile_id].out_limit_bandwidth = pf_array[profile_id].out_limit_bandwidth;
     return;
@@ -191,6 +201,7 @@ void stub_init()
     for (i = 0; i < MAX_STUB_PROFILE_NUM; i++) {
         pf_curr_avl_token[i].in_limit_bandwidth = DEFAULT_AVALIABLE_TOKEN_PER_SEC;
         pf_curr_avl_token[i].out_limit_bandwidth = DEFAULT_AVALIABLE_TOKEN_PER_SEC;
+        pf_curr_avl_token[i].bidirection_limit_bandwidth = DEFAULT_AVALIABLE_TOKEN_PER_SEC;
         pf_array[i].id = i;
         pf_array[i].in_limit_bandwidth = DEFAULT_AVALIABLE_TOKEN_PER_SEC;
         pf_array[i].out_limit_bandwidth = DEFAULT_AVALIABLE_TOKEN_PER_SEC;
@@ -377,7 +388,14 @@ void swarmkv_tconsume(struct swarmkv * db, const char * key, size_t keylen, long
 
     sscanf(key, "tsg-shaping-%d-%15s", &profile_id, direction);
 
-    if (strncmp("incoming", direction, sizeof(direction)) == 0) {
+    if (strncmp("bidirectional", direction, sizeof(direction)) == 0) {
+        if (pf_curr_avl_token[profile_id].bidirection_limit_bandwidth == DEFAULT_AVALIABLE_TOKEN_PER_SEC) {
+            actual_tokens = tokens;
+        } else {
+            actual_tokens = pf_curr_avl_token[profile_id].bidirection_limit_bandwidth >= tokens ? tokens : 0;
+            pf_curr_avl_token[profile_id].bidirection_limit_bandwidth -= actual_tokens;
+        }
+    } else if (strncmp("incoming", direction, sizeof(direction)) == 0) {
         if (pf_curr_avl_token[profile_id].in_limit_bandwidth == DEFAULT_AVALIABLE_TOKEN_PER_SEC) {
             actual_tokens = tokens;
         } else {

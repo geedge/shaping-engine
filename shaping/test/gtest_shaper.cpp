@@ -244,7 +244,7 @@ TEST(single_session, udp_tx_in_order)
     ASSERT_TRUE(sf != NULL);
 
     stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT);
+    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
     shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
 
@@ -302,6 +302,69 @@ TEST(single_session, udp_tx_in_order)
 
 /*session1 match rule1
   rule1:
+      profile: bidirectional limit 1000*/
+TEST(bidirectional, udp_tx_in_order)
+{
+    struct stub_pkt_queue expec_tx_queue;
+    struct stub_pkt_queue *actual_tx_queue;
+    struct shaping_ctx *ctx = NULL;
+    struct shaping_flow *sf = NULL;
+    long long rule_id[] = {0};
+    int priority[] = {1};
+    int profile_num[] = {1};
+    int profile_id[][MAX_REF_PROFILE] = {{0}};
+
+    TAILQ_INIT(&expec_tx_queue);
+    stub_init();
+    ctx = shaping_engine_init();
+    ASSERT_TRUE(ctx != NULL);
+    sf = shaping_flow_new(&ctx->thread_ctx[0]);
+    ASSERT_TRUE(sf != NULL);
+
+    stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
+    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_BIDIRECTION);
+    actual_tx_queue = stub_get_tx_queue();
+    shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
+
+    /*******send packets***********/
+    send_packets(&ctx->thread_ctx[0], sf, 10, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
+    send_packets(&ctx->thread_ctx[0], sf, 10, 100, SHAPING_DIR_IN, &expec_tx_queue, 1, 0);
+    send_packets(&ctx->thread_ctx[0], sf, 10, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
+
+
+    //first 10 out packets
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
+    ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
+
+    stub_refresh_token_bucket(0);
+    for (int i = 0; i < 11; i++) {//first polling just request token and don't send pkt
+        polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
+        stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
+    }
+    //10 out packets
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
+    ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
+
+    stub_refresh_token_bucket(0);
+    for (int i = 0; i < 11; i++) {//first polling just request token and don't send pkt
+        polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
+        stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
+    }
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
+    ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
+    ASSERT_TRUE(TAILQ_EMPTY(&expec_tx_queue));
+
+    shaping_flow_free(&ctx->thread_ctx[0], sf);
+    fieldstat_global_disable_prometheus_endpoint();
+
+    shaper_thread_resource_clear();
+    shaping_engine_destroy(ctx);
+    stub_clear_matched_shaping_rules();
+
+}
+
+/*session1 match rule1
+  rule1:
       profile: limit 1000*/
 TEST(max_min_host_fairness_profile, udp_tx_in_order)
 {
@@ -322,7 +385,7 @@ TEST(max_min_host_fairness_profile, udp_tx_in_order)
     ASSERT_TRUE(sf != NULL);
 
     stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT);
+    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     stub_set_profile_type(0, PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS);
     actual_tx_queue = stub_get_tx_queue();
     shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
@@ -403,7 +466,7 @@ TEST(single_session, tcp_tx_in_order)
     ASSERT_TRUE(sf != NULL);
 
     stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT);
+    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
     shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
 
@@ -489,7 +552,7 @@ TEST(single_session, udp_diff_direction)
     ASSERT_TRUE(sf != NULL);
 
     stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT);
+    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
     shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
 
@@ -568,9 +631,9 @@ TEST(single_session, udp_multi_rules)
     ASSERT_TRUE(sf != NULL);
 
     stub_set_matched_shaping_rules(3, rule_id, priority, profile_num, profile_id);
-    stub_set_token_bucket_avl_per_sec(0, 3000, SHAPING_DIR_OUT);
-    stub_set_token_bucket_avl_per_sec(1, 2000, SHAPING_DIR_OUT);
-    stub_set_token_bucket_avl_per_sec(2, 1000, SHAPING_DIR_OUT);
+    stub_set_token_bucket_avl_per_sec(0, 3000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(1, 2000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(2, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
     shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 3);
 
@@ -648,8 +711,8 @@ TEST(single_session, udp_borrow)
     ASSERT_TRUE(sf != NULL);
 
     stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
-    stub_set_token_bucket_avl_per_sec(1, 0, SHAPING_DIR_OUT);
-    stub_set_token_bucket_avl_per_sec(2, 1000, SHAPING_DIR_OUT);
+    stub_set_token_bucket_avl_per_sec(1, 0, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(2, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
     shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
 
@@ -722,9 +785,9 @@ TEST(single_session, udp_borrow_same_priority_9)
     ASSERT_TRUE(sf != NULL);
 
     stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
-    stub_set_token_bucket_avl_per_sec(1, 0, SHAPING_DIR_OUT);
-    stub_set_token_bucket_avl_per_sec(2, 0, SHAPING_DIR_OUT);
-    stub_set_token_bucket_avl_per_sec(3, 1000, SHAPING_DIR_OUT);
+    stub_set_token_bucket_avl_per_sec(1, 0, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(2, 0, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(3, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
     shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
 
@@ -801,7 +864,7 @@ TEST(single_session_async, udp_close_before_async_exec)
     ASSERT_TRUE(sf != NULL);
 
     stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT);
+    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     stub_set_async_token_get_times(0, 20);
     actual_tx_queue = stub_get_tx_queue();
     shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
@@ -868,8 +931,8 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
 
     stub_set_matched_shaping_rules(2, rule_ids, prioritys, profile_nums, profile_ids);
 
-    stub_set_token_bucket_avl_per_sec(1, 0, SHAPING_DIR_OUT);
-    stub_set_token_bucket_avl_per_sec(2, 1000, SHAPING_DIR_OUT);
+    stub_set_token_bucket_avl_per_sec(1, 0, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(2, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
     shaper_rules_update(&ctx->thread_ctx[0], sf1, rule_id1, 1);
     shaper_rules_update(&ctx->thread_ctx[0], sf2, rule_id2, 1);
@@ -976,7 +1039,7 @@ TEST(two_session_diff_priority_same_profile, two_thread_udp_tx_in_order)
 
     stub_set_matched_shaping_rules(2, rule_ids, prioritys, profile_nums, profile_id);
 
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT);
+    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
     shaper_rules_update(&ctx->thread_ctx[0], sf1, rule_id1, 1);
     shaper_rules_update(&ctx->thread_ctx[1], sf2, rule_id2, 1);
@@ -1062,7 +1125,7 @@ TEST(two_session_diff_priority_same_profile, profile_timer_test)
 
     stub_set_matched_shaping_rules(2, rule_ids, prioritys, profile_nums, profile_id);
 
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT);
+    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
     shaper_rules_update(&ctx->thread_ctx[0], sf1, rule_id1, 1);
     shaper_rules_update(&ctx->thread_ctx[1], sf2, rule_id2, 1);
@@ -1168,8 +1231,8 @@ TEST(two_sessions, priority_non_block)
 
     stub_set_matched_shaping_rules(3, rule_ids, prioritys, profile_nums, profile_id);
 
-    stub_set_token_bucket_avl_per_sec(0, 3000, SHAPING_DIR_OUT);
-    stub_set_token_bucket_avl_per_sec(1, 1000, SHAPING_DIR_OUT);
+    stub_set_token_bucket_avl_per_sec(0, 3000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(1, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
     shaper_rules_update(&ctx->thread_ctx[0], sf1, rule_id1, 2);
     shaper_rules_update(&ctx->thread_ctx[1], sf2, rule_id2, 1);
@@ -1241,8 +1304,8 @@ TEST(two_sessions, borrow_when_primary_profile_priority_blocked)
 
     stub_set_matched_shaping_rules(2, rule_ids, prioritys, profile_nums, profile_id);
 
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT);
-    stub_set_token_bucket_avl_per_sec(1, 1000, SHAPING_DIR_OUT);
+    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(1, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
     shaper_rules_update(&ctx->thread_ctx[0], sf1, rule_id1, 1);
     shaper_rules_update(&ctx->thread_ctx[1], sf2, rule_id2, 1);
@@ -1316,8 +1379,8 @@ TEST(two_sessions, primary_profile_priority_blocked_by_borrow_profile)
 
     stub_set_matched_shaping_rules(2, rule_ids, prioritys, profile_nums, profile_id);
 
-    stub_set_token_bucket_avl_per_sec(0, 0, SHAPING_DIR_OUT);
-    stub_set_token_bucket_avl_per_sec(1, 1000, SHAPING_DIR_OUT);
+    stub_set_token_bucket_avl_per_sec(0, 0, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(1, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
     shaper_rules_update(&ctx->thread_ctx[0], sf1, rule_id1, 1);
     shaper_rules_update(&ctx->thread_ctx[1], sf2, rule_id2, 1);
@@ -1376,7 +1439,7 @@ TEST(statistics, udp_drop_pkt)
     ASSERT_TRUE(sf != NULL);
     
     stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT);
+    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
     shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
 
@@ -1452,7 +1515,7 @@ TEST(statistics, udp_queueing_pkt)
     ASSERT_TRUE(sf != NULL);
 
     stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT);
+    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
     shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
 
