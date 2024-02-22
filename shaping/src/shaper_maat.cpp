@@ -242,6 +242,14 @@ void shaper_profile_ex_new(const char *table_name, int table_id, const char *key
             LOG_ERROR("%s: json parse limit direction failed for profile id %d, line %s", LOG_TAG_MAAT, s_pf->id, table_line);
             goto END;
         }
+
+        if (strncmp(tmp_obj->valuestring, "bidirectional", strlen(tmp_obj->valuestring)) == 0) {
+            s_pf->limit_direction = PROFILE_LIMIT_DIRECTION_BIDIRECTION;
+            s_pf->bidirection_limit_bandwidth = limit_bandwidth;
+            break;//config either bidirectional or incoming/outgoing limit
+        } 
+        
+        s_pf->limit_direction = PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING;
         if (strncmp(tmp_obj->valuestring, "incoming", strlen(tmp_obj->valuestring)) == 0) {
             s_pf->in_limit_bandwidth = limit_bandwidth;
         } else {
@@ -287,6 +295,7 @@ void shaper_profile_update(struct shaping_thread_ctx *ctx, struct shaping_profil
     s_pf_info->type = s_pf_ex->type;
     shaper_profile_hash_node_update(ctx, s_pf_info);
     s_pf_info->hash_node->aqm_type = s_pf_ex->aqm_type;
+    s_pf_info->hash_node->limit_direction = s_pf_ex->limit_direction;
 
     return;
 }

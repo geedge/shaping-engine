@@ -98,6 +98,11 @@ enum shaping_profile_type {
     PROFILE_TYPE_SPLIT_BY_LOCAL_HOST
 };
 
+enum shaping_profile_limit_direction {
+    PROFILE_LIMIT_DIRECTION_BIDIRECTION,
+    PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING,
+};
+
 struct shaper_token_multiple {
     int token_get_multiple;
     unsigned char has_drop_by_queue_full;
@@ -108,8 +113,10 @@ struct shaper_token_multiple {
 struct shaping_profile_hash_node {
     int id;
     enum shaper_aqm_type aqm_type;
+    enum shaping_profile_limit_direction limit_direction;
     long long in_deposit_token_bits[SHAPING_PRIORITY_NUM_MAX];
     long long out_deposit_token_bits[SHAPING_PRIORITY_NUM_MAX];
+    long long bidirection_deposit_token_bits[SHAPING_PRIORITY_NUM_MAX];
     long long last_failed_get_token_ms;
     long long last_hmget_ms;
     long long queue_len[SHAPING_PRIORITY_NUM_MAX];
@@ -132,6 +139,7 @@ struct shaping_profile_info {
     int priority;
     long long in_deposit_token_bits;
     long long out_deposit_token_bits;
+    long long bidirection_deposit_token_bits;
     long long last_failed_get_token_ms;
     unsigned long long enqueue_time_us;//to calculate max latency
     struct shaping_stat_for_profile stat;

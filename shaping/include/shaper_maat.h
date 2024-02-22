@@ -19,8 +19,10 @@ struct shaping_profile {
     int id;
     enum shaping_profile_type type;
     enum shaper_aqm_type aqm_type;
+    enum shaping_profile_limit_direction limit_direction;
     int in_limit_bandwidth;
     int out_limit_bandwidth;
+    int bidirection_limit_bandwidth;
     int valid;
 };
 
