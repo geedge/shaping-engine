@@ -93,6 +93,7 @@ int raw_packet_parser_get_most_outer_address(struct raw_pkt_parser *handler, str
 uint64_t raw_packet_parser_get_hash_value(struct raw_pkt_parser *handler, enum ldbc_method method, int dir_is_internal);
 
 int raw_packet_tcp_payload_len_get(struct raw_pkt_parser *handler);
+void raw_packet_set_dscp(struct ethhdr *eth_hdr, uint8_t dscp);
 
 #ifdef __cpluscplus
 }

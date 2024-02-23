@@ -13,6 +13,8 @@ struct shaping_rule {
     int borrow_pf_id_array[SHAPING_REF_PROFILE_NUM_MAX];
     int borrow_pf_num;
     int fair_factor;
+    unsigned char dscp_enable;
+    unsigned char dscp_value;
 };
 
 struct shaping_profile {

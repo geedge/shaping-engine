@@ -36,6 +36,7 @@ void stub_set_profile_type(int profile_id, enum shaping_profile_type type);
 void stub_set_async_token_get_times(int profile_id, int times);
 
 void stub_set_matched_shaping_rules(int rule_num, long long *rule_id, const int *priority, const int *profile_num, int profile_id[][MAX_REF_PROFILE]);
+void stub_set_shaping_rule_dscp_value(int rule_id, int dscp_value);
 void stub_clear_matched_shaping_rules();
 
 void stub_send_packet(struct stub_packet *packet);

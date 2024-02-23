@@ -142,6 +142,13 @@ void stub_set_matched_shaping_rules(int rule_num, long long *rule_id, const int 
     return;
 }
 
+void stub_set_shaping_rule_dscp_value(int rule_id, int dscp_value)
+{
+    matched_rules.rules[rule_id].dscp_enable = 1;
+    matched_rules.rules[rule_id].dscp_value = dscp_value;
+    return;
+}
+
 void stub_clear_matched_shaping_rules()
 {
     memset(&matched_rules, 0, sizeof(struct stub_matched_rules));

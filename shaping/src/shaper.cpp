@@ -1062,6 +1062,11 @@ void shaping_packet_process(struct shaping_thread_ctx *ctx, marsio_buff_t *rx_bu
     struct shaping_marsio_info *marsio_info = ctx->marsio_info;
 
     sf->processed_pkts++;
+
+    if (sf->dscp_enable) {
+        struct ethhdr *eth_hdr = (struct ethhdr*)marsio_buff_mtod(rx_buff);
+        raw_packet_set_dscp(eth_hdr, sf->dscp_value);
+    }
     
     if (meta->is_tcp_pure_ctrl) {
         shaper_token_consume_force(sf, meta);
