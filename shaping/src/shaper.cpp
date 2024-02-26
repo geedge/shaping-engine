@@ -1048,6 +1048,9 @@ static void shaper_token_consume_force(struct shaping_flow *sf, struct metadata 
 
     for (int i = 0; i < sf->rule_num; i++) {
         rule = &sf->matched_rule_infos[i];
+        if (!rule->is_enabled) {
+            continue;
+        }
         shaper_deposit_token_get(&rule->primary, meta->raw_len * 8, meta->dir, rule->primary.priority, 1);
     }
 
@@ -1281,7 +1284,7 @@ void shaper_packet_recv_and_process(struct shaping_thread_ctx *ctx)
         }
         shaper_global_stat_throughput_rx_inc(&ctx->thread_global_stat, meta.raw_len);
 
-        if (meta.is_ctrl_pkt || !sf) {//ctrl pkt need send directly
+        if (meta.is_ctrl_pkt || !sf || sf->rule_num == 0) {//ctrl pkt need send directly
             marsio_send_burst(ctx->marsio_info->mr_path, ctx->thread_index, &rx_buff[i], 1);
             shaper_global_stat_throughput_tx_inc(&ctx->thread_global_stat, meta.raw_len);
         } else {
