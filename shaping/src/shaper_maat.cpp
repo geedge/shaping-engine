@@ -7,6 +7,7 @@
 #include <MESA/maat.h>
 #include <MESA/MESA_handle_logger.h>
 
+#include "raw_packet.h"
 #include "log.h"
 #include "shaper.h"
 #include "shaper_maat.h"
@@ -36,6 +37,45 @@ struct shaper_maat_config {
     enum log_level log_level;
 };
 
+enum dscp_class
+{
+    DSCP_CLASS_DF = 0,
+    DSCP_CLASS_CS1,
+    DSCP_CLASS_AF13,
+    DSCP_CLASS_AF12,
+    DSCP_CLASS_AF11,
+    DSCP_CLASS_CS2,
+    DSCP_CLASS_AF23,
+    DSCP_CLASS_AF22,
+    DSCP_CLASS_AF21,
+    DSCP_CLASS_CS3,
+    DSCP_CLASS_AF33,
+    DSCP_CLASS_AF32,
+    DSCP_CLASS_AF31,
+    DSCP_CLASS_CS4,
+    DSCP_CLASS_AF43,
+    DSCP_CLASS_AF42,
+    DSCP_CLASS_AF41,
+    DSCP_CLASS_CS5,
+    DSCP_CLASS_EF,
+    DSCP_CLASS_CS6,
+    DSCP_CLASS_CS7,
+    DSCP_CLASS_MAX,
+};
+#define DSCP_VALUE_MAX 64
+                                                    //   0                1               2               3               4               5                6              7              8               9             10
+static int dscp_value_to_priority[DSCP_VALUE_MAX] = {DSCP_CLASS_DF, DSCP_CLASS_MAX, DSCP_CLASS_MAX, DSCP_CLASS_MAX, DSCP_CLASS_MAX, DSCP_CLASS_MAX, DSCP_CLASS_MAX, DSCP_CLASS_MAX, DSCP_CLASS_CS1, DSCP_CLASS_MAX, DSCP_CLASS_AF11,
+                                                     //  11              12              13              14              15              16              17              18              19              20             21
+                                                     DSCP_CLASS_MAX, DSCP_CLASS_AF12, DSCP_CLASS_MAX, DSCP_CLASS_AF13, DSCP_CLASS_MAX, DSCP_CLASS_CS2, DSCP_CLASS_MAX, DSCP_CLASS_AF21, DSCP_CLASS_MAX, DSCP_CLASS_AF22, DSCP_CLASS_MAX,
+                                                     //  22              23              24              25              26              27              28              29              30              31             32
+                                                     DSCP_CLASS_AF23, DSCP_CLASS_MAX, DSCP_CLASS_CS3, DSCP_CLASS_MAX, DSCP_CLASS_AF31, DSCP_CLASS_MAX, DSCP_CLASS_AF32, DSCP_CLASS_MAX, DSCP_CLASS_AF33, DSCP_CLASS_MAX, DSCP_CLASS_CS4,
+                                                     //  33              34              35              36              37              38              39              40              41              42             43
+                                                     DSCP_CLASS_MAX, DSCP_CLASS_AF41, DSCP_CLASS_MAX, DSCP_CLASS_AF42, DSCP_CLASS_MAX, DSCP_CLASS_AF43, DSCP_CLASS_MAX, DSCP_CLASS_CS5, DSCP_CLASS_MAX, DSCP_CLASS_MAX, DSCP_CLASS_MAX,
+                                                     //  44              45              46              47              48              49              50              51              52              53             54
+                                                     DSCP_CLASS_MAX, DSCP_CLASS_MAX, DSCP_CLASS_EF, DSCP_CLASS_MAX, DSCP_CLASS_CS6, DSCP_CLASS_MAX, DSCP_CLASS_MAX, DSCP_CLASS_MAX, DSCP_CLASS_MAX, DSCP_CLASS_MAX, DSCP_CLASS_MAX,
+                                                     //  55              56              57              58              59              60              61              62              63
+                                                     DSCP_CLASS_MAX, DSCP_CLASS_CS7, DSCP_CLASS_MAX, DSCP_CLASS_MAX, DSCP_CLASS_MAX, DSCP_CLASS_MAX, DSCP_CLASS_MAX, DSCP_CLASS_MAX, DSCP_CLASS_MAX};
+
 struct maat *g_maat_instance = NULL;
 
 void shaper_rule_ex_new(const char *table_name, int table_id, const char *key, const char *table_line, void **ad, long argl, void *argp)
@@ -44,6 +84,7 @@ void shaper_rule_ex_new(const char *table_name, int table_id, const char *key, c
     cJSON *json=NULL;
     cJSON *tmp_obj = NULL;
     cJSON *tmp_array_obj = NULL;
+    cJSON *dscp_obj = NULL;
     int array_size;
     char user_region[1024] = {0};
     int i, ret;
@@ -87,6 +128,25 @@ void shaper_rule_ex_new(const char *table_name, int table_id, const char *key, c
     }
     s_rule->fair_factor = tmp_obj->valueint;
 
+    //dscp_marking
+    tmp_obj = cJSON_GetObjectItem(json, "dscp_marking");
+    if (!tmp_obj) {
+        LOG_ERROR("%s: json parse dscp_marking failed for table line %s", LOG_TAG_MAAT, table_line);
+        goto END;
+    }
+    dscp_obj = cJSON_GetObjectItem(tmp_obj, "enabled");
+    if (dscp_obj && dscp_obj->valueint == 1) {
+        dscp_obj = cJSON_GetObjectItem(tmp_obj, "dscp_value");
+        if (dscp_obj && dscp_obj->valueint < DSCP_VALUE_MAX && dscp_value_to_priority[dscp_obj->valueint] != DSCP_CLASS_MAX) {
+            s_rule->dscp_enable = 1;
+            s_rule->dscp_value = dscp_obj->valueint;
+        } else {
+            LOG_ERROR("%s: json parse dscp_value wrong for table line %s", LOG_TAG_MAAT, table_line);
+            goto END;
+        }
+    }
+
+    //profile_chain
     tmp_obj = cJSON_GetObjectItem(json, "profile_chain");
     if (!tmp_obj) {//required
         LOG_ERROR("%s: json parse profile_chain failed for table line %s", LOG_TAG_MAAT, table_line);
@@ -149,7 +209,6 @@ void shaper_profile_ex_new(const char *table_name, int table_id, const char *key
     char type_arg[64] = {0};
     char limits[128] = {0};
     char aqm_options[64] = {0};
-    char dscp_marking[64] = {0};
     char volume_based_shaping[64] = {0};
     int limit_bandwidth;
     int array_size, i;
@@ -161,9 +220,9 @@ void shaper_profile_ex_new(const char *table_name, int table_id, const char *key
 
     s_pf = (struct shaping_profile*)calloc(1, sizeof(struct shaping_profile));
 
-    ret = sscanf(table_line, "%d\t%63s\t%63s\t%127s\t%63s\t%63s\t%63s\t%d",
-            &s_pf->id, profile_type, type_arg, limits, aqm_options, dscp_marking, volume_based_shaping, &s_pf->valid);
-    if (ret != 8) {
+    ret = sscanf(table_line, "%d\t%63s\t%63s\t%127s\t%63s\t%63s\t%d",
+            &s_pf->id, profile_type, type_arg, limits, aqm_options, volume_based_shaping, &s_pf->valid);
+    if (ret != 7) {
         LOG_ERROR("%s: sscanf parse failed for profile line %s", LOG_TAG_MAAT, table_line);
         goto END;
     }
@@ -329,6 +388,13 @@ static int shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_flo
         if (sf->priority > s_rule->priority) {
             sf->priority = s_rule->priority;
             *priority_changed = 1;
+        }
+    }
+
+    if (s_rule->dscp_enable) {
+        sf->dscp_enable = 1;
+        if (dscp_value_to_priority[s_rule->dscp_value] > dscp_value_to_priority[sf->dscp_value]) {
+            sf->dscp_value = s_rule->dscp_value;
         }
     }
 

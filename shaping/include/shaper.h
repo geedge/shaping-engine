@@ -188,6 +188,8 @@ struct shaping_flow {
     int rule_num;
     struct shaping_rule_info matched_rule_infos[SHAPING_RULE_NUM_MAX];
     int priority;
+    unsigned char dscp_enable;
+    unsigned char dscp_value;
     struct addr_tuple4 tuple4;
     int anchor;//rule_idx
     int ref_cnt;

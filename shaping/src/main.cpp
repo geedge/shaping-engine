@@ -84,7 +84,7 @@ int main(int argc, char **argv)
 
     if (signal(SIGQUIT, sig_handler) == SIG_ERR || signal(SIGTERM, sig_handler) == SIG_ERR)
     {
-        LOG_ERROR("%s: unable to register SIGQUIT signal handler, error %d: %s", LOG_TAG_SHAPING, errno, strerror(errno));
+        LOG_ERROR("%s: unable to register SIGQUIT or SIGTERM signal handler, error %d: %s", LOG_TAG_SHAPING, errno, strerror(errno));
         LOG_CLOSE();
         return -1;
     }

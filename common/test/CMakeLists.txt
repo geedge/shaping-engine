@@ -20,7 +20,7 @@ target_link_libraries(gtest_session_table common pthread gtest)
 
 add_executable(gtest_raw_packet gtest_raw_packet.cpp)
 target_include_directories(gtest_raw_packet PUBLIC ${CMAKE_SOURCE_DIR}/common/include)
-target_link_libraries(gtest_raw_packet common pthread gtest)
+target_link_libraries(gtest_raw_packet common pthread pcap gtest)
 
 ###############################################################################
 # gtest_ctrl_packet

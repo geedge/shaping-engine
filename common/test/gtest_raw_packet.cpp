@@ -1,5 +1,10 @@
+#include <cstdint>
 #include <gtest/gtest.h>
 #include <arpa/inet.h>
+#include <linux/if_ether.h>
+#include <pcap/pcap.h>
+#include <netinet/ip.h>
+#include <netinet/ip6.h>
 
 #include "raw_packet.h"
 #include "addr_tuple4.h"
@@ -1364,6 +1369,54 @@ TEST(RAW_PACKET, GET_HASH_VALUE)
 
 	EXPECT_TRUE(raw_packet_parser_get_hash_value(&handler, LDBC_METHOD_HASH_INT_IP_AND_EXT_IP, 1) == raw_packet_parser_get_hash_value(&handler, LDBC_METHOD_HASH_INT_IP_AND_EXT_IP, 0));
 	EXPECT_TRUE(raw_packet_parser_get_hash_value(&handler, LDBC_METHOD_HASH_INNERMOST_INT_IP, 1) == raw_packet_parser_get_hash_value(&handler, LDBC_METHOD_HASH_INNERMOST_EXT_IP, 0));
+}
+
+TEST(RAW_PACKET, SET_IPV4_DSCP_VALUE)
+{
+	char error[100];
+	pcap_t *handle = pcap_open_offline("../../../common/test/pcap/ipv4_single_pkt.pcap", error);
+	ASSERT_NE(handle, nullptr);
+
+	struct pcap_pkthdr *header;
+	const u_char *packet;
+	int ret = pcap_next_ex(handle, &header, &packet);
+	ASSERT_EQ(ret, 1);
+
+	struct ethhdr *eth = (struct ethhdr *)packet;
+	struct iphdr *ip = (struct iphdr *)(eth + 1);
+
+	unsigned char dscp_value = ip->tos >> 2;
+	EXPECT_EQ(dscp_value, 0);
+
+	raw_packet_set_dscp(eth, 40);//40 is CS5
+	dscp_value = ip->tos >> 2;
+	EXPECT_EQ(dscp_value, 40);
+	pcap_close(handle);
+}
+
+TEST(RAW_PACKET, SET_IPV6_DSCP_VALUE)
+{
+	char error[100];
+	pcap_t *handle = pcap_open_offline("../../../common/test/pcap/ipv6_single_pkt.pcap", error);
+	ASSERT_NE(handle, nullptr);
+
+	struct pcap_pkthdr *header;
+	const u_char *packet;
+	int ret = pcap_next_ex(handle, &header, &packet);
+	ASSERT_EQ(ret, 1);
+
+	struct ethhdr *eth = (struct ethhdr *)packet;
+	struct ip6_hdr *ip = (struct ip6_hdr *)(eth + 1);
+
+	uint32_t flow_label = ntohl(ip->ip6_flow);
+	unsigned char dscp_value = (flow_label & 0x0fc00000) >> 22;
+	EXPECT_EQ(dscp_value, 0);
+
+	raw_packet_set_dscp(eth, 40);//40 is CS5
+	flow_label = ntohl(ip->ip6_flow);
+	dscp_value = (flow_label & 0x0fc00000) >> 22;
+	EXPECT_EQ(dscp_value, 40);
+	pcap_close(handle);
 }
 
 int main(int argc, char **argv)
