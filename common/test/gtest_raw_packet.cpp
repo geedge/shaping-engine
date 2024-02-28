@@ -1391,6 +1391,9 @@ TEST(RAW_PACKET, SET_IPV4_DSCP_VALUE)
 	raw_packet_set_dscp(eth, 40);//40 is CS5
 	dscp_value = ip->tos >> 2;
 	EXPECT_EQ(dscp_value, 40);
+
+	EXPECT_EQ(htons(ip->check), 0x7fb3);
+
 	pcap_close(handle);
 }
 

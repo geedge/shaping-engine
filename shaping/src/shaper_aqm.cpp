@@ -1,10 +1,11 @@
 #include <math.h>
 #include <time.h>
+#include "log.h"
 #include "shaper.h"
 #include "shaper_aqm.h"
 
 thread_local unsigned int seed = 0;
-int shaper_aqm_blue_need_drop(struct shaper_aqm_blue_para *para, int curr_queue_len)
+int shaper_aqm_blue_need_drop(int profile_id, struct shaper_aqm_blue_para *para, int curr_queue_len)
 {
     time_t curr_time;
 
@@ -15,6 +16,8 @@ int shaper_aqm_blue_need_drop(struct shaper_aqm_blue_para *para, int curr_queue_
         } else if (curr_queue_len == 0) {
             para->probability = (para->probability - BLUE_DECREMENT) >= 0 ? (para->probability - BLUE_DECREMENT) : 0;
         }
+
+        LOG_INFO("%s: profile id: %d blue probability update to %d", LOG_TAG_SHAPING, profile_id, para->probability);
     }
 
     if (rand_r(&seed) % BLUE_PROBABILITY_MAX < para->probability) {
@@ -24,10 +27,14 @@ int shaper_aqm_blue_need_drop(struct shaper_aqm_blue_para *para, int curr_queue_
     return 0;
 }
 
-int shaper_aqm_codel_need_drop(struct shaper_aqm_codel_para *para, unsigned long long curr_time_ms, unsigned long long latency_ms)
+int shaper_aqm_codel_need_drop(int profile_id, struct shaper_aqm_codel_para *para, unsigned long long curr_time_ms, unsigned long long latency_ms)
 {
     if (latency_ms < CODEL_MAX_LATENCY) {
-        para->state = CODEL_STATE_NORMAL;
+        if (para->state != CODEL_STATE_NORMAL) {
+            para->state = CODEL_STATE_NORMAL;
+            LOG_INFO("%s: profile id: %d codel enter state CODEL_STATE_NORMAL", LOG_TAG_SHAPING, profile_id);
+        }
+        
         return 0;
     } 
 
@@ -36,6 +43,7 @@ int shaper_aqm_codel_need_drop(struct shaper_aqm_codel_para *para, unsigned long
         case CODEL_STATE_NORMAL:
             para->start_drop_time_ms = curr_time_ms + CODEL_DROP_INTERVAL;
             para->state = CODEL_STATE_DROPPING_TIMER;
+            LOG_INFO("%s: profile id: %d codel enter state CODEL_STATE_DROPPING_TIMER", LOG_TAG_SHAPING, profile_id);
             break;
         case CODEL_STATE_DROPPING_TIMER:
             if (curr_time_ms >= para->start_drop_time_ms) {
@@ -43,6 +51,7 @@ int shaper_aqm_codel_need_drop(struct shaper_aqm_codel_para *para, unsigned long
                 para->drop_count = 1;
                 para->next_drop_time_ms = curr_time_ms + CODEL_DROP_INTERVAL / sqrt(para->drop_count);
                 ret = 1;
+                LOG_INFO("%s: profile id: %d codel enter state CODEL_STATE_DROPPING_PHASE", LOG_TAG_SHAPING, profile_id);
             }
             break;
         case CODEL_STATE_DROPPING_PHASE:
@@ -102,11 +111,11 @@ int shaper_aqm_need_drop(struct shaping_profile_info *profile, struct shaping_pa
     
     switch (profile->hash_node->aqm_type) {
         case AQM_TYPE_BLUE:
-            ret = shaper_aqm_blue_need_drop(&profile->hash_node->aqm_blue_para, profile->hash_node->queue_len[profile->priority]);
+            ret = shaper_aqm_blue_need_drop(profile->id, &profile->hash_node->aqm_blue_para, profile->hash_node->queue_len[profile->priority]);
             break;
         case AQM_TYPE_CODEL:
             curr_time_ms = curr_time->tv_sec * MILLI_SECONDS_PER_SEC + curr_time->tv_nsec / NANO_SECONDS_PER_MILLI_SEC;
-            ret = shaper_aqm_codel_need_drop(&profile->hash_node->aqm_codel_para, curr_time_ms, latency_us / 1000);
+            ret = shaper_aqm_codel_need_drop(profile->id, &profile->hash_node->aqm_codel_para, curr_time_ms, latency_us / 1000);
             break;
         default:
             break;

@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <linux/if_ether.h>
+#include <netinet/in.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -1059,30 +1060,29 @@ static const void *parse_mpls(struct raw_pkt_parser *handler, const void *data, 
     }
 }
 
-static unsigned short ip_checksum(struct iphdr *iph) {
-    // 初始化检验和为0
-    unsigned short checksum = 0;
-    // 将IP头的指针转换为无符号短整型的指针
-    unsigned short *p = (unsigned short *)iph;
-    // 计算IP头的长度，单位为字节
-    int len = iph->ihl * 4;
-    // 逐个累加IP头的每个16位字段
-    while (len > 1) {
-        checksum += *p++;
-        len -= 2;
+static unsigned short ip_header_checksum_calculate(struct iphdr *iph)
+{
+    unsigned short *buffer = (unsigned short *)iph;
+    unsigned int length = iph->ihl * 4;
+    unsigned int sum = 0;
+
+    while (length > 1)
+    {
+        sum += *buffer++;
+        length -= 2;
     }
-    // 如果IP头的长度为奇数，将最后一个字节视为高8位，低8位补0，再累加
-    if (len == 1) {
-        checksum += *(unsigned char *)p << 8;
+
+    if (length > 0)
+    {
+        sum += ((*buffer) & htons(0xFF00));
     }
-    // 将检验和的高16位和低16位相加，直到没有进位
-    while (checksum >> 16) {
-        checksum = (checksum & 0xFFFF) + (checksum >> 16);
+
+    while (sum >> 16)
+    {
+        sum = (sum & 0xFFFF) + (sum >> 16);
     }
-    // 将检验和取反
-    checksum = ~checksum;
-    // 返回检验和
-    return checksum;
+
+    return ~sum;
 }
 
 void raw_packet_set_dscp(struct ethhdr *eth_hdr, uint8_t dscp)
@@ -1092,7 +1092,8 @@ void raw_packet_set_dscp(struct ethhdr *eth_hdr, uint8_t dscp)
         struct iphdr *ip_hdr = (struct iphdr *)(eth_hdr + 1);
         ip_hdr->tos = (ip_hdr->tos & 0x03) | (dscp << 2);
         //recalculate checksum
-        ip_hdr->check = ip_checksum(ip_hdr);
+        ip_hdr->check = 0;
+        ip_hdr->check = ip_header_checksum_calculate(ip_hdr);
     } 
     else if (eth_hdr->h_proto == htons(ETH_P_IPV6))
     {
