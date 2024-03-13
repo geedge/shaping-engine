@@ -32,7 +32,7 @@ int shaper_aqm_codel_need_drop(int profile_id, struct shaper_aqm_codel_para *par
     if (latency_ms < CODEL_MAX_LATENCY) {
         if (para->state != CODEL_STATE_NORMAL) {
             para->state = CODEL_STATE_NORMAL;
-            LOG_INFO("%s: profile id: %d codel enter state CODEL_STATE_NORMAL", LOG_TAG_SHAPING, profile_id);
+            LOG_INFO("%s: profile id: %d codel enter state CODEL_STATE_NORMAL, last DROPPING_PHASE drop count %d", LOG_TAG_SHAPING, profile_id, para->drop_count);
         }
         
         return 0;

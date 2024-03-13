@@ -341,10 +341,11 @@ static void shaper_flow_specific_borrow_priority_pop(struct shaping_thread_ctx *
     assert(pkt_wrapper != NULL);
 
     for (int i = 0; i < s_rule_info->borrowing_num; i++) {
-        priority = s_rule_info->borrowing[i].priority;
-        if (avl_node_in_tree(s_node->avl_node[priority])) {
-            avl_tree_node_remove(sp->priority_trees[priority], s_node->avl_node[priority]);
-            shaper_stat_queueing_pkt_dec(&s_rule_info->borrowing[i].stat, pkt_wrapper->direction, ctx->thread_index);
+        if (priority == s_rule_info->borrowing[i].priority) {
+            if (avl_node_in_tree(s_node->avl_node[priority])) {
+                avl_tree_node_remove(sp->priority_trees[priority], s_node->avl_node[priority]);
+                shaper_stat_queueing_pkt_dec(&s_rule_info->borrowing[i].stat, pkt_wrapper->direction, ctx->thread_index);
+            }
         }
     }
 
