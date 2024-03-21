@@ -817,17 +817,16 @@ static const void *parse_udp(struct raw_pkt_parser *handler, const void *data, s
     size_t data_next_length = length - hdr_len;
 
     //LOG_DEBUG("%s: pkt_trace_id: %lu, this_layer: %s, payload_len: [%lu/%lu]", LOG_TAG_RAWPKT, handler->pkt_trace_id, layer_type2str(this_type), data_next_length, length);
-    switch (ntohs(hdr->uh_dport))
-    {
-    // VXLAN_DPORT
-    case 4789:
-        // TESTED
+    if (ntohs(hdr->uh_dport) == 4789)
+    {// VXLAN_DPORT
         return parse_vxlan(handler, data_next_layer, data_next_length, LAYER_TYPE_G_VXLAN);
-    // GTP1U_PORT
-    case 2152:
-        // TESTED
+    }
+    else if (ntohs(hdr->uh_dport) == 2152 || ntohs(hdr->uh_sport) == 2152)
+    {// GTP1U_PORT
         return parse_gtpv1_u(handler, data_next_layer, data_next_length, LAYER_TYPE_GTPV1_U);
-    default:
+    }
+    else
+    {
         return data_next_layer;
     }
 }

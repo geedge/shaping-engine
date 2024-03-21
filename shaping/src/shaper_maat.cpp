@@ -352,18 +352,31 @@ void shaper_profile_update(struct shaping_thread_ctx *ctx, struct shaping_profil
 {
     s_pf_info->id = s_pf_ex->id;
     s_pf_info->type = s_pf_ex->type;
-    shaper_profile_hash_node_update(ctx, s_pf_info);
+    shaper_profile_hash_node_set(ctx, s_pf_info);
     s_pf_info->hash_node->aqm_type = s_pf_ex->aqm_type;
     s_pf_info->hash_node->limit_direction = s_pf_ex->limit_direction;
 
     return;
 }
 
+struct shaping_profile *shaper_maat_profile_get(struct shaping_thread_ctx *ctx, int profile_id)
+{
+    struct shaping_profile *s_pf = NULL;
+    char pf_id_key[8] = {0};
+
+    snprintf(pf_id_key, sizeof(pf_id_key), "%d", profile_id);
+    s_pf = (struct shaping_profile *)maat_plugin_table_get_ex_data(g_maat_instance, ctx->maat_info->profile_table_id, pf_id_key, strlen(pf_id_key));
+    if (!s_pf) {
+        LOG_ERROR("%s maat_plugin_table_get_ex_data get profile failed for key %s", LOG_TAG_MAAT, pf_id_key);
+    }
+
+    return s_pf;
+}
+
 static int shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, struct shaping_rule_info *s_rule_info, long long rule_compile_id, int *priority_changed)
 {
     struct shaping_rule *s_rule = NULL;
     struct shaping_profile *s_pf = NULL;
-    char pf_id_key[8] = {0};
 
     s_rule = (struct shaping_rule*)maat_plugin_table_get_ex_data(g_maat_instance, ctx->maat_info->rule_table_id, (char *)&rule_compile_id, sizeof(rule_compile_id));
     if (!s_rule) {
@@ -376,10 +389,8 @@ static int shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_flo
 
     s_rule_info->is_enabled = 1;
 
-    snprintf(pf_id_key, sizeof(pf_id_key), "%d", s_rule->primary_pf_id);
-    s_pf = (struct shaping_profile *)maat_plugin_table_get_ex_data(g_maat_instance, ctx->maat_info->profile_table_id, pf_id_key, strlen(pf_id_key));
+    s_pf = shaper_maat_profile_get(ctx, s_rule->primary_pf_id);
     if (!s_pf) {
-        LOG_ERROR("%s maat_plugin_table_get_ex_data get profile failed for key %s", LOG_TAG_MAAT, pf_id_key);
         return -1;
     }
     shaper_profile_update(ctx, &s_rule_info->primary, s_pf);
@@ -403,11 +414,8 @@ static int shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_flo
     }
 
     for (int i = 0; i < s_rule->borrow_pf_num; i++) {
-        memset(pf_id_key, 0, sizeof(pf_id_key));
-        snprintf(pf_id_key, sizeof(pf_id_key), "%d", s_rule->borrow_pf_id_array[i]);
-        s_pf = (struct shaping_profile *)maat_plugin_table_get_ex_data(g_maat_instance, ctx->maat_info->profile_table_id, pf_id_key, strlen(pf_id_key));
+        s_pf = shaper_maat_profile_get(ctx, s_rule->borrow_pf_id_array[i]);
         if (!s_pf) {
-            LOG_ERROR("%s maat_plugin_table_get_ex_data get profile failed for key %s", LOG_TAG_MAAT, pf_id_key);
             return -1;
         }
 

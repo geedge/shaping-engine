@@ -30,6 +30,8 @@ extern "C" {
 #define HMGET_REQUEST_INTERVAL_MS 10
 #define PRIORITY_BLOCK_MIN_TIME_MS 500
 
+#define PROFILE_HASH_NODE_REFRESH_SEC 5
+
 #define SWARMKV_QUEUE_LEN_GET_CMD "HMGET tsg-shaping-%d priority-0 priority-1 priority-2 priority-3 priority-4 priority-5 priority-6 priority-7 priority-8 priority-9"
 
 struct shaper {//trees in one thread
@@ -563,6 +565,23 @@ static int shaper_deposit_token_get(struct shaping_profile_info *profile, int re
     return -1;
 }
 
+static void shaper_profile_hash_node_refresh(struct shaping_thread_ctx *ctx, struct shaping_profile_hash_node *pf_hash_node)
+{
+    time_t curr_time_s = time(NULL);
+    if (curr_time_s - pf_hash_node->last_refresh_time_s < PROFILE_HASH_NODE_REFRESH_SEC) {
+        return;
+    }
+
+    struct shaping_profile *profile = shaper_maat_profile_get(ctx, pf_hash_node->id);
+    if (profile) {
+        pf_hash_node->limit_direction = profile->limit_direction;
+        pf_hash_node->aqm_type = profile->aqm_type;
+    }
+    pf_hash_node->last_refresh_time_s = curr_time_s;
+
+    return;
+}
+
 static void shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, struct shaping_profile_info *pf_info, int profile_type, int req_token_bits, unsigned char direction, struct timespec *curr_timespec)
 {
     struct shaping_tconsume_cb_arg *arg = NULL;
@@ -572,6 +591,8 @@ static void shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct
     if (pf_hash_node->tconsume_ref_cnt > 0) {
         return;
     }
+
+    shaper_profile_hash_node_refresh(ctx, pf_hash_node);
     
     if (pf_hash_node->limit_direction == PROFILE_LIMIT_DIRECTION_BIDIRECTION) {
         snprintf(key, sizeof(key), "tsg-shaping-%d-bidirectional", pf_info->id);
@@ -708,7 +729,7 @@ END:
     }
 }
 
-void shaper_profile_hash_node_update(struct shaping_thread_ctx *ctx, struct shaping_profile_info *profile)
+void shaper_profile_hash_node_set(struct shaping_thread_ctx *ctx, struct shaping_profile_info *profile)
 {
     if (profile->hash_node == NULL) {
         struct shaping_profile_hash_node *hash_node = NULL;
