@@ -37,6 +37,8 @@ void shaper_profile_ex_free(int table_id, void **ad, long argl, void *argp);
 
 int shaper_rule_is_enabled(struct shaping_thread_ctx *ctx, long long rule_id);
 
+struct shaping_profile *shaper_maat_profile_get(struct shaping_thread_ctx *ctx, int profile_id);
+
 void shaper_rules_update(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, long long *rule_compile_ids, int rule_num);
 struct shaping_maat_info* shaper_maat_init(const char *instance_name);
 void shaper_maat_destroy(struct shaping_maat_info *maat_info);
