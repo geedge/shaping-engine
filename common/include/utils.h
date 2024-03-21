@@ -7,6 +7,7 @@ extern "C"
 #endif
 
 #define MIN(a, b) ((a) > (b) ? (b) : (a))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 #ifndef container_of
 #define container_of(ptr, type, member) ({			 \
