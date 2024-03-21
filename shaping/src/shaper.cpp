@@ -32,6 +32,9 @@ extern "C" {
 
 #define PROFILE_HASH_NODE_REFRESH_SEC 5
 
+#define SWARMKV_CALLER_LOOP_DIVISOR_MIN 1
+#define SWARMKV_CALLER_LOOP_DIVISOR_MAX 10
+
 #define SWARMKV_QUEUE_LEN_GET_CMD "HMGET tsg-shaping-%d priority-0 priority-1 priority-2 priority-3 priority-4 priority-5 priority-6 priority-7 priority-8 priority-9"
 
 struct shaper {//trees in one thread
@@ -55,6 +58,7 @@ enum shaper_token_get_result {
 };
 
 thread_local struct shaping_profile_hash_node *thread_sp_hashtbl = NULL;
+thread_local static int thread_swarmkv_cb_cnt = 0;
 
 struct shaper* shaper_new(unsigned int priority_queue_len_max)
 {
@@ -459,6 +463,8 @@ static void shaper_token_get_cb(const struct swarmkv_reply *reply, void * cb_arg
     struct timespec curr_time;
     long long curr_time_us;
 
+    thread_swarmkv_cb_cnt++;
+
     clock_gettime(CLOCK_MONOTONIC, &curr_time);
     curr_time_us = curr_time.tv_sec * MICRO_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MICRO_SEC;
     shaper_global_stat_swarmkv_latency_update(ctx->ref_ctx->global_stat, curr_time_us - arg->start_time_us);
@@ -645,6 +651,8 @@ static void shaper_queue_len_get_cb(const struct swarmkv_reply *reply, void * cb
     struct timespec curr_time;
     long long curr_time_us;
     long long curr_time_ms;
+
+    thread_swarmkv_cb_cnt++;
 
     clock_gettime(CLOCK_MONOTONIC, &curr_time);
     curr_time_us = curr_time.tv_sec * MICRO_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MICRO_SEC;
@@ -1168,7 +1176,19 @@ END:
 
 void polling_entry(struct shaper *sp, struct shaping_stat *stat, struct shaping_thread_ctx *ctx)
 {
-    swarmkv_caller_loop(ctx->swarmkv_db, SWARMKV_LOOP_NONBLOCK, NULL);
+    static int swarmkv_caller_loop_divisor = SWARMKV_CALLER_LOOP_DIVISOR_MIN;
+    static unsigned int polling_cnt = 0;
+
+    polling_cnt++;
+    if (polling_cnt % swarmkv_caller_loop_divisor == 0) {
+        swarmkv_caller_loop(ctx->swarmkv_db, SWARMKV_LOOP_NONBLOCK, NULL);
+        if (thread_swarmkv_cb_cnt > 0) {
+            swarmkv_caller_loop_divisor = MAX(swarmkv_caller_loop_divisor - 1, SWARMKV_CALLER_LOOP_DIVISOR_MIN);
+        } else {
+            swarmkv_caller_loop_divisor = MIN(swarmkv_caller_loop_divisor + 1, SWARMKV_CALLER_LOOP_DIVISOR_MAX);
+        }
+        thread_swarmkv_cb_cnt = 0;
+    }
 
     struct shaping_profile_hash_node *hash_node = NULL;
     time_t curr_time = time(NULL);
