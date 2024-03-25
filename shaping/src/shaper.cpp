@@ -1176,8 +1176,8 @@ END:
 
 void polling_entry(struct shaper *sp, struct shaping_stat *stat, struct shaping_thread_ctx *ctx)
 {
-    static int swarmkv_caller_loop_divisor = SWARMKV_CALLER_LOOP_DIVISOR_MIN;
-    static unsigned int polling_cnt = 0;
+    static thread_local int swarmkv_caller_loop_divisor = SWARMKV_CALLER_LOOP_DIVISOR_MIN;
+    static thread_local unsigned int polling_cnt = 0;
 
     polling_cnt++;
     if (polling_cnt % swarmkv_caller_loop_divisor == 0) {
