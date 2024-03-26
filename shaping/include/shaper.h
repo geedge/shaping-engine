@@ -228,6 +228,7 @@ struct shaping_hincrby_cb_arg {
     long long queue_len;
     int profile_id;
     int priority;
+    int retry_cnt;
 };
 
 struct shaper;//instance of shaping, thread unsafe

@@ -15,6 +15,7 @@
 #define SHAPER_STAT_ROW_NAME "traffic_shaping_rule_hits"
 
 #define SHAPER_STAT_REFRESH_TIME_US 10000  //10 ms
+#define HINCRBY_RETRY_MAX 5
 
 struct shaper_stat_conf {
     int enable_backgroud_thread;
@@ -150,6 +151,12 @@ static void shaper_stat_swarmkv_hincrby_cb(const struct swarmkv_reply *reply, vo
     if (reply->type != SWARMKV_REPLY_INTEGER) {
         shaper_global_stat_async_hincrby_failed_inc(&ctx->thread_global_stat);
 
+        if (arg->retry_cnt >= HINCRBY_RETRY_MAX) {
+            LOG_ERROR("%s: shaping stat hincrby failed after retry %d times for profile id %d priority %d, operate queue_len %lld", LOG_TAG_STAT, arg->retry_cnt, arg->profile_id, arg->priority, arg->queue_len);
+            goto END;
+        }
+
+        arg->retry_cnt++;
         arg->start_time_us = curr_time_us;
         shaper_global_stat_async_invoke_inc(&ctx->thread_global_stat);//hincrby failed, retry
         shaper_global_stat_hincrby_invoke_inc(&ctx->thread_global_stat);
@@ -160,8 +167,8 @@ static void shaper_stat_swarmkv_hincrby_cb(const struct swarmkv_reply *reply, vo
         return;
     }
 
+END:
     free(cb_arg);
-
     return;
 }
 
