@@ -257,26 +257,23 @@ void shaper_profile_ex_new(const char *table_name, int table_id, const char *key
         goto END;
     }
 
-    tmp_obj = cJSON_GetObjectItem(json, "enabled");
+    
+    tmp_obj = cJSON_GetObjectItem(json, "algorithm");
     if (!tmp_obj) {
-        LOG_ERROR("%s: json parse aqm enabled failed for profile id %d, line %s", LOG_TAG_MAAT, s_pf->id, table_line);
+        LOG_ERROR("%s: json parse algorithm failed for profile id %d, line %s", LOG_TAG_MAAT, s_pf->id, table_line);
         goto END;
     }
-    if (tmp_obj->valueint == 1) {
-        tmp_obj = cJSON_GetObjectItem(json, "algorithm");
-        if (!tmp_obj) {
-            LOG_ERROR("%s: json parse algorithm failed for profile id %d, line %s", LOG_TAG_MAAT, s_pf->id, table_line);
-            goto END;
-        }
-        if (strncmp(tmp_obj->valuestring, "blue", strlen(tmp_obj->valuestring)) == 0) {
-            s_pf->aqm_type = AQM_TYPE_BLUE;
-        } else if (strncmp(tmp_obj->valuestring, "codel", strlen(tmp_obj->valuestring)) == 0) {
-            s_pf->aqm_type = AQM_TYPE_CODEL;
-        } else {
-            LOG_ERROR("%s: json parse aqm type wrong for profile id %d, line %s", LOG_TAG_MAAT, s_pf->id, table_line);
-            goto END;
-        }
+    if (strncmp(tmp_obj->valuestring, "none", strlen(tmp_obj->valuestring)) == 0) {
+        s_pf->aqm_type = AQM_TYPE_NONE;
+    } else if (strncmp(tmp_obj->valuestring, "blue", strlen(tmp_obj->valuestring)) == 0) {
+        s_pf->aqm_type = AQM_TYPE_BLUE;
+    } else if (strncmp(tmp_obj->valuestring, "codel", strlen(tmp_obj->valuestring)) == 0) {
+        s_pf->aqm_type = AQM_TYPE_CODEL;
+    } else {
+        LOG_ERROR("%s: json parse aqm type wrong for profile id %d, line %s", LOG_TAG_MAAT, s_pf->id, table_line);
+        goto END;
     }
+
     cJSON_Delete(json);
     
     //parse limits of profile
