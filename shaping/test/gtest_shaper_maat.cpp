@@ -44,7 +44,7 @@ TEST(shaping_profile, parse)
                         fair_share\t\
                         max_min_host_fairness\t\
                         [{\"direction\":\"incoming\",\"bandwidth\":1024},{\"direction\":\"outgoing\",\"bandwidth\":2048}]\t\
-                        {\"enabled\":1,\"algorithm\":\"codel\"}\t\
+                        {\"algorithm\":\"codel\"}\t\
                         {}\t\
                         1";
     struct shaping_profile *s_pf = NULL;
