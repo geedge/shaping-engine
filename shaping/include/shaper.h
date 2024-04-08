@@ -125,7 +125,7 @@ struct shaping_profile_hash_node {
     long long priority_blocked_time_ms[SHAPING_PRIORITY_NUM_MAX];
     int hmget_ref_cnt;
     int tconsume_ref_cnt;
-    time_t last_refresh_time_s;
+    unsigned long long last_refresh_time_ms;
     struct shaper_token_multiple token_multiple;
     struct shaper_aqm_blue_para aqm_blue_para;
     struct shaper_aqm_codel_para aqm_codel_para;
