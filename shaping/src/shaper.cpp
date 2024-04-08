@@ -30,7 +30,7 @@ extern "C" {
 #define HMGET_REQUEST_INTERVAL_MS 10
 #define PRIORITY_BLOCK_MIN_TIME_MS 500
 
-#define PROFILE_HASH_NODE_REFRESH_SEC 5
+#define PROFILE_HASH_NODE_REFRESH_MS 500
 
 #define SWARMKV_CALLER_LOOP_DIVISOR_MIN 1
 #define SWARMKV_CALLER_LOOP_DIVISOR_MAX 10
@@ -571,10 +571,11 @@ static int shaper_deposit_token_get(struct shaping_profile_info *profile, int re
     return -1;
 }
 
-static void shaper_profile_hash_node_refresh(struct shaping_thread_ctx *ctx, struct shaping_profile_hash_node *pf_hash_node)
+static void shaper_profile_hash_node_refresh(struct shaping_thread_ctx *ctx, struct shaping_profile_hash_node *pf_hash_node, struct timespec *curr_timespec)
 {
-    time_t curr_time_s = time(NULL);
-    if (curr_time_s - pf_hash_node->last_refresh_time_s < PROFILE_HASH_NODE_REFRESH_SEC) {
+    unsigned long long curr_time_ms = curr_timespec->tv_sec * MILLI_SECONDS_PER_SEC + curr_timespec->tv_nsec / NANO_SECONDS_PER_MILLI_SEC;
+
+    if (curr_time_ms - pf_hash_node->last_refresh_time_ms < PROFILE_HASH_NODE_REFRESH_MS) {
         return;
     }
 
@@ -583,7 +584,7 @@ static void shaper_profile_hash_node_refresh(struct shaping_thread_ctx *ctx, str
         pf_hash_node->limit_direction = profile->limit_direction;
         pf_hash_node->aqm_type = profile->aqm_type;
     }
-    pf_hash_node->last_refresh_time_s = curr_time_s;
+    pf_hash_node->last_refresh_time_ms = curr_time_ms;
 
     return;
 }
@@ -598,7 +599,7 @@ static void shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct
         return;
     }
 
-    shaper_profile_hash_node_refresh(ctx, pf_hash_node);
+    shaper_profile_hash_node_refresh(ctx, pf_hash_node, curr_timespec);
     
     if (pf_hash_node->limit_direction == PROFILE_LIMIT_DIRECTION_BIDIRECTION) {
         snprintf(key, sizeof(key), "tsg-shaping-%d-bidirectional", pf_info->id);
