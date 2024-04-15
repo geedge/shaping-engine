@@ -13,7 +13,7 @@ target_link_libraries(shaping_engine PUBLIC shaper)
 target_link_libraries(shaping_engine PUBLIC maatframe)
 target_link_libraries(shaping_engine PUBLIC mrzcpd)
 target_link_libraries(shaping_engine PUBLIC swarmkv)
-target_link_libraries(shaping_engine PUBLIC jemalloc)
+target_link_libraries(shaping_engine PUBLIC libjemalloc-static dl)
 
 install(TARGETS shaping_engine RUNTIME DESTINATION bin COMPONENT Program)
 
