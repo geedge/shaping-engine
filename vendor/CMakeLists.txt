@@ -39,7 +39,7 @@ set_property(TARGET cjson PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${INSTALL_DIR}/
 # jemalloc
 ExternalProject_Add(libjemalloc PREFIX libjemalloc
         URL ${CMAKE_CURRENT_SOURCE_DIR}/jemalloc-5.3.0.tar.bz2
-        CONFIGURE_COMMAND ./autogen.sh --prefix=<INSTALL_DIR> #--enable-prof --enable-prof-libunwind
+        CONFIGURE_COMMAND ./autogen.sh --prefix=<INSTALL_DIR> #--enable-prof
         BUILD_COMMAND make
 		BUILD_IN_SOURCE 1
         INSTALL_COMMAND make install prefix=<INSTALL_DIR>)
