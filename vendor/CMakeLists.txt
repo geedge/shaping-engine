@@ -35,3 +35,19 @@ add_library(cjson SHARED IMPORTED GLOBAL)
 add_dependencies(cjson cJSON)
 set_property(TARGET cjson PROPERTY IMPORTED_LOCATION ${INSTALL_DIR}/lib64/libcjson.a)
 set_property(TARGET cjson PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${INSTALL_DIR}/include)
+
+# jemalloc
+ExternalProject_Add(libjemalloc PREFIX libjemalloc
+        URL ${CMAKE_CURRENT_SOURCE_DIR}/jemalloc-5.3.0.tar.bz2
+        CONFIGURE_COMMAND ./autogen.sh --prefix=<INSTALL_DIR> #--enable-prof
+        BUILD_COMMAND make
+		BUILD_IN_SOURCE 1
+        INSTALL_COMMAND make install prefix=<INSTALL_DIR>)
+
+ExternalProject_Get_Property(libjemalloc INSTALL_DIR)
+file(MAKE_DIRECTORY ${INSTALL_DIR}/include)
+
+add_library(libjemalloc-static STATIC IMPORTED GLOBAL)
+add_dependencies(libjemalloc-static libjemalloc)
+set_property(TARGET libjemalloc-static PROPERTY IMPORTED_LOCATION ${INSTALL_DIR}/lib/libjemalloc.a)
+set_property(TARGET libjemalloc-static PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${INSTALL_DIR}/include)
