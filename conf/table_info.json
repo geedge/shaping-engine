@@ -15,7 +15,7 @@
         "table_id": 1,
         "table_name": "TRAFFIC_SHAPING_PROFILE",
         "table_type": "plugin",
-        "valid_column": 7,
+        "valid_column": 8,
         "custom": {
             "gc_timeout_s":2,
             "key": 1,

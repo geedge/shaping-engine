@@ -209,6 +209,7 @@ void shaper_profile_ex_new(const char *table_name, int table_id, const char *key
     char type_arg[64] = {0};
     char limits[128] = {0};
     char aqm_options[64] = {0};
+    char dscp_marking[64] = {0};
     char volume_based_shaping[64] = {0};
     int limit_bandwidth;
     int array_size, i;
@@ -220,9 +221,9 @@ void shaper_profile_ex_new(const char *table_name, int table_id, const char *key
 
     s_pf = (struct shaping_profile*)calloc(1, sizeof(struct shaping_profile));
 
-    ret = sscanf(table_line, "%d\t%63s\t%63s\t%127s\t%63s\t%63s\t%d",
-            &s_pf->id, profile_type, type_arg, limits, aqm_options, volume_based_shaping, &s_pf->valid);
-    if (ret != 7) {
+    ret = sscanf(table_line, "%d\t%63s\t%63s\t%127s\t%63s\t%63s\t%63s\t%d",
+            &s_pf->id, profile_type, type_arg, limits, aqm_options, dscp_marking, volume_based_shaping, &s_pf->valid);
+    if (ret != 8) {
         LOG_ERROR("%s: sscanf parse failed for profile line %s", LOG_TAG_MAAT, table_line);
         goto END;
     }
@@ -251,7 +252,7 @@ void shaper_profile_ex_new(const char *table_name, int table_id, const char *key
     }
 
     //parse aqm options
-    json = cJSON_Parse(aqm_options);
+    /*json = cJSON_Parse(aqm_options);
     if (!json) {
         LOG_ERROR("%s: json parse profile aqm options failed for profile id %d, line %s", LOG_TAG_MAAT, s_pf->id, table_line);
         goto END;
@@ -274,7 +275,7 @@ void shaper_profile_ex_new(const char *table_name, int table_id, const char *key
         goto END;
     }
 
-    cJSON_Delete(json);
+    cJSON_Delete(json);*/
     
     //parse limits of profile
     json = cJSON_Parse(limits);
