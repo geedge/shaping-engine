@@ -129,7 +129,7 @@ void shaper_rule_ex_new(const char *table_name, int table_id, const char *key, c
     s_rule->fair_factor = tmp_obj->valueint;
 
     //dscp_marking
-    tmp_obj = cJSON_GetObjectItem(json, "dscp_marking");
+    /*tmp_obj = cJSON_GetObjectItem(json, "dscp_marking");
     if (!tmp_obj) {
         LOG_ERROR("%s: json parse dscp_marking failed for table line %s", LOG_TAG_MAAT, table_line);
         goto END;
@@ -144,7 +144,7 @@ void shaper_rule_ex_new(const char *table_name, int table_id, const char *key, c
             LOG_ERROR("%s: json parse dscp_value wrong for table line %s", LOG_TAG_MAAT, table_line);
             goto END;
         }
-    }
+    }*/
 
     //profile_chain
     tmp_obj = cJSON_GetObjectItem(json, "profile_chain");
