@@ -37,7 +37,7 @@ yum install -y libasan
 yum install -y systemd-devel
 yum install -y tsg_master-devel
 yum install -y framework_env
-yum install -y mrzcpd
+yum install -y mrzcpd-corei7
 yum install -y libfieldstat3-devel
 yum install -y libmaatframe-devel
 yum install -y libswarmkv-devel
