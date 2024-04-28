@@ -1308,6 +1308,40 @@ static struct shaping_flow *shaper_raw_pkt_session_handle(struct shaping_thread_
     return sf;
 }
 
+static void shaper_datapath_telemetry_info_append(struct shaping_marsio_info *marsio_info, marsio_buff_t *buff, struct shaping_flow *sf)
+{
+    char datapath_telemetry_str[512] = {0};
+    struct shaping_rule_info *rule = NULL;
+    int len = 0;
+
+    if (marsio_dp_trace_measurements_can_emit(marsio_info->instance, buff, DP_TRACE_MEASUREMENT_TYPE_TELEMETRY)) {
+        len += snprintf(datapath_telemetry_str + len, sizeof(datapath_telemetry_str) - len, "shaping:");
+
+        for (int i= 0; i < sf->rule_num; i++) {
+            rule = &sf->matched_rule_infos[i];
+
+            len += snprintf(datapath_telemetry_str + len, sizeof(datapath_telemetry_str) - len, "rule_id=%d, primary_pf_id=%d", rule->id, rule->primary.id);
+
+            if (rule->borrowing_num > 0) {
+                len += snprintf(datapath_telemetry_str + len, sizeof(datapath_telemetry_str) - len, ", borrow_pf_ids:[");
+            }
+            for (int j = 0; j < rule->borrowing_num; j++) {
+                if (j != 0) {
+                    len += snprintf(datapath_telemetry_str + len, sizeof(datapath_telemetry_str) - len, ",");
+                }
+                len += snprintf(datapath_telemetry_str + len, sizeof(datapath_telemetry_str) - len, "%d", rule->borrowing[j].id);
+            }
+            if (rule->borrowing_num > 0) {
+                len += snprintf(datapath_telemetry_str + len, sizeof(datapath_telemetry_str) - len, "]");
+            }
+            len += snprintf(datapath_telemetry_str + len, sizeof(datapath_telemetry_str) - len, ";");
+        }
+
+        marsio_dp_trace_measurement_emit_str(marsio_info->instance, buff, DP_TRACE_MEASUREMENT_TYPE_TELEMETRY, "shaping", datapath_telemetry_str);
+    }
+    return;
+}
+
 void shaper_packet_recv_and_process(struct shaping_thread_ctx *ctx)
 {
     marsio_buff_t *rx_buff[SHAPER_MARSIO_RX_BRUST_MAX];
@@ -1333,6 +1367,7 @@ void shaper_packet_recv_and_process(struct shaping_thread_ctx *ctx)
             marsio_send_burst(ctx->marsio_info->mr_path, ctx->thread_index, &rx_buff[i], 1);
             shaper_global_stat_throughput_tx_inc(&ctx->thread_global_stat, meta.raw_len);
         } else {
+            shaper_datapath_telemetry_info_append(ctx->marsio_info, rx_buff[i], sf);
             shaping_packet_process(ctx, rx_buff[i], &meta, sf);
         }
 
