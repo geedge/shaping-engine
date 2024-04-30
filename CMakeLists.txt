@@ -67,8 +67,8 @@ add_library(MESA_prof_load SHARED IMPORTED GLOBAL)
 set_property(TARGET MESA_prof_load PROPERTY IMPORTED_LOCATION ${MESA_FRAMEWORK_LIB_DIR}/libMESA_prof_load.so)
 set_property(TARGET MESA_prof_load PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${MESA_FRAMEWORK_INCLUDE_DIR})
 
-set(MRZCPD_LIB_DIR /opt/mrzcpd/lib)
-set(MRZCPD_INCLUDE_DIR /opt/mrzcpd/include)
+set(MRZCPD_LIB_DIR /opt/tsg/mrzcpd/lib)
+set(MRZCPD_INCLUDE_DIR /opt/tsg/mrzcpd/include)
 
 add_library(mrzcpd SHARED IMPORTED GLOBAL)
 set_property(TARGET mrzcpd PROPERTY IMPORTED_LOCATION ${MRZCPD_LIB_DIR}/libmarsio.so)
