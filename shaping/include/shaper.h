@@ -21,11 +21,10 @@ extern "C" {
 #define SHAPER_FLOW_POP_NUM_MAX 10
 
 #define SESSION_CLOSE 0x1
-#define SESSION_BORROW 0x2
 
 #define CONFIRM_PRIORITY_PKTS 20
 
-#define SHAPING_WROK_THREAD_NUM_MAX 128
+#define SHAPING_WROK_THREAD_NUM_MAX 256
 
 #define SHAPING_STAT_REFRESH_INTERVAL_SEC 2
 #define SHAPING_STAT_REFRESH_MAX_PER_POLLING 5
@@ -130,6 +129,7 @@ struct shaping_profile_hash_node {
     struct shaper_aqm_blue_para aqm_blue_para;
     struct shaper_aqm_codel_para aqm_codel_para;
     unsigned char is_invalid;
+    int async_pass[SHAPING_PRIORITY_NUM_MAX];
     struct timeout timeout_handle;
     UT_hash_handle hh;
 };
@@ -138,6 +138,7 @@ struct shaping_profile_info {
     int id;//profile_id
     enum shaping_profile_type type;
     int priority;
+    int async_pass;
     long long in_deposit_token_bits;
     long long out_deposit_token_bits;
     long long bidirection_deposit_token_bits;
