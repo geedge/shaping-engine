@@ -383,15 +383,15 @@ int shaper_flow_in_order_get(struct shaper *sp, struct shaper_flow_instance sf_i
     return count;
 }
 
-static void shaper_profile_async_pass_set(struct shaping_profile_info *profile, int priority, int async_pass_enabled)
+static void shaper_profile_async_pass_set(struct shaping_profile_info *profile, unsigned char direction, int priority, int async_pass_enabled)
 {
     struct shaping_profile_hash_node *pf_hash_node = profile->hash_node;
-    int *async_pass = NULL;
+    unsigned char *async_pass = NULL;
 
     if (profile->type == PROFILE_TYPE_GENERIC) {
-        async_pass = &pf_hash_node->async_pass[priority];
+        async_pass = &pf_hash_node->async_pass[priority][direction];
     } else {
-        async_pass = &profile->async_pass;
+        async_pass = &profile->async_pass[direction];
     }
 
     if (*async_pass != async_pass_enabled) {
@@ -401,14 +401,14 @@ static void shaper_profile_async_pass_set(struct shaping_profile_info *profile, 
     return;
 }
 
-static int shaper_profile_async_pass_get(struct shaping_profile_info *profile, int priority)
+static int shaper_profile_async_pass_get(struct shaping_profile_info *profile, unsigned char direction, int priority)
 {
     struct shaping_profile_hash_node *pf_hash_node = profile->hash_node;
 
     if (profile->type == PROFILE_TYPE_GENERIC) {
-        return pf_hash_node->async_pass[priority];
+        return pf_hash_node->async_pass[priority][direction];
     } else {
-        return profile->async_pass;
+        return profile->async_pass[direction];
     }
 }
 
@@ -445,7 +445,7 @@ static void shaper_deposit_token_add(struct shaping_profile_info *profile, int r
 
     *deposit_token += req_token_bits;
     if (*deposit_token > 0) {
-        shaper_profile_async_pass_set(profile, priority, 1);
+        shaper_profile_async_pass_set(profile, direction, priority, 1);
     }
 }
 
@@ -522,12 +522,8 @@ static void shaper_token_get_cb(const struct swarmkv_reply *reply, void * cb_arg
         shaper_deposit_token_add(profile, reply->integer, arg->direction, profile->priority);//deposit tokens to profile
     }
 
-    if (arg->is_primary_pf) {
-        //TODO: is_primary_pf is not used
-    }
-
     if (reply->integer == 0) {
-        shaper_profile_async_pass_set(profile, profile->priority, 0);
+        shaper_profile_async_pass_set(profile, arg->direction, profile->priority, 0);
 
         if (profile->type == PROFILE_TYPE_GENERIC) {
             pf_hash_node->token_multiple.has_failed_get_token = 1;
@@ -591,10 +587,7 @@ static int shaper_deposit_token_get(struct shaping_profile_info *profile, int re
             return 0;
     }
 
-    if (force) {
-        *deposit_token -= req_token_bits;
-        ret = 0;
-    } else if (*deposit_token >= req_token_bits) {
+    if (force || *deposit_token >= req_token_bits) {
         *deposit_token -= req_token_bits;
         ret = 0;
     }
@@ -624,7 +617,7 @@ static void shaper_profile_hash_node_refresh(struct shaping_thread_ctx *ctx, str
     return;
 }
 
-static void shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, struct shaping_profile_info *pf_info, int profile_type, int req_token_bits, unsigned char direction, struct timespec *curr_timespec)
+static void shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, struct shaping_profile_info *pf_info, int req_token_bits, unsigned char direction, struct timespec *curr_timespec)
 {
     struct shaping_tconsume_cb_arg *arg = NULL;
     struct shaping_profile_hash_node *pf_hash_node = pf_info->hash_node;
@@ -648,9 +641,6 @@ static void shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct
     arg->sf = sf;
     arg->direction = direction;
     arg->start_time_us = curr_timespec->tv_sec * MICRO_SECONDS_PER_SEC + curr_timespec->tv_nsec / NANO_SECONDS_PER_MICRO_SEC;
-    if (profile_type == PROFILE_IN_RULE_TYPE_PRIMARY) {
-        arg->is_primary_pf = 1;
-    }
 
     shaper_global_stat_async_invoke_inc(&ctx->thread_global_stat);
     sheper_global_stat_tconsume_invoke_inc(&ctx->thread_global_stat);
@@ -768,7 +758,8 @@ static int shaper_profile_is_priority_blocked(struct shaping_thread_ctx *ctx, st
 
 END:
     if (curr_time_ms - profile->hash_node->priority_blocked_time_ms[priority] < PRIORITY_BLOCK_MIN_TIME_MS) {
-        shaper_profile_async_pass_set(profile, priority, 0);
+        shaper_profile_async_pass_set(profile, SHAPING_DIR_OUT, priority, 0);
+        shaper_profile_async_pass_set(profile, SHAPING_DIR_IN, priority, 0);
         return 1;
     } else {
         return 0;
@@ -838,7 +829,7 @@ static int shaper_token_consume(struct shaping_thread_ctx *ctx, struct shaping_f
         return SHAPER_TOKEN_GET_PASS;//rule is disabled, don't need to get token and forward packet
     }
 
-    if (shaper_profile_async_pass_get(profile, profile->priority) == 1) {
+    if (shaper_profile_async_pass_get(profile, direction, profile->priority) == 1) {
         shaper_deposit_token_get(profile, req_token_bytes * 8, direction, profile->priority, 1, &need_get_token);
         ret = SHAPER_TOKEN_GET_SUCCESS;
     } else if (shaper_deposit_token_get(profile, req_token_bytes * 8, direction, profile->priority, 0, &need_get_token) == 0) {
@@ -860,7 +851,7 @@ static int shaper_token_consume(struct shaping_thread_ctx *ctx, struct shaping_f
     }
 
     int req_token_bits = req_token_bytes * 8;
-    shaper_token_get_from_profile(ctx, sf, profile, profile_type, req_token_bits, direction, curr_timespec);
+    shaper_token_get_from_profile(ctx, sf, profile, req_token_bits, direction, curr_timespec);
 
     if (profile->hash_node->is_invalid && profile_type == PROFILE_IN_RULE_TYPE_PRIMARY) {//for primary, means this rule don't need get token
         return SHAPER_TOKEN_GET_SUCCESS;
@@ -1408,7 +1399,7 @@ void shaper_packet_recv_and_process(struct shaping_thread_ctx *ctx)
             marsio_send_burst(ctx->marsio_info->mr_path, ctx->thread_index, &rx_buff[i], 1);
             shaper_global_stat_throughput_tx_inc(&ctx->thread_global_stat, meta.raw_len);
         } else {
-            //shaper_datapath_telemetry_info_append(ctx->marsio_info, rx_buff[i], sf);
+            shaper_datapath_telemetry_info_append(ctx->marsio_info, rx_buff[i], sf);
             shaping_packet_process(ctx, rx_buff[i], &meta, sf);
         }
 

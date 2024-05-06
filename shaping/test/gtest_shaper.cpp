@@ -599,7 +599,7 @@ TEST(single_session, udp_diff_direction)
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
     shaping_stat_judge(line, 0, 0, 1, 20, 2000, 0, 0, 21000, SHAPING_DIR_OUT, profile_type_primary);
 
-    shaping_stat_judge(line, 0, 0, 1, 20, 2000, 0, 0, 22000, SHAPING_DIR_IN, profile_type_primary);
+    shaping_stat_judge(line, 0, 0, 1, 20, 2000, 0, 0, 21000, SHAPING_DIR_IN, profile_type_primary);
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
     fclose(stat_file);
@@ -678,7 +678,7 @@ TEST(single_session, udp_multi_rules)
     shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, 507000, SHAPING_DIR_OUT, profile_type_primary);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 1 
-    shaping_stat_judge(line, 1, 1, 1, 100, 10000, 0, 0, 2000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(line, 1, 1, 1, 100, 10000, 0, 0, 1000, SHAPING_DIR_OUT, profile_type_primary);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2
     shaping_stat_judge(line, 2, 2, 1, 100, 10000, 0, 0, 91000, SHAPING_DIR_OUT, profile_type_primary);//max latency is first queued pkt

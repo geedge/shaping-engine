@@ -12,9 +12,6 @@ extern "C" {
 #include "timeout.h"
 }
 
-#define SHAPING_DIR_IN 0x1
-#define SHAPING_DIR_OUT 0x2
-
 #define SHAPING_RULE_NUM_MAX 8
 #define SHAPING_REF_PROFILE_NUM_MAX 8
 #define SHAPING_PRIORITY_NUM_MAX 10
@@ -79,6 +76,12 @@ struct shaping_ctx {
     struct shaping_thread_ctx *thread_ctx;
 };
 
+enum shaping_packet_dir {
+    SHAPING_DIR_IN = 0,
+    SHAPING_DIR_OUT,
+    SHAPING_DIR_MAX
+};
+
 enum shaping_packet_action {
     SHAPING_FORWARD = 0,
     SHAPING_QUEUED,
@@ -129,7 +132,7 @@ struct shaping_profile_hash_node {
     struct shaper_aqm_blue_para aqm_blue_para;
     struct shaper_aqm_codel_para aqm_codel_para;
     unsigned char is_invalid;
-    int async_pass[SHAPING_PRIORITY_NUM_MAX];
+    unsigned char async_pass[SHAPING_PRIORITY_NUM_MAX][SHAPING_DIR_MAX];
     struct timeout timeout_handle;
     UT_hash_handle hh;
 };
@@ -138,7 +141,7 @@ struct shaping_profile_info {
     int id;//profile_id
     enum shaping_profile_type type;
     int priority;
-    int async_pass;
+    unsigned char async_pass[SHAPING_DIR_MAX];
     long long in_deposit_token_bits;
     long long out_deposit_token_bits;
     long long bidirection_deposit_token_bits;
@@ -213,7 +216,6 @@ struct shaping_tconsume_cb_arg {
     struct shaping_profile_info *profile;
     struct shaping_flow *sf;
     unsigned char direction;
-    unsigned char is_primary_pf;
     long long start_time_us;
 };
 
