@@ -259,7 +259,7 @@ void shaper_profile_ex_new(const char *table_name, int table_id, const char *key
 
     
     tmp_obj = cJSON_GetObjectItem(json, "algorithm");
-    if (!tmp_obj) {
+    if (!tmp_obj || tmp_obj->type != cJSON_String || !tmp_obj->valuestring) {
         LOG_ERROR("%s: json parse algorithm failed for profile id %d, line %s", LOG_TAG_MAAT, s_pf->id, table_line);
         goto END;
     }
