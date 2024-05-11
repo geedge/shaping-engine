@@ -587,13 +587,13 @@ static int shaper_deposit_token_get(struct shaping_profile_info *profile, int re
             return 0;
     }
 
+    if (*deposit_token < req_token_bits) {
+        *need_get_token = 1;
+    }
+
     if (force || *deposit_token >= req_token_bits) {
         *deposit_token -= req_token_bits;
         ret = 0;
-    }
-
-    if (*deposit_token <= 0) {
-        *need_get_token = 1;
     }
 
     return ret;
