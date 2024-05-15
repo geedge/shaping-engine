@@ -117,12 +117,13 @@ static void shaper_session_log_send(struct shaping_thread_ctx *ctx, struct shapi
 
     shaper_session_log_prepare(sf, &mpack_data, &mpack_size);
 
-    marsio_buff_t *tx_buff;
+    marsio_buff_t *tx_buff = NULL;
     char *pkt_header_data = sf->ctrl_meta.raw_data;
     int pkt_header_len = sf->ctrl_meta.l7_offset;
     struct metadata *ctrl_meta = &sf->ctrl_meta;
     struct sids sids;
     char *dst = NULL;
+    int marsio_buff_free_flag = 1;
     char *addr_str = addr_tuple4_to_str(&sf->tuple4);
 
     if (marsio_buff_malloc_global(ctx->marsio_info->instance, &tx_buff, 1, 0, ctx->thread_index) < 0) {
@@ -132,6 +133,11 @@ static void shaper_session_log_send(struct shaping_thread_ctx *ctx, struct shapi
 
     marsio_buff_set_ctrlbuf(tx_buff);
     dst = marsio_buff_append(tx_buff, pkt_header_len + mpack_size);
+    if (dst == NULL) {
+        LOG_ERROR("%s: marsio_buff_append failed for session %s", LOG_TAG_SHAPING, addr_str);
+        goto END;
+    }
+
     memcpy(dst, pkt_header_data, pkt_header_len);
     memcpy(dst + pkt_header_len, mpack_data, mpack_size);
 
@@ -157,6 +163,7 @@ static void shaper_session_log_send(struct shaping_thread_ctx *ctx, struct shapi
         goto END;
     }
 
+    marsio_buff_free_flag = 0;
     marsio_send_burst(ctx->marsio_info->mr_path, ctx->thread_index, &tx_buff, 1);
     shaper_global_stat_session_log_send_num_inc(&ctx->thread_global_stat);
 
@@ -168,6 +175,11 @@ END:
     if (mpack_data) {
         free(mpack_data);
     }
+
+    if (marsio_buff_free_flag && tx_buff) {
+        marsio_buff_free(ctx->marsio_info->instance, &tx_buff, 1, 0, ctx->thread_index);
+    }
+
     return;
 }
 
