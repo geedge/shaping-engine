@@ -379,7 +379,6 @@ int shaper_flow_in_order_get(struct shaper *sp, struct shaper_flow_instance sf_i
         avl_node = avl_tree_next_in_order_node_get(avl_node);
     }
 
-
     return count;
 }
 
@@ -412,7 +411,43 @@ static int shaper_profile_async_pass_get(struct shaping_profile_info *profile, u
     }
 }
 
-static void shaper_deposit_token_add(struct shaping_profile_info *profile, int req_token_bits, unsigned char direction, int priority)
+static void shaper_token_multiple_update(struct shaping_thread_ctx *ctx, struct shaping_profile_info *profile)
+{
+    if (profile->type != PROFILE_TYPE_GENERIC) {
+        return;
+    }
+
+    struct shaper_token_multiple *token_multiple = &profile->hash_node->token_multiple;
+    int curr_multiple = token_multiple->token_get_multiple;
+    time_t curr_time_s = time(NULL);
+    int token_multiple_min = ctx->conf.token_multiple_min;
+    int token_multiple_max = ctx->conf.token_multiple_max;
+
+    if (curr_time_s - token_multiple->token_multiple_update_time_s < TOKEN_MULTIPLE_UPDATE_INTERVAL_S) {
+        return;
+    }
+
+    token_multiple->token_multiple_update_time_s = curr_time_s;
+
+    if (token_multiple->has_failed_get_token) {
+        token_multiple->token_get_multiple = (curr_multiple - 1) < token_multiple_min ? token_multiple_min : (curr_multiple - 1);
+        goto END;
+    }
+
+    if (token_multiple->token_not_enough) {
+        token_multiple->token_get_multiple = (curr_multiple + 1) > token_multiple_max ? token_multiple_max : (curr_multiple + 1);
+        goto END;
+    }
+
+END:
+    LOG_INFO("%s: profile id %d, token_get_multiple %d, has_failed_get_token %d, token_not_enough %d", LOG_TAG_SHAPING, profile->id, token_multiple->token_get_multiple, token_multiple->has_failed_get_token, token_multiple->token_not_enough);
+    token_multiple->has_failed_get_token = 0;
+    token_multiple->token_not_enough = 0;
+    
+    return;
+}
+
+static void shaper_deposit_token_add(struct shaping_thread_ctx *ctx, struct shaping_profile_info *profile, int req_token_bits, unsigned char direction, int priority)
 {
     long long *deposit_token;
     struct shaping_profile_hash_node *pf_hash_node = profile->hash_node;
@@ -446,43 +481,10 @@ static void shaper_deposit_token_add(struct shaping_profile_info *profile, int r
     *deposit_token += req_token_bits;
     if (*deposit_token > 0) {
         shaper_profile_async_pass_set(profile, direction, priority, 1);
+    } else {
+        pf_hash_node->token_multiple.token_not_enough = 1;
+        shaper_token_multiple_update(ctx, profile);
     }
-}
-
-static void shaper_token_multiple_update(struct shaping_thread_ctx *ctx, struct shaping_profile_info *profile)
-{
-    if (profile->type != PROFILE_TYPE_GENERIC) {
-        return;
-    }
-
-    struct shaper_token_multiple *token_multiple = &profile->hash_node->token_multiple;
-    int curr_multiple = token_multiple->token_get_multiple;
-    time_t curr_time_s = time(NULL);
-    int token_multiple_min = ctx->conf.token_multiple_min;
-    int token_multiple_max = ctx->conf.token_multiple_max;
-
-    if (curr_time_s - token_multiple->token_multiple_update_time_s < TOKEN_MULTIPLE_UPDATE_INTERVAL_S) {
-        return;
-    }
-
-    token_multiple->token_multiple_update_time_s = curr_time_s;
-
-    if (token_multiple->has_failed_get_token) {
-        token_multiple->token_get_multiple = (curr_multiple - 1) < token_multiple_min ? token_multiple_min : (curr_multiple - 1);
-        goto END;
-    }
-
-    if (token_multiple->has_drop_by_queue_full) {
-        token_multiple->token_get_multiple = (curr_multiple + 1) > token_multiple_max ? token_multiple_max : (curr_multiple + 1);
-        goto END;
-    }
-
-END:
-    LOG_INFO("%s: profile id %d, token_get_multiple %d, has_failed_get_token %d, has_drop_by_queue_full %d", LOG_TAG_SHAPING, profile->id, token_multiple->token_get_multiple, token_multiple->has_failed_get_token, token_multiple->has_drop_by_queue_full);
-    token_multiple->has_failed_get_token = 0;
-    token_multiple->has_drop_by_queue_full = 0;
-    
-    return;
 }
 
 static void shaper_token_get_cb(const struct swarmkv_reply *reply, void * cb_arg)
@@ -519,7 +521,7 @@ static void shaper_token_get_cb(const struct swarmkv_reply *reply, void * cb_arg
     }
 
     if (reply->integer > 0) {
-        shaper_deposit_token_add(profile, reply->integer, arg->direction, profile->priority);//deposit tokens to profile
+        shaper_deposit_token_add(ctx, profile, reply->integer, arg->direction, profile->priority);//deposit tokens to profile
     }
 
     if (reply->integer == 0) {
@@ -537,12 +539,12 @@ END:
     if (reply->type != SWARMKV_REPLY_INTEGER || reply->integer == 0) {
         switch (profile->type) {
             case PROFILE_TYPE_GENERIC:
-                pf_hash_node->last_failed_get_token_ms = curr_time.tv_sec * MILLI_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MILLI_SEC;
+                pf_hash_node->last_failed_get_token_ms[arg->direction] = curr_time.tv_sec * MILLI_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MILLI_SEC;
                 break;
             case PROFILE_TYPE_HOST_FARINESS:
             case PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS:
             case PROFILE_TYPE_SPLIT_BY_LOCAL_HOST:
-                profile->last_failed_get_token_ms = curr_time.tv_sec * MILLI_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MILLI_SEC;
+                profile->last_failed_get_token_ms[arg->direction] = curr_time.tv_sec * MILLI_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MILLI_SEC;
                 break;
         }
     }
@@ -560,6 +562,7 @@ static int shaper_deposit_token_get(struct shaping_profile_info *profile, int re
     long long *deposit_token;
     struct shaping_profile_hash_node *pf_hash_node = profile->hash_node;
     int ret = -1;
+    int token_multiple;
 
     switch (profile->type) {
         case PROFILE_TYPE_GENERIC:
@@ -570,9 +573,19 @@ static int shaper_deposit_token_get(struct shaping_profile_info *profile, int re
             } else {
                 deposit_token = &pf_hash_node->out_deposit_token_bits[priority];
             }
+            token_multiple = pf_hash_node->token_multiple.token_get_multiple;
             break;
         case PROFILE_TYPE_HOST_FARINESS:
         case PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS:
+            if (pf_hash_node->limit_direction == PROFILE_LIMIT_DIRECTION_BIDIRECTION) {
+                deposit_token = &profile->bidirection_deposit_token_bits;
+            } else if (direction == SHAPING_DIR_IN) {
+                deposit_token = &profile->in_deposit_token_bits;
+            } else {
+                deposit_token = &profile->out_deposit_token_bits;
+            }
+            token_multiple = 1;
+            break;
         case PROFILE_TYPE_SPLIT_BY_LOCAL_HOST:
             if (pf_hash_node->limit_direction == PROFILE_LIMIT_DIRECTION_BIDIRECTION) {
                 deposit_token = &profile->bidirection_deposit_token_bits;
@@ -581,6 +594,7 @@ static int shaper_deposit_token_get(struct shaping_profile_info *profile, int re
             } else {
                 deposit_token = &profile->out_deposit_token_bits;
             }
+            token_multiple = TOKEN_MULTIPLE_DEFAULT;
             break;
         default:
             LOG_ERROR("%s: invalid profile type %d, profile id %d", LOG_TAG_SHAPING, profile->type, profile->id);
@@ -594,6 +608,10 @@ static int shaper_deposit_token_get(struct shaping_profile_info *profile, int re
     if (force || *deposit_token >= req_token_bits) {
         *deposit_token -= req_token_bits;
         ret = 0;
+    }
+
+    if (*deposit_token + (req_token_bits * token_multiple * 2) < 0) {
+        shaper_profile_async_pass_set(profile, direction, priority, 0);
     }
 
     return ret;
@@ -786,18 +804,18 @@ void shaper_profile_hash_node_set(struct shaping_thread_ctx *ctx, struct shaping
     return;
 }
 
-static int shaping_swarmkv_is_too_short_interval(long long curr_time_ms, struct shaping_profile_info *profile)
+static int shaping_swarmkv_is_too_short_interval(long long curr_time_ms, struct shaping_profile_info *profile, unsigned char direction)
 {
     long long last_failed_ms = 0;
 
     switch (profile->type) {
         case PROFILE_TYPE_GENERIC:
-            last_failed_ms = profile->hash_node->last_failed_get_token_ms;
+            last_failed_ms = profile->hash_node->last_failed_get_token_ms[direction];
             break;
         case PROFILE_TYPE_HOST_FARINESS:
         case PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS:
         case PROFILE_TYPE_SPLIT_BY_LOCAL_HOST:
-            last_failed_ms = profile->last_failed_get_token_ms;
+            last_failed_ms = profile->last_failed_get_token_ms[direction];
             break;
     }
 
@@ -842,7 +860,7 @@ static int shaper_token_consume(struct shaping_thread_ctx *ctx, struct shaping_f
 
     long long curr_time_ms = curr_timespec->tv_sec * MILLI_SECONDS_PER_SEC + curr_timespec->tv_nsec / NANO_SECONDS_PER_MILLI_SEC;
 
-    if (shaping_swarmkv_is_too_short_interval(curr_time_ms, profile)) {
+    if (shaping_swarmkv_is_too_short_interval(curr_time_ms, profile, direction)) {
         return ret;
     }
 
@@ -1036,8 +1054,6 @@ DROP:
     shaper_stat_drop_inc(&pf_info->stat, meta->dir, ctx->thread_index);
     sf->anchor = 0;
 
-    pf_info->hash_node->token_multiple.has_drop_by_queue_full = 1;
-    shaper_token_multiple_update(ctx, pf_info);
     return SHAPING_DROP;
 }
 
@@ -1156,8 +1172,6 @@ void shaping_packet_process(struct shaping_thread_ctx *ctx, marsio_buff_t *rx_bu
             shaper_global_stat_queueing_inc(&ctx->thread_global_stat, meta->raw_len);
         } else {
             struct shaping_profile_info *pf_info = &s_rule->primary;
-            pf_info->hash_node->token_multiple.has_drop_by_queue_full = 1;
-            shaper_token_multiple_update(ctx, pf_info);
 
             shaper_stat_drop_inc(&pf_info->stat, meta->dir, ctx->thread_index);
             shaper_global_stat_drop_inc(&ctx->thread_global_stat, meta->raw_len);

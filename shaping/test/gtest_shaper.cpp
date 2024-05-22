@@ -250,11 +250,12 @@ TEST(single_session, udp_tx_in_order)
 
 
     /**********send packets*********************/
-    send_packets(&ctx->thread_ctx[0], sf, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
+    send_packets(&ctx->thread_ctx[0], sf, 101, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
     /*******************************************/
 
     //first 10 packets
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 1));//async pass 1 packet
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
     while (!TAILQ_EMPTY(&expec_tx_queue)) {//last 90 delay packets
@@ -287,7 +288,7 @@ TEST(single_session, udp_tx_in_order)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
+    shaping_stat_judge(line, 0, 0, 1, 101, 10100, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
     fclose(stat_file);
@@ -296,7 +297,7 @@ TEST(single_session, udp_tx_in_order)
     stat_file = fopen(SHAPING_GLOBAL_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_global_stat_judge(line, 100, 10000, 0, 0, 0, 0);
+    shaping_global_stat_judge(line, 101, 10100, 0, 0, 0, 0);
     fclose(stat_file);
 }
 
@@ -392,11 +393,12 @@ TEST(max_min_host_fairness_profile, udp_tx_in_order)
 
 
     /**********send packets*********************/
-    send_packets(&ctx->thread_ctx[0], sf, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
+    send_packets(&ctx->thread_ctx[0], sf, 101, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
     /*******************************************/
 
     //first 10 packets
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 1));//async pass 1 packet
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
     while (!TAILQ_EMPTY(&expec_tx_queue)) {//last 90 delay packets
@@ -429,7 +431,7 @@ TEST(max_min_host_fairness_profile, udp_tx_in_order)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
+    shaping_stat_judge(line, 0, 0, 1, 101, 10100, 0, 0, 172000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
     fclose(stat_file);
@@ -438,7 +440,7 @@ TEST(max_min_host_fairness_profile, udp_tx_in_order)
     stat_file = fopen(SHAPING_GLOBAL_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_global_stat_judge(line, 100, 10000, 0, 0, 0, 0);
+    shaping_global_stat_judge(line, 101, 10100, 0, 0, 0, 0);
     fclose(stat_file);
 }
 
@@ -471,11 +473,12 @@ TEST(single_session, tcp_tx_in_order)
     shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
 
     /*******send packets***********/
-    send_packets(&ctx->thread_ctx[0], sf, 20, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
+    send_packets(&ctx->thread_ctx[0], sf, 21, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
     send_packets(&ctx->thread_ctx[0], sf, 10, 100, SHAPING_DIR_OUT, &expec_pure_ctl_tx_queue, 1, 1);
 
     //first 10 packets
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 1));//async pass 1 packet
     //10 pure ctrl pkts
     ASSERT_EQ(0, judge_packet_eq(&expec_pure_ctl_tx_queue, actual_tx_queue, 10));
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
@@ -519,7 +522,7 @@ TEST(single_session, tcp_tx_in_order)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 0, 0, 1, 20, 2000, 0, 10, 0, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(line, 0, 0, 1, 21, 2100, 0, 10, 0, SHAPING_DIR_OUT, profile_type_primary);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
     shaping_stat_judge(line, 0, 0, 1, 10, 1000, 0, 0, 31000, SHAPING_DIR_OUT, profile_type_primary);
@@ -597,9 +600,9 @@ TEST(single_session, udp_diff_direction)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 0, 0, 1, 20, 2000, 0, 0, 21000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(line, 0, 0, 1, 20, 2000, 0, 0, 20000, SHAPING_DIR_OUT, profile_type_primary);
 
-    shaping_stat_judge(line, 0, 0, 1, 20, 2000, 0, 0, 21000, SHAPING_DIR_IN, profile_type_primary);
+    shaping_stat_judge(line, 0, 0, 1, 20, 2000, 0, 0, 20000, SHAPING_DIR_IN, profile_type_primary);
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
     fclose(stat_file);
@@ -638,11 +641,12 @@ TEST(single_session, udp_multi_rules)
     shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 3);
 
     /*******send packets***********/
-    send_packets(&ctx->thread_ctx[0], sf, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue, 5, 0);
+    send_packets(&ctx->thread_ctx[0], sf, 101, 100, SHAPING_DIR_OUT, &expec_tx_queue, 5, 0);
 
 
     //first 10 packets
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 1));//async pass 1 packet
 
     while (!TAILQ_EMPTY(&expec_tx_queue)) {//last 90 delay packets
         stub_refresh_token_bucket(0);
@@ -675,13 +679,13 @@ TEST(single_session, udp_multi_rules)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 0
-    shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, 507000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(line, 0, 0, 1, 101, 10100, 0, 0, 507000, SHAPING_DIR_OUT, profile_type_primary);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 1 
-    shaping_stat_judge(line, 1, 1, 1, 100, 10000, 0, 0, 1000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(line, 1, 1, 1, 101, 10100, 0, 0, 1000, SHAPING_DIR_OUT, profile_type_primary);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2
-    shaping_stat_judge(line, 2, 2, 1, 100, 10000, 0, 0, 91000, SHAPING_DIR_OUT, profile_type_primary);//max latency is first queued pkt
+    shaping_stat_judge(line, 2, 2, 1, 101, 10100, 0, 0, 91000, SHAPING_DIR_OUT, profile_type_primary);//max latency is first queued pkt
 
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
@@ -717,11 +721,12 @@ TEST(single_session, udp_borrow)
     shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
 
     /*******send packets***********/
-    send_packets(&ctx->thread_ctx[0], sf, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
+    send_packets(&ctx->thread_ctx[0], sf, 101, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
 
 
     //first 10 packets
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 1));//async pass 1 packet
 
     while (!TAILQ_EMPTY(&expec_tx_queue)) {//last 90 delay packets
         stub_refresh_token_bucket(2);
@@ -753,7 +758,7 @@ TEST(single_session, udp_borrow)
     shaping_stat_judge(line, 1, 1, 1, 0, 0, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2, borrow
-    shaping_stat_judge(line, 1, 2, 2, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
+    shaping_stat_judge(line, 1, 2, 2, 101, 10100, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
@@ -792,11 +797,12 @@ TEST(single_session, udp_borrow_same_priority_9)
     shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
 
     /*******send packets***********/
-    send_packets(&ctx->thread_ctx[0], sf, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
+    send_packets(&ctx->thread_ctx[0], sf, 101, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
 
 
     //first 10 packets
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 1));//async pass 1 packet
 
     while (!TAILQ_EMPTY(&expec_tx_queue)) {//last 90 delay packets
         stub_refresh_token_bucket(3);
@@ -833,7 +839,7 @@ TEST(single_session, udp_borrow_same_priority_9)
 #endif
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 3, borrow
-    shaping_stat_judge(line, 1, 3, 9, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
+    shaping_stat_judge(line, 1, 3, 9, 101, 10100, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
@@ -939,12 +945,22 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
 
 
     /*******send packets***********/
-    send_packets(&ctx->thread_ctx[0], sf1, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue1, 1, 0);
-    send_packets(&ctx->thread_ctx[0], sf2, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue2, 1, 0);
+    send_packets(&ctx->thread_ctx[0], sf1, 101, 100, SHAPING_DIR_OUT, &expec_tx_queue1, 1, 0);
+    send_packets(&ctx->thread_ctx[0], sf2, 101, 100, SHAPING_DIR_OUT, &expec_tx_queue2, 1, 0);
     
 
     //first 10 packets
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 10));
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 1));//async pass 1 packet
+    ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
+
+    stub_refresh_token_bucket(2);
+    for (int i = 0; i < 20; i++) {
+        polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
+        stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
+    }
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 10));
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 1));//async pass 1 packet
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
     while (!TAILQ_EMPTY(&expec_tx_queue2)) {
@@ -987,13 +1003,13 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 1, primary
-    shaping_stat_judge(line, 1, 1, 1, 0, 0, 0, 0, 1471000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(line, 1, 1, 1, 0, 0, 0, 0, 1472000, SHAPING_DIR_OUT, profile_type_primary);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2, borrow
-    shaping_stat_judge(line, 1, 2, 2, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
+    shaping_stat_judge(line, 1, 2, 2, 101, 10100, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2, primary
-    shaping_stat_judge(line, 2, 2, 1, 100, 10000, 0, 0, 191000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(line, 2, 2, 1, 101, 10100, 0, 0, 191000, SHAPING_DIR_OUT, profile_type_primary);
 
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
@@ -1048,6 +1064,7 @@ TEST(two_session_diff_priority_same_profile, two_thread_udp_tx_in_order)
     send_packets(&ctx->thread_ctx[0], sf1, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue1, 1, 0);
     send_packets(&ctx->thread_ctx[1], sf2, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue2, 1, 0);
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 10));
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 1));//async pass 1 packet
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
     shaper_stat_refresh(&ctx->thread_ctx[0], sf1, 1);//刷新线程0中的优先级队列长度到swarmkv中
@@ -1134,6 +1151,7 @@ TEST(two_session_diff_priority_same_profile, profile_timer_test)
     send_packets(&ctx->thread_ctx[0], sf1, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue1, 1, 0);
     send_packets(&ctx->thread_ctx[1], sf2, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue2, 1, 0);
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 10));
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 1));//async pass 1 packet
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
     sleep(3);//wait profile timer to expire, to refresh priority queue_len to swarmkv
@@ -1241,6 +1259,8 @@ TEST(two_sessions, priority_non_block)
     send_packets(&ctx->thread_ctx[0], sf1, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue1, 3, 0);//sf1 blocked by rule2(profile id 1), while rule3(profile id 0) still has 1000 token
     send_packets(&ctx->thread_ctx[1], sf2, 10, 100, SHAPING_DIR_OUT, &expec_tx_queue2, 1, 0);
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 10));//sf1 should send 10 pkts
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 1));//sf1 async pass 1 pkts
+
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 10));//sf2 should send 10 pkts cause rule3(profile id 0) has 1000 token
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
@@ -1314,6 +1334,7 @@ TEST(two_sessions, borrow_when_primary_profile_priority_blocked)
     send_packets(&ctx->thread_ctx[0], sf1, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue1, 1, 0);
     send_packets(&ctx->thread_ctx[1], sf2, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue2, 1, 0);
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 10));
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 1));//async pass 1 packet
 
     while (!TAILQ_EMPTY(&expec_tx_queue2)) {
         stub_refresh_token_bucket(1);
@@ -1386,10 +1407,13 @@ TEST(two_sessions, primary_profile_priority_blocked_by_borrow_profile)
     shaper_rules_update(&ctx->thread_ctx[1], sf2, rule_id2, 1);
 
     /*******send packets***********/
-    send_packets(&ctx->thread_ctx[0], sf1, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue1, 1, 0);
+    send_packets(&ctx->thread_ctx[0], sf1, 101, 100, SHAPING_DIR_OUT, &expec_tx_queue1, 1, 0);
     send_packets(&ctx->thread_ctx[1], sf2, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue2, 1, 0);
 
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 10));
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 1));//async pass 1 packet
+    ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
+
     while (!TAILQ_EMPTY(&expec_tx_queue1)) {
         stub_refresh_token_bucket(1);
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
@@ -1444,11 +1468,12 @@ TEST(statistics, udp_drop_pkt)
     shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
 
     /*******send packets***********/
-    send_packets(&ctx->thread_ctx[0], sf, SHAPING_SESSION_QUEUE_LEN + 10, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
+    send_packets(&ctx->thread_ctx[0], sf, SHAPING_SESSION_QUEUE_LEN + 10 + 1, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
     send_packets(&ctx->thread_ctx[0], sf, 100, 100, SHAPING_DIR_OUT, NULL, 1, 0);//these 100 pkts will be dropped
 
     //first 10 packets
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 1));//async pass 1 packet
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
     while (!TAILQ_EMPTY(&expec_tx_queue)) {
@@ -1478,7 +1503,7 @@ TEST(statistics, udp_drop_pkt)
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 0, 0, 1, SHAPING_SESSION_QUEUE_LEN+10, (SHAPING_SESSION_QUEUE_LEN+10)*100, 100, 0, 228000, SHAPING_DIR_OUT, profile_type_primary);//every queued pkt's latency is max
+    shaping_stat_judge(line, 0, 0, 1, SHAPING_SESSION_QUEUE_LEN+10+1, (SHAPING_SESSION_QUEUE_LEN+10+1)*100, 100, 0, 228000, SHAPING_DIR_OUT, profile_type_primary);//every queued pkt's latency is max
     fclose(stat_file);
     stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
     fclose(stat_file);
@@ -1487,7 +1512,7 @@ TEST(statistics, udp_drop_pkt)
     stat_file = fopen(SHAPING_GLOBAL_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_global_stat_judge(line, SHAPING_SESSION_QUEUE_LEN+10, (SHAPING_SESSION_QUEUE_LEN+10)*100, 100, 10000, 0, 0);
+    shaping_global_stat_judge(line, SHAPING_SESSION_QUEUE_LEN+10+1, (SHAPING_SESSION_QUEUE_LEN+10+1)*100, 100, 10000, 0, 0);
     fclose(stat_file);
 }
 
@@ -1520,7 +1545,7 @@ TEST(statistics, udp_queueing_pkt)
     shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
 
     /*******send packets***********/
-    send_packets(&ctx->thread_ctx[0], sf, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
+    send_packets(&ctx->thread_ctx[0], sf, 101, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
 
 
     /***********send stat data here********************/
@@ -1533,11 +1558,12 @@ TEST(statistics, udp_queueing_pkt)
     stat_file = fopen(SHAPING_GLOBAL_STAT_FILE_NAME, "r");
     memset(line, 0, sizeof(line));
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_global_stat_judge(line, 10, 1000, 0, 0, 90, 9000);
+    shaping_global_stat_judge(line, 11, 1100, 0, 0, 90, 9000);
     fclose(stat_file);
 
     //first 10 packets
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
+    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 1));//async pass 1 packet
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
     while (!TAILQ_EMPTY(&expec_tx_queue)) {//last 90 delay packets
@@ -1567,7 +1593,7 @@ TEST(statistics, udp_queueing_pkt)
     memset(line, 0, sizeof(line));
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//stat data first sent
-    shaping_stat_judge(line, 0, 0, 1, 10, 1000, 0, 90, 0, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(line, 0, 0, 1, 11, 1100, 0, 90, 0, SHAPING_DIR_OUT, profile_type_primary);
 
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//stat data last sent
     shaping_stat_judge(line, 0, 0, 1, 90, 9000, 0, 0, 90000, SHAPING_DIR_OUT, profile_type_primary);
