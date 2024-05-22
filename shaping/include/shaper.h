@@ -132,7 +132,7 @@ struct shaping_profile_hash_node {
     struct shaper_aqm_blue_para aqm_blue_para;
     struct shaper_aqm_codel_para aqm_codel_para;
     unsigned char is_invalid;
-    unsigned char async_pass[SHAPING_DIR_MAX];
+    unsigned char async_pass[SHAPING_PRIORITY_NUM_MAX][SHAPING_DIR_MAX];
     struct timeout timeout_handle;
     UT_hash_handle hh;
 };

@@ -382,13 +382,13 @@ int shaper_flow_in_order_get(struct shaper *sp, struct shaper_flow_instance sf_i
     return count;
 }
 
-static void shaper_profile_async_pass_set(struct shaping_profile_info *profile, unsigned char direction, int async_pass_enabled)
+static void shaper_profile_async_pass_set(struct shaping_profile_info *profile, unsigned char direction, int priority, int async_pass_enabled)
 {
     struct shaping_profile_hash_node *pf_hash_node = profile->hash_node;
     unsigned char *async_pass = NULL;
 
     if (profile->type == PROFILE_TYPE_GENERIC) {
-        async_pass = &pf_hash_node->async_pass[direction];
+        async_pass = &pf_hash_node->async_pass[priority][direction];
     } else {
         async_pass = &profile->async_pass[direction];
     }
@@ -400,12 +400,12 @@ static void shaper_profile_async_pass_set(struct shaping_profile_info *profile, 
     return;
 }
 
-static int shaper_profile_async_pass_get(struct shaping_profile_info *profile, unsigned char direction)
+static int shaper_profile_async_pass_get(struct shaping_profile_info *profile, unsigned char direction, int priority)
 {
     struct shaping_profile_hash_node *pf_hash_node = profile->hash_node;
 
     if (profile->type == PROFILE_TYPE_GENERIC) {
-        return pf_hash_node->async_pass[direction];
+        return pf_hash_node->async_pass[priority][direction];
     } else {
         return profile->async_pass[direction];
     }
@@ -480,7 +480,7 @@ static void shaper_deposit_token_add(struct shaping_thread_ctx *ctx, struct shap
 
     *deposit_token += req_token_bits;
     if (*deposit_token > 0) {
-        shaper_profile_async_pass_set(profile, direction, 1);
+        shaper_profile_async_pass_set(profile, direction, priority, 1);
     } else {
         pf_hash_node->token_multiple.token_not_enough = 1;
         shaper_token_multiple_update(ctx, profile);
@@ -525,7 +525,7 @@ static void shaper_token_get_cb(const struct swarmkv_reply *reply, void * cb_arg
     }
 
     if (reply->integer == 0) {
-        shaper_profile_async_pass_set(profile, arg->direction, 0);
+        shaper_profile_async_pass_set(profile, arg->direction, profile->priority, 0);
 
         if (profile->type == PROFILE_TYPE_GENERIC) {
             pf_hash_node->token_multiple.has_failed_get_token = 1;
@@ -577,6 +577,15 @@ static int shaper_deposit_token_get(struct shaping_profile_info *profile, int re
             break;
         case PROFILE_TYPE_HOST_FARINESS:
         case PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS:
+            if (pf_hash_node->limit_direction == PROFILE_LIMIT_DIRECTION_BIDIRECTION) {
+                deposit_token = &profile->bidirection_deposit_token_bits;
+            } else if (direction == SHAPING_DIR_IN) {
+                deposit_token = &profile->in_deposit_token_bits;
+            } else {
+                deposit_token = &profile->out_deposit_token_bits;
+            }
+            token_multiple = 1;
+            break;
         case PROFILE_TYPE_SPLIT_BY_LOCAL_HOST:
             if (pf_hash_node->limit_direction == PROFILE_LIMIT_DIRECTION_BIDIRECTION) {
                 deposit_token = &profile->bidirection_deposit_token_bits;
@@ -602,7 +611,7 @@ static int shaper_deposit_token_get(struct shaping_profile_info *profile, int re
     }
 
     if (*deposit_token + (req_token_bits * token_multiple * 2) < 0) {
-        shaper_profile_async_pass_set(profile, direction, 0);
+        shaper_profile_async_pass_set(profile, direction, priority, 0);
     }
 
     return ret;
@@ -767,8 +776,8 @@ static int shaper_profile_is_priority_blocked(struct shaping_thread_ctx *ctx, st
 
 END:
     if (curr_time_ms - profile->hash_node->priority_blocked_time_ms[priority] < PRIORITY_BLOCK_MIN_TIME_MS) {
-        shaper_profile_async_pass_set(profile, SHAPING_DIR_OUT, 0);
-        shaper_profile_async_pass_set(profile, SHAPING_DIR_IN, 0);
+        shaper_profile_async_pass_set(profile, SHAPING_DIR_OUT, priority, 0);
+        shaper_profile_async_pass_set(profile, SHAPING_DIR_IN, priority, 0);
         return 1;
     } else {
         return 0;
@@ -838,7 +847,7 @@ static int shaper_token_consume(struct shaping_thread_ctx *ctx, struct shaping_f
         return SHAPER_TOKEN_GET_PASS;//rule is disabled, don't need to get token and forward packet
     }
 
-    if (shaper_profile_async_pass_get(profile, direction) == 1) {
+    if (shaper_profile_async_pass_get(profile, direction, profile->priority) == 1) {
         shaper_deposit_token_get(profile, req_token_bytes * 8, direction, profile->priority, 1, &need_get_token);
         ret = SHAPER_TOKEN_GET_SUCCESS;
     } else if (shaper_deposit_token_get(profile, req_token_bytes * 8, direction, profile->priority, 0, &need_get_token) == 0) {
