@@ -232,6 +232,11 @@ int clock_gettime (clockid_t __clock_id, struct timespec *__tp)
 
 
 /**************stub of swarmkv*****************/
+void swarmkv_register_thread(struct swarmkv *db)
+{
+    return;
+}
+
 struct swarmkv_options* swarmkv_options_new(void)
 {
     return NULL;

@@ -195,7 +195,7 @@ struct shaping_flow* shaper_session_close(struct shaping_thread_ctx *ctx, struct
 
     sf = (struct shaping_flow *)session_node->val_data;
 
-    if (shaper_queue_empty(sf)) {
+    if (shaper_queue_empty(sf, SHAPING_DIR_IN) && shaper_queue_empty(sf, SHAPING_DIR_OUT)) {
         shaping_flow_free(ctx, sf);
     } else {
         sf->flag |= SESSION_CLOSE;
@@ -245,7 +245,8 @@ void shaper_session_data_free_cb(void *session_data, void *data)
     struct shaping_thread_ctx *ctx = (struct shaping_thread_ctx *)data;
 
     if (sf) {
-        shaper_queue_clear(sf, ctx);
+        shaper_queue_clear(sf, ctx, SHAPING_DIR_IN);
+        shaper_queue_clear(sf, ctx, SHAPING_DIR_OUT);
         shaping_flow_free(ctx, sf);
     }
 

@@ -139,6 +139,8 @@ struct swarmkv* shaper_swarmkv_init(int caller_thread_num)
         return NULL;
     }
 
+    swarmkv_register_thread(swarmkv_db);
+
     LOG_DEBUG("%s: shaping open swarmkv: %s", LOG_TAG_SWARMKV, conf.swarmkv_cluster_name);
 
     char cmd[256] = {0};//重启之后自动执行一次heal
