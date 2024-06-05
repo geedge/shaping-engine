@@ -146,7 +146,7 @@ struct shaping_profile_info {
     long long out_deposit_token_bits;
     long long bidirection_deposit_token_bits;
     long long last_failed_get_token_ms[SHAPING_DIR_MAX];
-    unsigned long long enqueue_time_us;//to calculate max latency
+    unsigned long long enqueue_time_us[SHAPING_DIR_MAX];//to calculate max latency
     struct shaping_stat_for_profile stat;
     struct shaping_profile_hash_node *hash_node;
 };
@@ -168,7 +168,6 @@ struct shaping_packet_wrapper {
     unsigned int length;
     int rule_anchor;
     int aqm_processed_pf_ids[SHAPING_REF_PROFILE_NUM_MAX];
-    unsigned char direction;
     TAILQ_ENTRY(shaping_packet_wrapper) node;
 };
 TAILQ_HEAD(delay_queue, shaping_packet_wrapper);
@@ -178,7 +177,7 @@ struct metadata
     uint64_t session_id;
     char *raw_data;
     int raw_len;
-    int dir;
+    enum shaping_packet_dir dir;
     int is_tcp_pure_ctrl;
     int is_ctrl_pkt;
     uint16_t l7_offset;       // only control packet set l7_offset
@@ -189,14 +188,14 @@ struct metadata
 struct shaping_flow {
     char *src_ip_str;
     size_t src_ip_str_len;
-    struct delay_queue packet_queue;
+    struct delay_queue packet_queue[SHAPING_DIR_MAX];
     int rule_num;
     struct shaping_rule_info matched_rule_infos[SHAPING_RULE_NUM_MAX];
     int priority;
     unsigned char dscp_enable;
     unsigned char dscp_value;
     struct addr_tuple4 tuple4;
-    int anchor;//rule_idx
+    int anchor[SHAPING_DIR_MAX];//rule_idx
     int ref_cnt;
     unsigned int queue_len;
     unsigned int flag;
@@ -241,12 +240,9 @@ void shaping_flow_free(struct shaping_thread_ctx *ctx, struct shaping_flow *sf);
 struct shaper* shaper_new(unsigned int priority_queue_len_max);
 void shaper_free(struct shaper *sp);
 
-bool shaper_queue_empty(struct shaping_flow *sf);
-void shaper_packet_dequeue(struct shaping_flow *sf);
-struct shaping_packet_wrapper* shaper_first_pkt_get(struct shaping_flow *sf);
-void shaper_queue_clear(struct shaping_flow *sf, struct shaping_thread_ctx *ctx);
+bool shaper_queue_empty(struct shaping_flow *sf, enum shaping_packet_dir dir);
+void shaper_queue_clear(struct shaping_flow *sf, struct shaping_thread_ctx *ctx, enum shaping_packet_dir dir);
 
-int shaper_flow_in_order_get(struct shaper *sp, struct shaper_flow_instance sf_ins[], int priority, int max_sf_num);
 void shaper_profile_hash_node_set(struct shaping_thread_ctx *ctx, struct shaping_profile_info *profile);
 
 int shaper_global_conf_init(struct shaping_system_conf *conf);
