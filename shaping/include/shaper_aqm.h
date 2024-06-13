@@ -1,6 +1,8 @@
 #pragma once
 #include <time.h>
 
+#include "shaper_stat.h"
+
 #define BLUE_PROBABILITY_MAX 100
 #define BLUE_INCREMENT 10
 #define BLUE_DECREMENT 1
@@ -34,6 +36,6 @@ struct shaper_aqm_codel_para {
     unsigned int drop_count;
 };
 
-int shaper_aqm_need_drop(struct shaping_profile_info *profile, struct shaping_packet_wrapper *pkt_wrapper, struct timespec *curr_time, unsigned long long latency_us);
+int shaper_aqm_need_drop(struct shaping_profile_info *profile, struct shaping_packet_wrapper *pkt_wrapper, enum shaping_packet_dir dir, struct timespec *curr_time, unsigned long long latency_us);
 int shaper_aqm_blue_need_drop(int profile_id, struct shaper_aqm_blue_para *para, int curr_queue_len);
 int shaper_aqm_codel_need_drop(int profile_id, struct shaper_aqm_codel_para *para, unsigned long long curr_time_ms, unsigned long long latency_ms);

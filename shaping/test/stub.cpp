@@ -15,6 +15,7 @@
 #include <assert.h>
 #include <pthread.h>
 #include "shaper.h"
+#include "shaper_stat.h"
 #include "stub.h"
 #include "shaper_maat.h"
 #include "log.h"
@@ -51,7 +52,7 @@ static int pf_async_times[MAX_STUB_PROFILE_NUM];
 vector<struct stub_token_thread_arg> pf_async_thread[MAX_STUB_PROFILE_NUM];
 struct stub_matched_rules matched_rules;
 struct shaping_profile pf_array[MAX_STUB_PROFILE_NUM];
-static int profile_priority_len[MAX_STUB_PROFILE_NUM][10] = {{0}};
+static int profile_priority_len[MAX_STUB_PROFILE_NUM][SHAPING_PRIORITY_NUM_MAX][SHAPING_DIR_MAX];
 
 static unsigned long long curr_time_ns = 2000000000;//2s
 static unsigned int curr_time_s = 0;
@@ -204,6 +205,7 @@ void stub_init()
     TAILQ_INIT(&tx_queue);
     memset(&matched_rules, 0, sizeof(struct stub_matched_rules));
     memset(&pf_array, 0, MAX_STUB_PROFILE_NUM * sizeof(struct shaping_profile));
+    memset(&profile_priority_len, 0, MAX_STUB_PROFILE_NUM * SHAPING_PRIORITY_NUM_MAX * SHAPING_DIR_MAX * sizeof(int));
 
     for (i = 0; i < MAX_STUB_PROFILE_NUM; i++) {
         pf_curr_avl_token[i].in_limit_bandwidth = DEFAULT_AVALIABLE_TOKEN_PER_SEC;
@@ -316,10 +318,18 @@ static void swarmkv_hincrby_cmd_func(char *cmd_str, swarmkv_on_reply_callback_t 
     int profile_id;
     int priority;
     int value;
+    char direction[5] = {0};
+    enum shaping_packet_dir dir;
     struct swarmkv_reply *reply = (struct swarmkv_reply*)calloc(1, sizeof(struct swarmkv_reply));
 
-    sscanf(cmd_str, "HINCRBY tsg-shaping-%d priority-%d %d", &profile_id, &priority, &value);
-    profile_priority_len[profile_id][priority] += value;
+    sscanf(cmd_str, "HINCRBY tsg-shaping-%d priority-%d-%s %d", &profile_id, &priority, direction, &value);
+    if (strncmp(direction, "in", 2) == 0) {
+        dir = SHAPING_DIR_IN;
+    } else {
+        dir = SHAPING_DIR_OUT;
+    }
+
+    profile_priority_len[profile_id][priority][dir] += value;
 
     reply->type = SWARMKV_REPLY_INTEGER;
     cb(reply, cb_arg);
@@ -335,11 +345,19 @@ static void swarmkv_hmget_cmd_func(char *cmd_str, swarmkv_on_reply_callback_t * 
     int priority[10];
     int ret;
     int priority_num;
+    char direction[5] = {0};
+    enum shaping_packet_dir dir;
     struct swarmkv_reply *reply = (struct swarmkv_reply*)calloc(1, sizeof(struct swarmkv_reply));
 
-    ret = sscanf(cmd_str, "HMGET tsg-shaping-%d priority-%d priority-%d priority-%d priority-%d priority-%d priority-%d priority-%d priority-%d priority-%d", 
-                    &profile_id, &priority[0], &priority[1], &priority[2], &priority[3], &priority[4], &priority[5], &priority[6], &priority[7], &priority[8]);
+    ret = sscanf(cmd_str, "HMGET tsg-shaping-%d priority-%d-%s priority-%d-%*s priority-%d-%*s priority-%d-%*s priority-%d-%*s priority-%d-%*s priority-%d-%*s priority-%d-%*s priority-%d-%*s", 
+                    &profile_id, &priority[0], direction, &priority[1], &priority[2], &priority[3], &priority[4], &priority[5], &priority[6], &priority[7], &priority[8]);
     priority_num = ret - 1;
+
+    if (strncmp(direction, "in", 2) == 0) {
+        dir = SHAPING_DIR_IN;
+    } else {
+        dir = SHAPING_DIR_OUT;
+    }
 
     reply->type = SWARMKV_REPLY_ARRAY;
     reply->n_element = priority_num;
@@ -349,7 +367,7 @@ static void swarmkv_hmget_cmd_func(char *cmd_str, swarmkv_on_reply_callback_t * 
         reply->elements[i]->type = SWARMKV_REPLY_STRING;
 
         char tmp_str[128] = {0};
-        sprintf(tmp_str, "%d", profile_priority_len[profile_id][priority[i]]);
+        sprintf(tmp_str, "%d", profile_priority_len[profile_id][priority[i]][dir]);
         reply->elements[i]->str = (char *)calloc(1, strlen(tmp_str));
         memcpy(reply->elements[i]->str, tmp_str, strlen(tmp_str));
         reply->elements[i]->len = strlen(tmp_str);

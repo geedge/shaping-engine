@@ -4,6 +4,12 @@
 #include "uthash.h"
 #include <fieldstat.h>
 
+enum shaping_packet_dir {
+    SHAPING_DIR_IN = 0,
+    SHAPING_DIR_OUT,
+    SHAPING_DIR_MAX
+};
+
 enum shaping_stat_tags_index {
     TAG_VSYS_ID_IDX = 0,
     TAG_RULE_ID_IDX,
@@ -37,7 +43,7 @@ struct shaping_stat_for_profile_dir {
 struct shaping_stat_for_profile {
     struct shaping_stat_for_profile_dir in;
     struct shaping_stat_for_profile_dir out;
-    long long priority_queue_len;
+    long long priority_queue_len[SHAPING_DIR_MAX];
 };
 
 struct shaping_stat {
