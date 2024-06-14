@@ -96,7 +96,7 @@ static void shaper_aqm_mark_processed(struct shaping_packet_wrapper *pkt_wrapper
     }
 }
 
-int shaper_aqm_need_drop(struct shaping_profile_info *profile, struct shaping_packet_wrapper *pkt_wrapper, struct timespec *curr_time, unsigned long long latency_us)
+int shaper_aqm_need_drop(struct shaping_profile_info *profile, struct shaping_packet_wrapper *pkt_wrapper, enum shaping_packet_dir dir, struct timespec *curr_time, unsigned long long latency_us)
 {
     int ret = 0;
     unsigned long long curr_time_ms;
@@ -111,7 +111,7 @@ int shaper_aqm_need_drop(struct shaping_profile_info *profile, struct shaping_pa
     
     switch (profile->hash_node->aqm_type) {
         case AQM_TYPE_BLUE:
-            ret = shaper_aqm_blue_need_drop(profile->id, &profile->hash_node->aqm_blue_para, profile->hash_node->queue_len[profile->priority]);
+            ret = shaper_aqm_blue_need_drop(profile->id, &profile->hash_node->aqm_blue_para, profile->hash_node->queue_len[profile->priority][dir]);
             break;
         case AQM_TYPE_CODEL:
             curr_time_ms = curr_time->tv_sec * MILLI_SECONDS_PER_SEC + curr_time->tv_nsec / NANO_SECONDS_PER_MILLI_SEC;

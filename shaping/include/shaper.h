@@ -76,12 +76,6 @@ struct shaping_ctx {
     struct shaping_thread_ctx *thread_ctx;
 };
 
-enum shaping_packet_dir {
-    SHAPING_DIR_IN = 0,
-    SHAPING_DIR_OUT,
-    SHAPING_DIR_MAX
-};
-
 enum shaping_packet_action {
     SHAPING_FORWARD = 0,
     SHAPING_QUEUED,
@@ -120,11 +114,11 @@ struct shaping_profile_hash_node {
     long long out_deposit_token_bits[SHAPING_PRIORITY_NUM_MAX];
     long long bidirection_deposit_token_bits[SHAPING_PRIORITY_NUM_MAX];
     long long last_failed_get_token_ms[SHAPING_DIR_MAX];
-    long long last_hmget_ms;
-    long long queue_len[SHAPING_PRIORITY_NUM_MAX];
-    long long local_queue_len[SHAPING_PRIORITY_NUM_MAX];
+    long long last_hmget_ms[SHAPING_DIR_MAX];
+    long long queue_len[SHAPING_PRIORITY_NUM_MAX][SHAPING_DIR_MAX];
+    long long local_queue_len[SHAPING_PRIORITY_NUM_MAX][SHAPING_DIR_MAX];
     long long local_queue_len_update_time_us[SHAPING_PRIORITY_NUM_MAX];
-    long long priority_blocked_time_ms[SHAPING_PRIORITY_NUM_MAX];
+    long long priority_blocked_time_ms[SHAPING_PRIORITY_NUM_MAX][SHAPING_DIR_MAX];
     int hmget_ref_cnt;
     int tconsume_ref_cnt;
     unsigned long long last_refresh_time_ms;
@@ -221,6 +215,7 @@ struct shaping_tconsume_cb_arg {
 struct shaping_hmget_cb_arg {
     struct shaping_thread_ctx *ctx;
     struct shaping_profile_hash_node *pf_hash_node;
+    enum shaping_packet_dir dir;
     long long start_time_us;
 };
 
@@ -228,6 +223,7 @@ struct shaping_hincrby_cb_arg {
     struct shaping_thread_ctx *ctx;
     long long start_time_us;
     long long queue_len;
+    enum shaping_packet_dir dir;
     int profile_id;
     int priority;
     int retry_cnt;

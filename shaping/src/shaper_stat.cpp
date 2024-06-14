@@ -152,7 +152,8 @@ static void shaper_stat_swarmkv_hincrby_cb(const struct swarmkv_reply *reply, vo
         shaper_global_stat_async_hincrby_failed_inc(&ctx->thread_global_stat);
 
         if (arg->retry_cnt >= HINCRBY_RETRY_MAX) {
-            LOG_ERROR("%s: shaping stat hincrby failed after retry %d times for profile id %d priority %d, operate queue_len %lld", LOG_TAG_STAT, arg->retry_cnt, arg->profile_id, arg->priority, arg->queue_len);
+            LOG_ERROR("%s: shaping stat hincrby failed after retry %d times for profile id %d priority %d, operate %s queue_len %lld", 
+                    LOG_TAG_STAT, arg->retry_cnt, arg->profile_id, arg->priority, arg->dir == SHAPING_DIR_IN ? "in" : "out", arg->queue_len);
             goto END;
         }
 
@@ -161,8 +162,13 @@ static void shaper_stat_swarmkv_hincrby_cb(const struct swarmkv_reply *reply, vo
         shaper_global_stat_async_invoke_inc(&ctx->thread_global_stat);//hincrby failed, retry
         shaper_global_stat_hincrby_invoke_inc(&ctx->thread_global_stat);
 
-        LOG_DEBUG("%s: shaping stat hincrby failed, retry for profile id %d priority %d, operate queue_len %lld", LOG_TAG_STAT, arg->profile_id, arg->priority, arg->queue_len);
-        swarmkv_async_command(ctx->swarmkv_db, shaper_stat_swarmkv_hincrby_cb, arg, "HINCRBY tsg-shaping-%d priority-%d %lld", arg->profile_id, arg->priority, arg->queue_len);
+        LOG_DEBUG("%s: shaping stat hincrby failed, retry for profile id %d priority %d, operate %s queue_len %lld", LOG_TAG_STAT, arg->profile_id, arg->priority, arg->dir == SHAPING_DIR_IN ? "in" : "out", arg->queue_len);
+
+        if (arg->dir == SHAPING_DIR_IN) {
+            swarmkv_async_command(ctx->swarmkv_db, shaper_stat_swarmkv_hincrby_cb, arg, "HINCRBY tsg-shaping-%d priority-%d-in %lld", arg->profile_id, arg->priority, arg->queue_len);
+        } else {
+            swarmkv_async_command(ctx->swarmkv_db, shaper_stat_swarmkv_hincrby_cb, arg, "HINCRBY tsg-shaping-%d priority-%d-out %lld", arg->profile_id, arg->priority, arg->queue_len);
+        }
         
         return;
     }
@@ -172,13 +178,9 @@ END:
     return;
 }
 
-static void shaper_stat_priority_queue_len_refresh(struct shaping_thread_ctx *ctx, struct shaping_profile_hash_node *profile_hash_node, int priority, long long curr_time_us)
+static void shaper_stat_priority_queue_len_refresh_dir(struct shaping_thread_ctx *ctx, struct shaping_profile_hash_node *profile_hash_node, int priority, enum shaping_packet_dir direction, long long curr_time_us)
 {
-    if (profile_hash_node->local_queue_len[priority] == 0) {
-        return;
-    }
-
-    if (curr_time_us - profile_hash_node->local_queue_len_update_time_us[priority] < SHAPER_STAT_REFRESH_TIME_US) {
+    if (profile_hash_node->local_queue_len[priority][direction] == 0) {
         return;
     }
 
@@ -188,13 +190,31 @@ static void shaper_stat_priority_queue_len_refresh(struct shaping_thread_ctx *ct
     arg->start_time_us = curr_time_us;
     arg->profile_id = profile_hash_node->id;
     arg->priority = priority;
-    arg->queue_len = profile_hash_node->local_queue_len[priority];
+    arg->dir = direction;
+    arg->queue_len = profile_hash_node->local_queue_len[priority][direction];
     shaper_global_stat_async_invoke_inc(&ctx->thread_global_stat);
     shaper_global_stat_hincrby_invoke_inc(&ctx->thread_global_stat);
-    swarmkv_async_command(ctx->swarmkv_db, shaper_stat_swarmkv_hincrby_cb, arg, "HINCRBY tsg-shaping-%d priority-%d %lld", arg->profile_id, arg->priority, arg->queue_len);
+    if (direction == SHAPING_DIR_IN) {
+        swarmkv_async_command(ctx->swarmkv_db, shaper_stat_swarmkv_hincrby_cb, arg, "HINCRBY tsg-shaping-%d priority-%d-in %lld", arg->profile_id, arg->priority, arg->queue_len);
+    } else {
+        swarmkv_async_command(ctx->swarmkv_db, shaper_stat_swarmkv_hincrby_cb, arg, "HINCRBY tsg-shaping-%d priority-%d-out %lld", arg->profile_id, arg->priority, arg->queue_len);
+    }
+
+    profile_hash_node->local_queue_len[priority][direction] = 0;
+
+    return;
+}
+
+static void shaper_stat_priority_queue_len_refresh(struct shaping_thread_ctx *ctx, struct shaping_profile_hash_node *profile_hash_node, int priority, long long curr_time_us)
+{
+    if (curr_time_us - profile_hash_node->local_queue_len_update_time_us[priority] < SHAPER_STAT_REFRESH_TIME_US) {
+        return;
+    }
+
+    shaper_stat_priority_queue_len_refresh_dir(ctx, profile_hash_node, priority, SHAPING_DIR_IN, curr_time_us);
+    shaper_stat_priority_queue_len_refresh_dir(ctx, profile_hash_node, priority, SHAPING_DIR_OUT, curr_time_us);
 
     profile_hash_node->local_queue_len_update_time_us[priority] = curr_time_us;
-    profile_hash_node->local_queue_len[priority] = 0;
 
     return;
 }
@@ -223,8 +243,10 @@ static void shaper_stat_profile_metirc_refresh(struct shaping_thread_ctx *ctx, s
     unsigned long long old_latency;
 
     if (need_update_guage) {
-        profile->hash_node->local_queue_len[priority] += profile_stat->priority_queue_len;
-        profile_stat->priority_queue_len = 0;
+        profile->hash_node->local_queue_len[priority][SHAPING_DIR_IN] += profile_stat->priority_queue_len[SHAPING_DIR_IN];
+        profile->hash_node->local_queue_len[priority][SHAPING_DIR_OUT] += profile_stat->priority_queue_len[SHAPING_DIR_OUT];
+        profile_stat->priority_queue_len[SHAPING_DIR_IN] = 0;
+        profile_stat->priority_queue_len[SHAPING_DIR_OUT] = 0;
         shaper_stat_priority_queue_len_refresh(ctx, profile->hash_node, priority, curr_time_us);
     }
 
@@ -358,7 +380,7 @@ void shaper_stat_queueing_pkt_inc(struct shaping_stat_for_profile *profile_stat,
         profile_stat->out.queue_len++;
     }
 
-    profile_stat->priority_queue_len++;
+    profile_stat->priority_queue_len[direction]++;
 
     return;
 }
@@ -371,7 +393,7 @@ void shaper_stat_queueing_pkt_dec(struct shaping_stat_for_profile *profile_stat,
         profile_stat->out.queue_len--;
     }
 
-    profile_stat->priority_queue_len--;
+    profile_stat->priority_queue_len[direction]--;
 
     return;
 }
