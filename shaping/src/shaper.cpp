@@ -813,7 +813,6 @@ void shaper_profile_hash_node_set(struct shaping_thread_ctx *ctx, struct shaping
 static int shaping_swarmkv_is_too_short_interval(long long curr_time_ms, struct shaping_profile_info *profile, unsigned char direction)
 {
     long long last_failed_ms = 0;
-    return 0;
 
     switch (profile->type) {
         case PROFILE_TYPE_GENERIC:
