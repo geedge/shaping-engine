@@ -676,7 +676,7 @@ static void shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct
         case PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS:
             swarmkv_ftconsume(ctx->swarmkv_db, key, strlen(key), sf->src_ip_str, sf->src_ip_str_len, sf->matched_rule_infos[sf->anchor[dir]].fair_factor, req_token_bits, shaper_token_get_cb, arg);
             //TODO: ftconsume with flexiable
-            //swarmkv_async_command(ctx->swarmkv_db, shaper_token_get_cb, arg, "FTCONSUME %s %s %d %d %s", key, sf->src_ip_str, sf->matched_rule_infos[sf->anchor].fair_factor, req_token_bits, "FLEXIBLE");
+            //swarmkv_async_command(ctx->swarmkv_db, shaper_token_get_cb, arg, "FTCONSUME %s %s %d %d %s", key, sf->src_ip_str, sf->matched_rule_infos[sf->anchor[dir]].fair_factor, req_token_bits, "FLEXIBLE");
             break;
         case PROFILE_TYPE_SPLIT_BY_LOCAL_HOST:
             swarmkv_btconsume(ctx->swarmkv_db, key, strlen(key), sf->src_ip_str, sf->src_ip_str_len, req_token_bits * TOKEN_MULTIPLE_DEFAULT, shaper_token_get_cb, arg);
@@ -813,6 +813,7 @@ void shaper_profile_hash_node_set(struct shaping_thread_ctx *ctx, struct shaping
 static int shaping_swarmkv_is_too_short_interval(long long curr_time_ms, struct shaping_profile_info *profile, unsigned char direction)
 {
     long long last_failed_ms = 0;
+    return 0;
 
     switch (profile->type) {
         case PROFILE_TYPE_GENERIC:
