@@ -1,5 +1,3 @@
-#include <cstring>
-#include <ctime>
 #include <fieldstat.h>
 #include <gtest/gtest.h>
 #include <cjson/cJSON.h>

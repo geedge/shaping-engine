@@ -49,6 +49,7 @@ void stub_curr_time_s_inc(int time_s);
 unsigned long long stub_curr_time_ns_get();
 
 void stub_init();
+void init_dummy_swarmkv();
 
 /*******************temporary for test******************************/
 void stub_shaper_stat_send(int thread_seq);
