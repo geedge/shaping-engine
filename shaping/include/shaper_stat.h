@@ -1,8 +1,8 @@
 #pragma once
 
 #include <netinet/in.h>
+#include <librdkafka/rdkafka.h>
 #include "uthash.h"
-#include <fieldstat.h>
 
 enum shaping_packet_dir {
     SHAPING_DIR_IN = 0,
@@ -20,9 +20,7 @@ enum shaping_stat_tags_index {
 };
 
 enum shaping_stat_column_index {
-    IN_MAX_LATENCY_IDX = 0,
-    IN_QUEUE_LEN_IDX,
-    OUT_MAX_LATENCY_IDX,
+    IN_QUEUE_LEN_IDX = 0,
     OUT_QUEUE_LEN_IDX,
     IN_PKTS_IDX,
     IN_BYTES_IDX,
@@ -47,8 +45,12 @@ struct shaping_stat_for_profile {
 };
 
 struct shaping_stat {
-    struct fieldstat_dynamic_instance *instance;
-    int table_id;
+    struct fieldstat_easy *instance;
+    rd_kafka_t *kafka_handle; 
+    rd_kafka_topic_t *topic_rkt;
+    int output_interval_s;
+    int in_latency_histogram_id;
+    int out_latency_histogram_id;
     unsigned int column_ids[STAT_COLUNM_IDX_MAX];
 };
 
@@ -66,3 +68,5 @@ void shaper_stat_max_latency_update(struct shaping_stat_for_profile *profile_sta
 
 void shaper_stat_refresh(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, int force);
 void shaper_stat_priority_queue_len_refresh_all(struct shaping_thread_ctx *ctx, struct shaping_profile_hash_node *profile_hash_node);
+
+void shaper_stat_output(struct shaping_stat *stat);

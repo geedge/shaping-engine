@@ -1,7 +1,7 @@
-#include <fieldstat.h>
 #include <gtest/gtest.h>
 #include <cjson/cJSON.h>
 #include <sys/queue.h>
+#include <fieldstat/fieldstat_easy.h>
 
 #include "log.h"
 #include "shaper.h"
@@ -12,14 +12,12 @@
 #include "stub.h"
 
 #define SHAPING_SESSION_QUEUE_LEN 128
-#define SHAPING_STAT_FILE_NAME "/tmp/shaping_metrics.json"
-#define SHAPING_GLOBAL_STAT_FILE_NAME "shaping_global_metric"
 #define FIELDSTAT_AUTO_TIME_MAX 999999000
+
+#define FIELDSTAT_OUTPUT_BUF_LEN 4096
 
 char profile_type_primary[] = "primary";
 char profile_type_borrow[] = "borrow";
-
-char line[4096];
 
 static struct stub_packet* packet_new(unsigned long long income_time, unsigned int length, unsigned char dir)
 {
@@ -266,11 +264,17 @@ TEST(single_session, udp_tx_in_order)
     }
 
     shaping_flow_free(&ctx->thread_ctx[0], sf);
-    fieldstat_global_disable_prometheus_endpoint();
 
     /***********send stat data here********************/
-    fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
-    shaper_global_stat_refresh(ctx);
+    char *global_stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
+    size_t global_stat_str_len = sizeof(global_stat_str);
+    char *stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
+    size_t stat_str_len = sizeof(stat_str);
+    
+    shaper_thread_global_stat_refresh(&ctx->thread_ctx[0]);
+
+    fieldstat_easy_output(ctx->global_stat->instance, &global_stat_str, &global_stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
@@ -278,24 +282,14 @@ TEST(single_session, udp_tx_in_order)
     stub_clear_matched_shaping_rules();
 
     /*******test statistics***********/
-    sleep(2);//wait telegraf to output
-    FILE *stat_file;
-
     //judge shaping metric
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
-    memset(line, 0, sizeof(line));
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
-    fclose(stat_file);
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
-    fclose(stat_file);
+    shaping_stat_judge(stat_str, 0, 0, 1, 100, 10000, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
 
     //judge shaping global metric
-    stat_file = fopen(SHAPING_GLOBAL_STAT_FILE_NAME, "r");
-    memset(line, 0, sizeof(line));
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_global_stat_judge(line, 100, 10000, 0, 0, 0, 0);
-    fclose(stat_file);
+    shaping_global_stat_judge(global_stat_str, 100, 10000, 0, 0, 0, 0);
+
+    free(global_stat_str);
+    free(stat_str);
 }
 
 /*session1 match rule1
@@ -355,7 +349,6 @@ TEST(bidirectional, udp_tx_in_order)
     ASSERT_TRUE(TAILQ_EMPTY(&expec_tx_queue_in));
 
     shaping_flow_free(&ctx->thread_ctx[0], sf);
-    fieldstat_global_disable_prometheus_endpoint();
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
@@ -410,11 +403,17 @@ TEST(max_min_host_fairness_profile, udp_tx_in_order)
     }
 
     shaping_flow_free(&ctx->thread_ctx[0], sf);
-    fieldstat_global_disable_prometheus_endpoint();
 
     /***********send stat data here********************/
-    fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
-    shaper_global_stat_refresh(ctx);
+    char *global_stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
+    size_t global_stat_str_len = sizeof(global_stat_str);
+    char *stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
+    size_t stat_str_len = sizeof(stat_str);
+    
+    shaper_thread_global_stat_refresh(&ctx->thread_ctx[0]);
+
+    fieldstat_easy_output(ctx->global_stat->instance, &global_stat_str, &global_stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
@@ -422,24 +421,14 @@ TEST(max_min_host_fairness_profile, udp_tx_in_order)
     stub_clear_matched_shaping_rules();
 
     /*******test statistics***********/
-    sleep(2);//wait telegraf to output
-    FILE *stat_file;
-
     //judge shaping metric
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
-    memset(line, 0, sizeof(line));
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
-    fclose(stat_file);
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
-    fclose(stat_file);
+    shaping_stat_judge(stat_str, 0, 0, 1, 100, 10000, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
 
     //judge shaping global metric
-    stat_file = fopen(SHAPING_GLOBAL_STAT_FILE_NAME, "r");
-    memset(line, 0, sizeof(line));
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_global_stat_judge(line, 100, 10000, 0, 0, 0, 0);
-    fclose(stat_file);
+    shaping_global_stat_judge(global_stat_str, 100, 10000, 0, 0, 0, 0);
+
+    free(global_stat_str);
+    free(stat_str);
 }
 
 /*session1 match rule1
@@ -482,9 +471,11 @@ TEST(single_session, tcp_tx_in_order)
 
 
     /***********send stat data here********************/
-    shaper_stat_refresh(&ctx->thread_ctx[0], sf, 1);
-    fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
-    sleep(2);//wait telegraf generate metric
+    char *stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
+    size_t stat_str_len = sizeof(stat_str);
+    
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
+    shaping_stat_judge(stat_str, 0, 0, 1, 20, 2000, 0, 10, 0, SHAPING_DIR_OUT, profile_type_primary);//*test statistics
 
 
     stub_refresh_token_bucket(0);
@@ -502,10 +493,9 @@ TEST(single_session, tcp_tx_in_order)
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
 
     shaping_flow_free(&ctx->thread_ctx[0], sf);
-    fieldstat_global_disable_prometheus_endpoint();
 
     /***********send stat data here********************/
-    fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
@@ -513,20 +503,8 @@ TEST(single_session, tcp_tx_in_order)
 
 
     /*******test statistics***********/
-    sleep(2);//wait telegraf to output
-    FILE *stat_file;
-
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
-    memset(line, 0, sizeof(line));
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 0, 0, 1, 20, 2000, 0, 10, 0, SHAPING_DIR_OUT, profile_type_primary);
-
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 0, 0, 1, 10, 1000, 0, 0, 31000, SHAPING_DIR_OUT, profile_type_primary);
-
-    fclose(stat_file);
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
-    fclose(stat_file);
+    shaping_stat_judge(stat_str, 0, 0, 1, 10, 1000, 0, 0, 31000, SHAPING_DIR_OUT, profile_type_primary);
+    free(stat_str);
 }
 
 /*session1 match rule1
@@ -581,10 +559,12 @@ TEST(single_session, udp_diff_direction)
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
     shaping_flow_free(&ctx->thread_ctx[0], sf);
-    fieldstat_global_disable_prometheus_endpoint();
 
     /***********send stat data here********************/
-    fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
+    char *stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
+    size_t stat_str_len = sizeof(stat_str);
+    
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
@@ -592,18 +572,9 @@ TEST(single_session, udp_diff_direction)
 
 
     /*******test statistics***********/
-    sleep(2);//wait telegraf to output
-    FILE *stat_file;
-
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
-    memset(line, 0, sizeof(line));
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 0, 0, 1, 20, 2000, 0, 0, 21000, SHAPING_DIR_OUT, profile_type_primary);
-
-    shaping_stat_judge(line, 0, 0, 1, 20, 2000, 0, 0, 0, SHAPING_DIR_IN, profile_type_primary);
-    fclose(stat_file);
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
-    fclose(stat_file);
+    shaping_stat_judge(stat_str, 0, 0, 1, 20, 2000, 0, 0, 21000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(stat_str, 0, 0, 1, 20, 2000, 0, 0, 0, SHAPING_DIR_IN, profile_type_primary);
+    free(stat_str);
 }
 
 /*session1 match rule1, rule2, rule3
@@ -660,33 +631,28 @@ TEST(single_session, udp_multi_rules)
     }
 
     shaping_flow_free(&ctx->thread_ctx[0], sf);
-    fieldstat_global_disable_prometheus_endpoint();
 
     /***********send stat data here********************/
-    fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
+    char *stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
+    size_t stat_str_len = sizeof(stat_str);
+    
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
 
     /*******test statistics***********/
-    sleep(2);//wait telegraf to output
-    FILE *stat_file;
+    //profile_id 0
+    shaping_stat_judge(stat_str, 0, 0, 1, 100, 10000, 0, 0, 507000, SHAPING_DIR_OUT, profile_type_primary);
 
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
-    memset(line, 0, sizeof(line));
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 0
-    shaping_stat_judge(line, 0, 0, 1, 100, 10000, 0, 0, 507000, SHAPING_DIR_OUT, profile_type_primary);
+    //profile_id 1 
+    shaping_stat_judge(stat_str, 1, 1, 1, 100, 10000, 0, 0, 1000, SHAPING_DIR_OUT, profile_type_primary);
 
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 1 
-    shaping_stat_judge(line, 1, 1, 1, 100, 10000, 0, 0, 1000, SHAPING_DIR_OUT, profile_type_primary);
+    //profile_id 2
+    shaping_stat_judge(stat_str, 2, 2, 1, 100, 10000, 0, 0, 91000, SHAPING_DIR_OUT, profile_type_primary);//max latency is first queued pkt
 
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2
-    shaping_stat_judge(line, 2, 2, 1, 100, 10000, 0, 0, 91000, SHAPING_DIR_OUT, profile_type_primary);//max latency is first queued pkt
-
-    fclose(stat_file);
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
-    fclose(stat_file);
+    free(stat_str);
 }
 
 /*session1 match rule1
@@ -735,30 +701,25 @@ TEST(single_session, udp_borrow)
     }
 
     shaping_flow_free(&ctx->thread_ctx[0], sf);
-    fieldstat_global_disable_prometheus_endpoint();
 
     /***********send stat data here********************/
-    fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
+    char *stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
+    size_t stat_str_len = sizeof(stat_str);
+    
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
 
     /*******test statistics***********/
-    sleep(2);//wait telegraf to output
-    FILE *stat_file;
+    //profile_id 1, primary
+    shaping_stat_judge(stat_str, 1, 1, 1, 0, 0, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);
 
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
-    memset(line, 0, sizeof(line));
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 1, primary
-    shaping_stat_judge(line, 1, 1, 1, 0, 0, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);
+    //profile_id 2, borrow
+    shaping_stat_judge(stat_str, 1, 2, 2, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2, borrow
-    shaping_stat_judge(line, 1, 2, 2, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
-
-    fclose(stat_file);
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
-    fclose(stat_file);
+    free(stat_str);
 }
 
 /*session1 match rule1
@@ -810,35 +771,30 @@ TEST(single_session, udp_borrow_same_priority_9)
     }
 
     shaping_flow_free(&ctx->thread_ctx[0], sf);
-    fieldstat_global_disable_prometheus_endpoint();
 
     /***********send stat data here********************/
-    fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
+    char *stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
+    size_t stat_str_len = sizeof(stat_str);
+    
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
 
     /*******test statistics***********/
-    sleep(2);//wait telegraf to output
-    FILE *stat_file;
-
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
-    memset(line, 0, sizeof(line));
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 1, primary
-    shaping_stat_judge(line, 1, 1, 9, 0, 0, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);
+    //profile_id 1, primary
+    shaping_stat_judge(stat_str, 1, 1, 9, 0, 0, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);
 
 #if 0 //fieldstat don't output a row when all values is zero
     ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2, borrow
     shaping_stat_judge(line, 1, 2, 9, 0, 0, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
 #endif
 
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 3, borrow
-    shaping_stat_judge(line, 1, 3, 9, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
+    //profile_id 3, borrow
+    shaping_stat_judge(stat_str, 1, 3, 9, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
-    fclose(stat_file);
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
-    fclose(stat_file);
+    free(stat_str);
 }
 
 /*session1 match rule1
@@ -885,7 +841,6 @@ TEST(single_session_async, udp_close_before_async_exec)
 
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
     
-    fieldstat_global_disable_prometheus_endpoint();
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
@@ -980,33 +935,28 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
 
     shaping_flow_free(&ctx->thread_ctx[0], sf1);
     shaping_flow_free(&ctx->thread_ctx[0], sf2);
-    fieldstat_global_disable_prometheus_endpoint();
 
     /***********send stat data here********************/
-    fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
+    char *stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
+    size_t stat_str_len = sizeof(stat_str);
+    
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
 
     /*******test statistics***********/
-    sleep(2);//wait telegraf to output
-    FILE *stat_file;
+    //profile_id 1, primary
+    shaping_stat_judge(stat_str, 1, 1, 1, 0, 0, 0, 0, 1471000, SHAPING_DIR_OUT, profile_type_primary);
 
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
-    memset(line, 0, sizeof(line));
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 1, primary
-    shaping_stat_judge(line, 1, 1, 1, 0, 0, 0, 0, 1471000, SHAPING_DIR_OUT, profile_type_primary);
+    //profile_id 2, borrow
+    shaping_stat_judge(stat_str, 1, 2, 2, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2, borrow
-    shaping_stat_judge(line, 1, 2, 2, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
+    //profile_id 2, primary
+    shaping_stat_judge(stat_str, 2, 2, 1, 100, 10000, 0, 0, 191000, SHAPING_DIR_OUT, profile_type_primary);
 
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2, primary
-    shaping_stat_judge(line, 2, 2, 1, 100, 10000, 0, 0, 191000, SHAPING_DIR_OUT, profile_type_primary);
-
-    fclose(stat_file);
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
-    fclose(stat_file);
+    free(stat_str);
 }
 
 /*session1 match rule1; session2 match rule2
@@ -1089,7 +1039,6 @@ TEST(two_session_diff_priority_same_profile, two_thread_udp_tx_in_order)
 
     shaping_flow_free(&ctx->thread_ctx[0], sf1);
     shaping_flow_free(&ctx->thread_ctx[1], sf2);
-    fieldstat_global_disable_prometheus_endpoint();
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
@@ -1191,7 +1140,6 @@ TEST(two_session_diff_priority_same_profile, profile_timer_test)
 
     shaping_flow_free(&ctx->thread_ctx[0], sf1);
     shaping_flow_free(&ctx->thread_ctx[1], sf2);
-    fieldstat_global_disable_prometheus_endpoint();
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
@@ -1279,7 +1227,6 @@ TEST(two_session_diff_priority_same_profile, one_direction_dont_block_another)
 
     shaping_flow_free(&ctx->thread_ctx[0], sf1);
     shaping_flow_free(&ctx->thread_ctx[1], sf2);
-    fieldstat_global_disable_prometheus_endpoint();
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
@@ -1355,7 +1302,6 @@ TEST(two_sessions, priority_non_block)
 
     shaping_flow_free(&ctx->thread_ctx[0], sf1);
     shaping_flow_free(&ctx->thread_ctx[1], sf2);
-    fieldstat_global_disable_prometheus_endpoint();
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
@@ -1430,7 +1376,6 @@ TEST(two_sessions, borrow_when_primary_profile_priority_blocked)
 
     shaping_flow_free(&ctx->thread_ctx[0], sf1);
     shaping_flow_free(&ctx->thread_ctx[1], sf2);
-    fieldstat_global_disable_prometheus_endpoint();
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
@@ -1511,7 +1456,6 @@ TEST(two_sessions, primary_profile_priority_blocked_by_borrow_profile)
 
     shaping_flow_free(&ctx->thread_ctx[0], sf1);
     shaping_flow_free(&ctx->thread_ctx[1], sf2);
-    fieldstat_global_disable_prometheus_endpoint();
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
@@ -1560,35 +1504,31 @@ TEST(statistics, udp_drop_pkt)
     }
 
     shaping_flow_free(&ctx->thread_ctx[0], sf);
-    fieldstat_global_disable_prometheus_endpoint();
 
     /***********send stat data here********************/
-    fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
-    shaper_global_stat_refresh(ctx);
+    char *global_stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
+    size_t global_stat_str_len = sizeof(global_stat_str);
+    char *stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
+    size_t stat_str_len = sizeof(stat_str);
+    
+    shaper_thread_global_stat_refresh(&ctx->thread_ctx[0]);
+
+    fieldstat_easy_output(ctx->global_stat->instance, &global_stat_str, &global_stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
 
     /*******test statistics***********/
-    sleep(2);//wait telegraf to output
-    FILE *stat_file;
-
     //judge shaping metric
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
-    memset(line, 0, sizeof(line));
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_stat_judge(line, 0, 0, 1, SHAPING_SESSION_QUEUE_LEN+10, (SHAPING_SESSION_QUEUE_LEN+10)*100, 100, 0, 228000, SHAPING_DIR_OUT, profile_type_primary);//every queued pkt's latency is max
-    fclose(stat_file);
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
-    fclose(stat_file);
+    shaping_stat_judge(stat_str, 0, 0, 1, SHAPING_SESSION_QUEUE_LEN+10, (SHAPING_SESSION_QUEUE_LEN+10)*100, 100, 0, 228000, SHAPING_DIR_OUT, profile_type_primary);//every queued pkt's latency is max
 
     //judge shaping global metric
-    stat_file = fopen(SHAPING_GLOBAL_STAT_FILE_NAME, "r");
-    memset(line, 0, sizeof(line));
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_global_stat_judge(line, SHAPING_SESSION_QUEUE_LEN+10, (SHAPING_SESSION_QUEUE_LEN+10)*100, 100, 10000, 0, 0);
-    fclose(stat_file);
+    shaping_global_stat_judge(global_stat_str, SHAPING_SESSION_QUEUE_LEN+10, (SHAPING_SESSION_QUEUE_LEN+10)*100, 100, 10000, 0, 0);
+
+    free(global_stat_str);
+    free(stat_str);
 }
 
 /*session1 match rule1
@@ -1604,7 +1544,6 @@ TEST(statistics, udp_queueing_pkt)
     int priority[] = {1};
     int profile_num[] = {1};
     int profile_id[][MAX_REF_PROFILE] = {{0}};
-    FILE *stat_file;
 
     TAILQ_INIT(&expec_tx_queue);
     stub_init();
@@ -1624,17 +1563,20 @@ TEST(statistics, udp_queueing_pkt)
 
 
     /***********send stat data here********************/
+    char *global_stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
+    size_t global_stat_str_len = sizeof(global_stat_str);
+    char *stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
+    size_t stat_str_len = sizeof(stat_str);
+    
+    shaper_thread_global_stat_refresh(&ctx->thread_ctx[0]);
     shaper_stat_refresh(&ctx->thread_ctx[0], sf, 1);
-    fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
-    shaper_global_stat_refresh(ctx);
-    sleep(2);//wait telegraf generate metric
 
-    /*******judge global metric********/
-    stat_file = fopen(SHAPING_GLOBAL_STAT_FILE_NAME, "r");
-    memset(line, 0, sizeof(line));
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_global_stat_judge(line, 10, 1000, 0, 0, 90, 9000);
-    fclose(stat_file);
+    fieldstat_easy_output(ctx->global_stat->instance, &global_stat_str, &global_stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
+
+    /*******judge metric********/
+    shaping_stat_judge(stat_str, 0, 0, 1, 10, 1000, 0, 90, 0, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_global_stat_judge(global_stat_str, 10, 1000, 0, 0, 90, 9000);
 
     //first 10 packets
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
@@ -1649,39 +1591,24 @@ TEST(statistics, udp_queueing_pkt)
     }
 
     shaping_flow_free(&ctx->thread_ctx[0], sf);
-    fieldstat_global_disable_prometheus_endpoint();
 
     /***********send stat data here********************/
-    fieldstat_dynamic_passive_output(ctx->stat->instance);//send metric manualy
-    shaper_global_stat_refresh(ctx);
+    fieldstat_easy_output(ctx->global_stat->instance, &global_stat_str, &global_stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     stub_clear_matched_shaping_rules();
 
     /*******test statistics***********/
-    sleep(2);//wait telegraf to output
-
     //judge shaping metric
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "r");
-    memset(line, 0, sizeof(line));
-
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//stat data first sent
-    shaping_stat_judge(line, 0, 0, 1, 10, 1000, 0, 90, 0, SHAPING_DIR_OUT, profile_type_primary);
-
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//stat data last sent
-    shaping_stat_judge(line, 0, 0, 1, 90, 9000, 0, 0, 90000, SHAPING_DIR_OUT, profile_type_primary);
-
-    fclose(stat_file);
-    stat_file = fopen(SHAPING_STAT_FILE_NAME, "w");//clear stat file
-    fclose(stat_file);
+    shaping_stat_judge(stat_str, 0, 0, 1, 90, 9000, 0, 0, 90000, SHAPING_DIR_OUT, profile_type_primary);
 
     //judge global metric
-    stat_file = fopen(SHAPING_GLOBAL_STAT_FILE_NAME, "r");
-    memset(line, 0, sizeof(line));
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));
-    shaping_global_stat_judge(line, 90, 9000, 0, 0, -90, -9000);
-    fclose(stat_file);
+    shaping_global_stat_judge(global_stat_str, 90, 9000, 0, 0, -90, -9000);
+
+    free(global_stat_str);
+    free(stat_str);
 }
 
 int main(int argc, char **argv) 

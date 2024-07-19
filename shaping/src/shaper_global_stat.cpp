@@ -2,70 +2,64 @@
 #include <stdlib.h>
 
 #include <MESA/MESA_prof_load.h>
-#include <fieldstat.h>
+#include <fieldstat/fieldstat_easy.h>
 
 #include "log.h"
 #include "utils.h"
 #include "shaper.h"
 #include "shaper_global_stat.h"
 
-struct shaping_global_stat_conf {
-    int is_self_test;
-};
-
-static int shaper_global_stat_conf_load(struct shaping_global_stat *stat, struct shaping_global_stat_conf *conf)
+static int shaper_global_stat_conf_load(struct shaping_global_stat *stat)
 {
     MESA_load_profile_int_def(SHAPING_GLOBAL_CONF_FILE, "METRIC", "GLOBAL_STAT_OUTPUT_INTERVAL_S", &stat->output_interval_s, 1);
-    MESA_load_profile_int_def(SHAPING_GLOBAL_CONF_FILE, "METRIC", "SELF_TEST", &conf->is_self_test, 0);
 
     return 0;
 }
 
 static void shaper_global_stat_fieldstat_reg(struct shaping_global_stat *stat)
 {
-    const char * quantiles = "0.1,0.5,0.8,0.9,0.95,0.99";
-    stat->swarmkv_latency_summary_id = fieldstat_register_summary(stat->instance, "async_delay(us)", NULL, 0, quantiles, 1, 500000, 3, 1);
+    stat->swarmkv_latency_summary_id = fieldstat_easy_register_histogram(stat->instance, "async_delay(us)", 1, 500000, 1);
 
-    stat->column_ids[CURR_SESSION_NUM_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_GAUGE, "curr_session_num", NULL, 0);
-    stat->column_ids[QUEUEING_PKTS_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_GAUGE, "curr_queueing_pkts", NULL, 0);
-    stat->column_ids[QUEUEING_BYTES_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_GAUGE, "curr_queueing_bytes", NULL, 0);
+    stat->column_ids[CURR_SESSION_NUM_IDX] = fieldstat_easy_register_counter(stat->instance, "curr_session_num");
+    stat->column_ids[QUEUEING_PKTS_IDX] = fieldstat_easy_register_counter(stat->instance, "curr_queueing_pkts");
+    stat->column_ids[QUEUEING_BYTES_IDX] = fieldstat_easy_register_counter(stat->instance, "curr_queueing_bytes");
 
-    stat->column_ids[CTRL_ERR_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "ctrl_error", NULL, 0);
-    stat->column_ids[CTRL_OPENING_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "ctrl_open", NULL, 0);
-    stat->column_ids[CTRL_ACTIVE_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "ctrl_active", NULL, 0);
-    stat->column_ids[CTRL_CLOSE_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "ctrl_close", NULL, 0);
-    stat->column_ids[CTRL_ACTIVE_CLOSE_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "ctrl_sf_close", NULL, 0);
-    stat->column_ids[CTRL_RESETALL_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "ctrl_reset", NULL, 0);
-    stat->column_ids[SESSION_LOG_SEND_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "sess_log_send", NULL, 0);
+    stat->column_ids[CTRL_ERR_IDX] = fieldstat_easy_register_counter(stat->instance, "ctrl_error");
+    stat->column_ids[CTRL_OPENING_IDX] = fieldstat_easy_register_counter(stat->instance, "ctrl_open");
+    stat->column_ids[CTRL_ACTIVE_IDX] = fieldstat_easy_register_counter(stat->instance, "ctrl_active");
+    stat->column_ids[CTRL_CLOSE_IDX] = fieldstat_easy_register_counter(stat->instance, "ctrl_close");
+    stat->column_ids[CTRL_ACTIVE_CLOSE_IDX] = fieldstat_easy_register_counter(stat->instance, "ctrl_sf_close");
+    stat->column_ids[CTRL_RESETALL_IDX] = fieldstat_easy_register_counter(stat->instance, "ctrl_reset");
+    stat->column_ids[SESSION_LOG_SEND_IDX] = fieldstat_easy_register_counter(stat->instance, "sess_log_send");
 
-    stat->column_ids[ASYNC_INVOKE_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "async", NULL, 0);
-    stat->column_ids[ASYNC_CALLBACK_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "async_cb", NULL, 0);
+    stat->column_ids[ASYNC_INVOKE_IDX] = fieldstat_easy_register_counter(stat->instance, "async");
+    stat->column_ids[ASYNC_CALLBACK_IDX] = fieldstat_easy_register_counter(stat->instance, "async_cb");
 
-    stat->column_ids[ASYNC_TCONSUME_INVOKE_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "tconsume", NULL, 0);
-    stat->column_ids[ASYNC_TCONSUME_CALLBACK_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "tconsume_cb", NULL, 0);
-    stat->column_ids[ASYNC_HINCRBY_INVOKE_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "hincrby", NULL, 0);
-    stat->column_ids[ASYNC_HINCRBY_CALLBACK_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "hincrby_cb", NULL, 0);
-    stat->column_ids[ASYNC_HMGET_INVOKE_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "hmget", NULL, 0);
-    stat->column_ids[ASYNC_HMGET_CALLBACK_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "hmget_cb", NULL, 0);
+    stat->column_ids[ASYNC_TCONSUME_INVOKE_IDX] = fieldstat_easy_register_counter(stat->instance, "tconsume");
+    stat->column_ids[ASYNC_TCONSUME_CALLBACK_IDX] = fieldstat_easy_register_counter(stat->instance, "tconsume_cb");
+    stat->column_ids[ASYNC_HINCRBY_INVOKE_IDX] = fieldstat_easy_register_counter(stat->instance, "hincrby");
+    stat->column_ids[ASYNC_HINCRBY_CALLBACK_IDX] = fieldstat_easy_register_counter(stat->instance, "hincrby_cb");
+    stat->column_ids[ASYNC_HMGET_INVOKE_IDX] = fieldstat_easy_register_counter(stat->instance, "hmget");
+    stat->column_ids[ASYNC_HMGET_CALLBACK_IDX] = fieldstat_easy_register_counter(stat->instance, "hmget_cb");
 
-    stat->column_ids[ASYNC_TCONSUME_FAILED] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "tconsume_failed", NULL, 0);
-    stat->column_ids[ASYNC_HINCRBY_FAILED] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "hincrby_failed", NULL, 0);
-    stat->column_ids[ASYNC_HMGET_FAILED] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "hmget_failed", NULL, 0);
+    stat->column_ids[ASYNC_TCONSUME_FAILED] = fieldstat_easy_register_counter(stat->instance, "tconsume_failed");
+    stat->column_ids[ASYNC_HINCRBY_FAILED] = fieldstat_easy_register_counter(stat->instance, "hincrby_failed");
+    stat->column_ids[ASYNC_HMGET_FAILED] = fieldstat_easy_register_counter(stat->instance, "hmget_failed");
 
-    stat->column_ids[RX_PKTS_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "all_rx_pkts", NULL, 0);
-    stat->column_ids[RX_BYTES_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "all_rx_bytes", NULL, 0);
-    stat->column_ids[TX_PKTS_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "all_tx_pkts", NULL, 0);
-    stat->column_ids[TX_BYTES_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "all_tx_bytes", NULL, 0);
-    stat->column_ids[DROP_PKTS_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "all_drop_pkts", NULL, 0);
-    stat->column_ids[DROP_BYTES_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "all_drop_bytes", NULL, 0);
+    stat->column_ids[RX_PKTS_IDX] = fieldstat_easy_register_counter(stat->instance, "all_rx_pkts");
+    stat->column_ids[RX_BYTES_IDX] = fieldstat_easy_register_counter(stat->instance, "all_rx_bytes");
+    stat->column_ids[TX_PKTS_IDX] = fieldstat_easy_register_counter(stat->instance, "all_tx_pkts");
+    stat->column_ids[TX_BYTES_IDX] = fieldstat_easy_register_counter(stat->instance, "all_tx_bytes");
+    stat->column_ids[DROP_PKTS_IDX] = fieldstat_easy_register_counter(stat->instance, "all_drop_pkts");
+    stat->column_ids[DROP_BYTES_IDX] = fieldstat_easy_register_counter(stat->instance, "all_drop_bytes");
 
-    stat->column_ids[HIT_POLICY_RX_PKTS_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "shape_rx_pkts", NULL, 0);
-    stat->column_ids[HIT_POLICY_RX_BYTES_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "shape_rx_bytes", NULL, 0);
-    stat->column_ids[HIT_POLICY_TX_PKTS_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "shape_tx_pkts", NULL, 0);
-    stat->column_ids[HIT_POLICY_TX_BYTES_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "shape_tx_bytes", NULL, 0);
-    stat->column_ids[HIT_POLICY_TX_SYN_ACK_PKTS_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "shape_tx_syn_ack_pkts", NULL, 0);
-    stat->column_ids[HIT_POLICY_DROP_PKTS_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "shape_drop_pkts", NULL, 0);
-    stat->column_ids[HIT_POLICY_DROP_BYTES_IDX] = fieldstat_register(stat->instance, FIELD_TYPE_COUNTER, "shape_drop_bytes", NULL, 0);
+    stat->column_ids[HIT_POLICY_RX_PKTS_IDX] = fieldstat_easy_register_counter(stat->instance, "shape_rx_pkts");
+    stat->column_ids[HIT_POLICY_RX_BYTES_IDX] = fieldstat_easy_register_counter(stat->instance, "shape_rx_bytes");
+    stat->column_ids[HIT_POLICY_TX_PKTS_IDX] = fieldstat_easy_register_counter(stat->instance, "shape_tx_pkts");
+    stat->column_ids[HIT_POLICY_TX_BYTES_IDX] = fieldstat_easy_register_counter(stat->instance, "shape_tx_bytes");
+    stat->column_ids[HIT_POLICY_TX_SYN_ACK_PKTS_IDX] = fieldstat_easy_register_counter(stat->instance, "shape_tx_syn_ack_pkts");
+    stat->column_ids[HIT_POLICY_DROP_PKTS_IDX] = fieldstat_easy_register_counter(stat->instance, "shape_drop_pkts");
+    stat->column_ids[HIT_POLICY_DROP_BYTES_IDX] = fieldstat_easy_register_counter(stat->instance, "shape_drop_bytes");
 
     return;
 }
@@ -73,49 +67,38 @@ static void shaper_global_stat_fieldstat_reg(struct shaping_global_stat *stat)
 struct shaping_global_stat* shaper_global_stat_init(int work_thread_num)
 {
     struct shaping_global_stat *stat = NULL;
-    struct shaping_global_stat_conf conf;
+    struct fieldstat_tag tag;
+    int ret = 0;
 
     stat = (struct shaping_global_stat*)calloc(1, sizeof(struct shaping_global_stat));
-    stat->stat_data = (struct shaping_global_stat_data*)calloc(work_thread_num, sizeof(struct shaping_global_stat_data));
 
-    if (shaper_global_stat_conf_load(stat, &conf) != 0) {
+    if (shaper_global_stat_conf_load(stat) != 0) {
         LOG_ERROR("%s: shaping init metric conf failed", LOG_TAG_STAT);
         goto ERROR;
     }
     
-    stat->instance = fieldstat_instance_new("shaping_global");
+    tag.key = "shaping_global";
+    tag.type = TAG_CSTRING;
+    tag.value_str = "shaping_global";
+    stat->instance = fieldstat_easy_new(work_thread_num, "shaping_global", &tag, 1);
     if (stat->instance == NULL) {
         LOG_ERROR("%s: shaping global init fieldstat instance failed", LOG_TAG_STAT);
         goto ERROR;
     }
 
     shaper_global_stat_fieldstat_reg(stat);
-
-    fieldstat_disable_background_thread(stat->instance);
-    if (conf.is_self_test) {
-        fieldstat_set_local_output(stat->instance, "shaping_global_metric", "json");
-    } else {
-        fieldstat_set_local_output(stat->instance, "shaping_global_metric", "default");
-    }
-
-    if (fieldstat_global_enable_prometheus_endpoint(9007, NULL) != 0) {
-        LOG_ERROR("%s: shaping global fieldstat enable prometheus endpoint failed", LOG_TAG_STAT);
+    ret = fieldstat_easy_enable_auto_output(stat->instance, "./metric/shaping_global_stat.json", stat->output_interval_s);
+    if (ret < 0) {
+        LOG_ERROR("%s: shaping global enable auto output failed, ret %d", LOG_TAG_STAT, ret);
         goto ERROR;
     }
-    
-    if (fieldstat_enable_prometheus_output(stat->instance) != 0) {
-        LOG_ERROR("%s: shaping global fieldstat enable prometheus output failed", LOG_TAG_STAT);
-        goto ERROR;
-    }
-
-    fieldstat_instance_start(stat->instance);
     
     return stat;
 
 ERROR:
     if (stat) {
         if (stat->instance) {
-            fieldstat_instance_free(stat->instance);
+            fieldstat_easy_free(stat->instance);
         }
         free(stat);
     }
@@ -128,21 +111,17 @@ void shaper_global_stat_destroy(struct shaping_global_stat *stat)
         return;
     }
 
-    if (stat->stat_data) {
-        free(stat->stat_data);
-    }
-
     if (stat->instance) {
-        fieldstat_instance_free(stat->instance);
+        fieldstat_easy_free(stat->instance);
     }
     free(stat);
 
     return;
 }
 
-void shaper_global_stat_swarmkv_latency_update(struct shaping_global_stat *stat, long long latency_us)
+void shaper_global_stat_swarmkv_latency_update(struct shaping_global_stat *stat, long long latency_us, int thread_idx)
 {
-    fieldstat_value_set(stat->instance, stat->swarmkv_latency_summary_id, latency_us);
+    fieldstat_easy_histogram_record(stat->instance, thread_idx, stat->swarmkv_latency_summary_id, NULL, 0, latency_us);
 
     return;
 }
@@ -360,103 +339,53 @@ void shaper_global_stat_hit_policy_drop_inc(struct shaping_global_stat_data *thr
     return;
 }
 
-void shaper_global_stat_refresh(struct shaping_ctx *ctx)
+void shaper_thread_global_stat_refresh(struct shaping_thread_ctx *ctx)
 {
-    static struct shaping_global_stat_data sum;
+    struct shaping_global_stat_data *stat_data = &ctx->thread_global_stat;
     struct shaping_global_stat *global_stat = ctx->global_stat;
-    struct shaping_global_stat_data *stat_data = global_stat->stat_data;
 
-    for (int i = 0; i < ctx->thread_num; i++) {
-        memcpy(&stat_data[i], &ctx->thread_ctx[i].thread_global_stat, sizeof(struct shaping_global_stat_data));
-    }
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[CURR_SESSION_NUM_IDX], NULL, 0, stat_data->curr_session_num);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[QUEUEING_PKTS_IDX], NULL, 0, stat_data->queueing_pkts);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[QUEUEING_BYTES_IDX], NULL, 0, stat_data->queueing_bytes);
 
-    memset(&sum, 0, sizeof(struct shaping_global_stat_data));
-    for (int i = 0; i < ctx->thread_num; i++) {
-        sum.curr_session_num += stat_data[i].curr_session_num;
-        sum.queueing_pkts += stat_data[i].queueing_pkts;
-        sum.queueing_bytes += stat_data[i].queueing_bytes;
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[CTRL_ERR_IDX], NULL, 0, stat_data->ctrl_error);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[CTRL_OPENING_IDX], NULL, 0, stat_data->ctrl_opening);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[CTRL_ACTIVE_IDX], NULL, 0, stat_data->ctrl_active);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[CTRL_CLOSE_IDX], NULL, 0, stat_data->ctrl_close);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[CTRL_ACTIVE_CLOSE_IDX], NULL, 0, stat_data->ctrl_active_close);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[CTRL_RESETALL_IDX], NULL, 0, stat_data->ctrl_resetall);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[SESSION_LOG_SEND_IDX], NULL, 0, stat_data->session_log_send);
 
-        sum.ctrl_error += stat_data[i].ctrl_error;
-        sum.ctrl_opening += stat_data[i].ctrl_opening;
-        sum.ctrl_active += stat_data[i].ctrl_active;
-        sum.ctrl_close += stat_data[i].ctrl_close;
-        sum.ctrl_active_close += stat_data[i].ctrl_active_close;
-        sum.ctrl_resetall += stat_data[i].ctrl_resetall;
-        sum.session_log_send += stat_data[i].session_log_send;
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[ASYNC_INVOKE_IDX], NULL, 0, stat_data->async_invoke);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[ASYNC_CALLBACK_IDX], NULL, 0, stat_data->async_callback);
 
-        sum.async_invoke += stat_data[i].async_invoke;
-        sum.async_callback += stat_data[i].async_callback;
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[ASYNC_TCONSUME_INVOKE_IDX], NULL, 0, stat_data->async_tconsume_invoke);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[ASYNC_TCONSUME_CALLBACK_IDX], NULL, 0, stat_data->async_tconsume_callback);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[ASYNC_HINCRBY_INVOKE_IDX], NULL, 0, stat_data->async_hincrby_invoke);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[ASYNC_HINCRBY_CALLBACK_IDX], NULL, 0, stat_data->async_hincrby_callback);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[ASYNC_HMGET_INVOKE_IDX], NULL, 0, stat_data->async_hmget_invoke);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[ASYNC_HMGET_CALLBACK_IDX], NULL, 0, stat_data->async_hmget_callback);
 
-        sum.async_tconsume_invoke += stat_data[i].async_tconsume_invoke;
-        sum.async_tconsume_callback += stat_data[i].async_tconsume_callback;
-        sum.async_hincrby_invoke += stat_data[i].async_hincrby_invoke;
-        sum.async_hincrby_callback += stat_data[i].async_hincrby_callback;
-        sum.async_hmget_invoke += stat_data[i].async_hmget_invoke;
-        sum.async_hmget_callback += stat_data[i].async_hmget_callback;
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[ASYNC_TCONSUME_FAILED], NULL, 0, stat_data->async_tconsume_failed);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[ASYNC_HINCRBY_FAILED], NULL, 0, stat_data->async_hincrby_failed);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[ASYNC_HMGET_FAILED], NULL, 0, stat_data->async_hmget_failed);
 
-        sum.async_tconsume_failed += stat_data[i].async_tconsume_failed;
-        sum.async_hincrby_failed += stat_data[i].async_hincrby_failed;
-        sum.async_hmget_failed += stat_data[i].async_hmget_failed;
+    struct shaping_global_stat_traffic_data *all_traffic_data = &stat_data->all_traffic;
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[RX_PKTS_IDX], NULL, 0, all_traffic_data->rx_pkts);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[RX_BYTES_IDX], NULL, 0, all_traffic_data->rx_bytes);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[TX_PKTS_IDX], NULL, 0, all_traffic_data->tx_pkts);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[TX_BYTES_IDX], NULL, 0, all_traffic_data->tx_bytes);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[DROP_PKTS_IDX], NULL, 0, all_traffic_data->drop_pkts);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[DROP_BYTES_IDX], NULL, 0, all_traffic_data->drop_bytes);
 
-        sum.all_traffic.rx_pkts += stat_data[i].all_traffic.rx_pkts;
-        sum.all_traffic.rx_bytes += stat_data[i].all_traffic.rx_bytes;
-        sum.all_traffic.tx_pkts += stat_data[i].all_traffic.tx_pkts;
-        sum.all_traffic.tx_bytes += stat_data[i].all_traffic.tx_bytes;
-        sum.all_traffic.drop_pkts += stat_data[i].all_traffic.drop_pkts;
-        sum.all_traffic.drop_bytes += stat_data[i].all_traffic.drop_bytes;
+    struct shaping_global_stat_traffic_data *hit_policy_traffic_data = &stat_data->hit_policy_traffic;
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[HIT_POLICY_RX_PKTS_IDX], NULL, 0, hit_policy_traffic_data->rx_pkts);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[HIT_POLICY_RX_BYTES_IDX], NULL, 0, hit_policy_traffic_data->rx_bytes);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[HIT_POLICY_TX_PKTS_IDX], NULL, 0, hit_policy_traffic_data->tx_pkts);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[HIT_POLICY_TX_BYTES_IDX], NULL, 0, hit_policy_traffic_data->tx_bytes);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[HIT_POLICY_TX_SYN_ACK_PKTS_IDX], NULL, 0, hit_policy_traffic_data->tx_syn_ack_pkts);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[HIT_POLICY_DROP_PKTS_IDX], NULL, 0, hit_policy_traffic_data->drop_pkts);
+    fieldstat_easy_counter_incrby(global_stat->instance, 0, global_stat->column_ids[HIT_POLICY_DROP_BYTES_IDX], NULL, 0, hit_policy_traffic_data->drop_bytes);
 
-        sum.hit_policy_traffic.rx_pkts += stat_data[i].hit_policy_traffic.rx_pkts;
-        sum.hit_policy_traffic.rx_bytes += stat_data[i].hit_policy_traffic.rx_bytes;
-        sum.hit_policy_traffic.tx_pkts += stat_data[i].hit_policy_traffic.tx_pkts;
-        sum.hit_policy_traffic.tx_bytes += stat_data[i].hit_policy_traffic.tx_bytes;
-        sum.hit_policy_traffic.tx_syn_ack_pkts += stat_data[i].hit_policy_traffic.tx_syn_ack_pkts;
-        sum.hit_policy_traffic.drop_pkts += stat_data[i].hit_policy_traffic.drop_pkts;
-        sum.hit_policy_traffic.drop_bytes += stat_data[i].hit_policy_traffic.drop_bytes;
-    }
-
-    struct shaping_global_stat_traffic_data *all_traffic_data = &sum.all_traffic;
-    struct shaping_global_stat_traffic_data *hit_policy_traffic_data = &sum.hit_policy_traffic;
-
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[CURR_SESSION_NUM_IDX], sum.curr_session_num);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[QUEUEING_PKTS_IDX], sum.queueing_pkts);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[QUEUEING_BYTES_IDX], sum.queueing_bytes);
-
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[CTRL_ERR_IDX], sum.ctrl_error);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[CTRL_OPENING_IDX], sum.ctrl_opening);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[CTRL_ACTIVE_IDX], sum.ctrl_active);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[CTRL_CLOSE_IDX], sum.ctrl_close);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[CTRL_ACTIVE_CLOSE_IDX], sum.ctrl_active_close);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[CTRL_RESETALL_IDX], sum.ctrl_resetall);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[SESSION_LOG_SEND_IDX], sum.session_log_send);
-
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[ASYNC_INVOKE_IDX], sum.async_invoke);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[ASYNC_CALLBACK_IDX], sum.async_callback);
-
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[ASYNC_TCONSUME_INVOKE_IDX], sum.async_tconsume_invoke);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[ASYNC_TCONSUME_CALLBACK_IDX], sum.async_tconsume_callback);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[ASYNC_HINCRBY_INVOKE_IDX], sum.async_hincrby_invoke);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[ASYNC_HINCRBY_CALLBACK_IDX], sum.async_hincrby_callback);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[ASYNC_HMGET_INVOKE_IDX], sum.async_hmget_invoke);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[ASYNC_HMGET_CALLBACK_IDX], sum.async_hmget_callback);
-    
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[ASYNC_TCONSUME_FAILED], sum.async_tconsume_failed);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[ASYNC_HINCRBY_FAILED], sum.async_hincrby_failed);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[ASYNC_HMGET_FAILED], sum.async_hmget_failed);
-
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[RX_PKTS_IDX], all_traffic_data->rx_pkts);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[RX_BYTES_IDX], all_traffic_data->rx_bytes);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[TX_PKTS_IDX], all_traffic_data->tx_pkts);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[TX_BYTES_IDX], all_traffic_data->tx_bytes);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[DROP_PKTS_IDX], all_traffic_data->drop_pkts);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[DROP_BYTES_IDX], all_traffic_data->drop_bytes);
-
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[HIT_POLICY_RX_PKTS_IDX], hit_policy_traffic_data->rx_pkts);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[HIT_POLICY_RX_BYTES_IDX], hit_policy_traffic_data->rx_bytes);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[HIT_POLICY_TX_PKTS_IDX], hit_policy_traffic_data->tx_pkts);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[HIT_POLICY_TX_BYTES_IDX], hit_policy_traffic_data->tx_bytes);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[HIT_POLICY_TX_SYN_ACK_PKTS_IDX], hit_policy_traffic_data->tx_syn_ack_pkts);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[HIT_POLICY_DROP_PKTS_IDX], hit_policy_traffic_data->drop_pkts);
-    fieldstat_value_set(global_stat->instance, global_stat->column_ids[HIT_POLICY_DROP_BYTES_IDX], hit_policy_traffic_data->drop_bytes);
-
-    fieldstat_passive_output(global_stat->instance);
+    memset(&ctx->thread_global_stat, 0, sizeof(struct shaping_global_stat_data));
 }

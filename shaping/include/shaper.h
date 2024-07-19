@@ -56,6 +56,7 @@ struct shaping_thread_ctx {
     struct shaping_ctx *ref_ctx;
     struct shaper *sp;
     struct shaping_stat *stat;
+    struct shaping_global_stat *global_stat;
     struct shaping_marsio_info *marsio_info;
     struct swarmkv *swarmkv_db;//handle of swarmkv 
     struct shaping_maat_info *maat_info;
