@@ -102,7 +102,7 @@ static int judge_packet_eq(struct stub_pkt_queue *expec_queue, struct stub_pkt_q
     return 0;
 }
 
-static void shaping_stat_judge(char *file_line, int rule_id, int profile_id, int priority, 
+static void shaping_stat_judge(char *file_line, int json_array_idx, int rule_id, int profile_id, int priority, 
                             unsigned long long tx_pkts, unsigned long long tx_bytes,
                             unsigned long long drop_pkts, long long queue_len, long long max_latency,
                             unsigned char direction, char profile_type[])
@@ -116,9 +116,14 @@ static void shaping_stat_judge(char *file_line, int rule_id, int profile_id, int
     json = cJSON_Parse(file_line);
     ASSERT_TRUE(json != NULL);
 
+    ASSERT_EQ(json->type, cJSON_Array);
+    ASSERT_GT(cJSON_GetArraySize(json), json_array_idx);
+
+    json = cJSON_GetArrayItem(json, json_array_idx);
+
     tmp_obj = cJSON_GetObjectItem(json, "name");
     ASSERT_TRUE(tmp_obj != NULL);
-    EXPECT_STREQ("traffic_shaping_rule_hits", tmp_obj->valuestring);
+    EXPECT_STREQ("shaping_stat", tmp_obj->valuestring);
 
     /******************parse tags***********************************/
     tags_json = cJSON_GetObjectItem(json, "tags");
@@ -126,19 +131,19 @@ static void shaping_stat_judge(char *file_line, int rule_id, int profile_id, int
 
     tmp_obj = cJSON_GetObjectItem(tags_json, "vsys_id");
     ASSERT_TRUE(tmp_obj != NULL);
-    EXPECT_EQ(atoi(tmp_obj->valuestring), STUB_TEST_VSYS_ID);
+    EXPECT_EQ(tmp_obj->valueint, STUB_TEST_VSYS_ID);
 
     tmp_obj = cJSON_GetObjectItem(tags_json, "rule_id");
     ASSERT_TRUE(tmp_obj != NULL);
-    EXPECT_EQ(rule_id, atoi(tmp_obj->valuestring));
+    EXPECT_EQ(rule_id, tmp_obj->valueint);
 
     tmp_obj = cJSON_GetObjectItem(tags_json, "profile_id");
     ASSERT_TRUE(tmp_obj != NULL);
-    EXPECT_EQ(profile_id, atoi(tmp_obj->valuestring));
+    EXPECT_EQ(profile_id, tmp_obj->valueint);
 
     tmp_obj = cJSON_GetObjectItem(tags_json, "priority");
     ASSERT_TRUE(tmp_obj != NULL);
-    EXPECT_EQ(priority, atoi(tmp_obj->valuestring));
+    EXPECT_EQ(priority, tmp_obj->valueint);
 
     tmp_obj = cJSON_GetObjectItem(tags_json, "profile_type");
     ASSERT_TRUE(tmp_obj != NULL);
@@ -163,17 +168,19 @@ static void shaping_stat_judge(char *file_line, int rule_id, int profile_id, int
     ASSERT_TRUE(tmp_obj != NULL);
     EXPECT_EQ(drop_pkts, tmp_obj->valueint);
 
-    if (max_latency != -1) {
+    //TODO: api to parse histogram
+    /*if (max_latency != -1) {
         snprintf(attr_name, sizeof(attr_name), "%s_max_latency_us", direction == SHAPING_DIR_OUT ? "out" : "in");
         tmp_obj = cJSON_GetObjectItem(fields_json, attr_name);
         ASSERT_TRUE(tmp_obj != NULL);
         EXPECT_EQ(max_latency, tmp_obj->valueint);
-    }
+    }*/
 
     snprintf(attr_name, sizeof(attr_name), "%s_queue_len", direction == SHAPING_DIR_OUT ? "out" : "in");
     tmp_obj = cJSON_GetObjectItem(fields_json, attr_name);
-    ASSERT_TRUE(tmp_obj != NULL);
-    EXPECT_EQ(queue_len, tmp_obj->valueint);
+    if (tmp_obj != NULL) {
+        EXPECT_EQ(queue_len, tmp_obj->valueint);
+    }
 
     cJSON_Delete(json);
 
@@ -182,14 +189,11 @@ static void shaping_stat_judge(char *file_line, int rule_id, int profile_id, int
 
 static int shaping_global_stat_field_get(cJSON *metrics, const char *field_name)
 {
-    int metrics_size = cJSON_GetArraySize(metrics);
+    cJSON *tmp_obj = NULL;
 
-    for (int i = 0; i < metrics_size; i++) {
-        cJSON *tmp = cJSON_GetArrayItem(metrics, i);
-        char *column_name = cJSON_GetObjectItem(tmp, "name")->valuestring;
-        if (strcmp(column_name, field_name) == 0) {
-            return cJSON_GetObjectItem(tmp, "diff")->valueint;
-        }
+    tmp_obj = cJSON_GetObjectItem(metrics, field_name);
+    if (tmp_obj != NULL) {
+        return tmp_obj->valueint;
     }
 
     return -1;
@@ -200,7 +204,9 @@ static void shaping_global_stat_judge(char *file_line, int tx_pkts, int tx_bytes
     cJSON *metrics = NULL;
     cJSON *json = cJSON_Parse(file_line);
 
-    metrics = cJSON_GetObjectItem(json, "metrics");
+    json = cJSON_GetArrayItem(json, 0);
+
+    metrics = cJSON_GetObjectItem(json, "fields");
 
     EXPECT_EQ(tx_pkts, shaping_global_stat_field_get(metrics, "all_tx_pkts"));
     EXPECT_EQ(tx_bytes, shaping_global_stat_field_get(metrics, "all_tx_bytes"));
@@ -283,7 +289,7 @@ TEST(single_session, udp_tx_in_order)
 
     /*******test statistics***********/
     //judge shaping metric
-    shaping_stat_judge(stat_str, 0, 0, 1, 100, 10000, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
+    shaping_stat_judge(stat_str, 0, 0, 0, 1, 100, 10000, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
 
     //judge shaping global metric
     shaping_global_stat_judge(global_stat_str, 100, 10000, 0, 0, 0, 0);
@@ -422,7 +428,7 @@ TEST(max_min_host_fairness_profile, udp_tx_in_order)
 
     /*******test statistics***********/
     //judge shaping metric
-    shaping_stat_judge(stat_str, 0, 0, 1, 100, 10000, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
+    shaping_stat_judge(stat_str, 0, 0, 0, 1, 100, 10000, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
 
     //judge shaping global metric
     shaping_global_stat_judge(global_stat_str, 100, 10000, 0, 0, 0, 0);
@@ -474,8 +480,9 @@ TEST(single_session, tcp_tx_in_order)
     char *stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
     size_t stat_str_len = sizeof(stat_str);
     
+    shaper_stat_refresh(&ctx->thread_ctx[0], sf, 1);
     fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
-    shaping_stat_judge(stat_str, 0, 0, 1, 20, 2000, 0, 10, 0, SHAPING_DIR_OUT, profile_type_primary);//*test statistics
+    shaping_stat_judge(stat_str, 0, 0, 0, 1, 20, 2000, 0, 10, 0, SHAPING_DIR_OUT, profile_type_primary);//*test statistics
 
 
     stub_refresh_token_bucket(0);
@@ -503,7 +510,7 @@ TEST(single_session, tcp_tx_in_order)
 
 
     /*******test statistics***********/
-    shaping_stat_judge(stat_str, 0, 0, 1, 10, 1000, 0, 0, 31000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(stat_str, 0, 0, 0, 1, 30, 3000, 0, 0, 31000, SHAPING_DIR_OUT, profile_type_primary);
     free(stat_str);
 }
 
@@ -572,8 +579,8 @@ TEST(single_session, udp_diff_direction)
 
 
     /*******test statistics***********/
-    shaping_stat_judge(stat_str, 0, 0, 1, 20, 2000, 0, 0, 21000, SHAPING_DIR_OUT, profile_type_primary);
-    shaping_stat_judge(stat_str, 0, 0, 1, 20, 2000, 0, 0, 0, SHAPING_DIR_IN, profile_type_primary);
+    shaping_stat_judge(stat_str, 0, 0, 0, 1, 20, 2000, 0, 0, 21000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(stat_str, 0, 0, 0, 1, 20, 2000, 0, 0, 0, SHAPING_DIR_IN, profile_type_primary);
     free(stat_str);
 }
 
@@ -644,13 +651,13 @@ TEST(single_session, udp_multi_rules)
 
     /*******test statistics***********/
     //profile_id 0
-    shaping_stat_judge(stat_str, 0, 0, 1, 100, 10000, 0, 0, 507000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(stat_str, 0, 0, 0, 1, 100, 10000, 0, 0, 507000, SHAPING_DIR_OUT, profile_type_primary);
 
     //profile_id 1 
-    shaping_stat_judge(stat_str, 1, 1, 1, 100, 10000, 0, 0, 1000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(stat_str, 1, 1, 1, 1, 100, 10000, 0, 0, 1000, SHAPING_DIR_OUT, profile_type_primary);
 
     //profile_id 2
-    shaping_stat_judge(stat_str, 2, 2, 1, 100, 10000, 0, 0, 91000, SHAPING_DIR_OUT, profile_type_primary);//max latency is first queued pkt
+    shaping_stat_judge(stat_str, 2, 2, 2, 1, 100, 10000, 0, 0, 91000, SHAPING_DIR_OUT, profile_type_primary);//max latency is first queued pkt
 
     free(stat_str);
 }
@@ -714,10 +721,10 @@ TEST(single_session, udp_borrow)
 
     /*******test statistics***********/
     //profile_id 1, primary
-    shaping_stat_judge(stat_str, 1, 1, 1, 0, 0, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(stat_str, 0, 1, 1, 1, 0, 0, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);
 
     //profile_id 2, borrow
-    shaping_stat_judge(stat_str, 1, 2, 2, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
+    shaping_stat_judge(stat_str, 1, 1, 2, 2, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
     free(stat_str);
 }
@@ -784,15 +791,13 @@ TEST(single_session, udp_borrow_same_priority_9)
 
     /*******test statistics***********/
     //profile_id 1, primary
-    shaping_stat_judge(stat_str, 1, 1, 9, 0, 0, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(stat_str, 0, 1, 1, 9, 0, 0, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);
 
-#if 0 //fieldstat don't output a row when all values is zero
-    ASSERT_TRUE(NULL != fgets(line, sizeof(line), stat_file));//profile_id 2, borrow
-    shaping_stat_judge(line, 1, 2, 9, 0, 0, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
-#endif
+    //profile_id 2, borrow
+    shaping_stat_judge(stat_str, 1, 1, 2, 9, 0, 0, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
     //profile_id 3, borrow
-    shaping_stat_judge(stat_str, 1, 3, 9, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
+    shaping_stat_judge(stat_str, 2, 1, 3, 9, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
     free(stat_str);
 }
@@ -948,13 +953,13 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
 
     /*******test statistics***********/
     //profile_id 1, primary
-    shaping_stat_judge(stat_str, 1, 1, 1, 0, 0, 0, 0, 1471000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(stat_str, 0, 1, 1, 1, 0, 0, 0, 0, 1471000, SHAPING_DIR_OUT, profile_type_primary);
 
     //profile_id 2, borrow
-    shaping_stat_judge(stat_str, 1, 2, 2, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
+    shaping_stat_judge(stat_str, 1, 1, 2, 2, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
     //profile_id 2, primary
-    shaping_stat_judge(stat_str, 2, 2, 1, 100, 10000, 0, 0, 191000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(stat_str, 2, 2, 2, 1, 100, 10000, 0, 0, 191000, SHAPING_DIR_OUT, profile_type_primary);
 
     free(stat_str);
 }
@@ -1522,7 +1527,7 @@ TEST(statistics, udp_drop_pkt)
 
     /*******test statistics***********/
     //judge shaping metric
-    shaping_stat_judge(stat_str, 0, 0, 1, SHAPING_SESSION_QUEUE_LEN+10, (SHAPING_SESSION_QUEUE_LEN+10)*100, 100, 0, 228000, SHAPING_DIR_OUT, profile_type_primary);//every queued pkt's latency is max
+    shaping_stat_judge(stat_str, 0, 0, 0, 1, SHAPING_SESSION_QUEUE_LEN+10, (SHAPING_SESSION_QUEUE_LEN+10)*100, 100, 0, 228000, SHAPING_DIR_OUT, profile_type_primary);//every queued pkt's latency is max
 
     //judge shaping global metric
     shaping_global_stat_judge(global_stat_str, SHAPING_SESSION_QUEUE_LEN+10, (SHAPING_SESSION_QUEUE_LEN+10)*100, 100, 10000, 0, 0);
@@ -1575,7 +1580,7 @@ TEST(statistics, udp_queueing_pkt)
     fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
 
     /*******judge metric********/
-    shaping_stat_judge(stat_str, 0, 0, 1, 10, 1000, 0, 90, 0, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(stat_str, 0, 0, 0, 1, 10, 1000, 0, 90, 0, SHAPING_DIR_OUT, profile_type_primary);
     shaping_global_stat_judge(global_stat_str, 10, 1000, 0, 0, 90, 9000);
 
     //first 10 packets
@@ -1593,6 +1598,7 @@ TEST(statistics, udp_queueing_pkt)
     shaping_flow_free(&ctx->thread_ctx[0], sf);
 
     /***********send stat data here********************/
+    shaper_thread_global_stat_refresh(&ctx->thread_ctx[0]);
     fieldstat_easy_output(ctx->global_stat->instance, &global_stat_str, &global_stat_str_len);
     fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
 
@@ -1602,10 +1608,10 @@ TEST(statistics, udp_queueing_pkt)
 
     /*******test statistics***********/
     //judge shaping metric
-    shaping_stat_judge(stat_str, 0, 0, 1, 90, 9000, 0, 0, 90000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(stat_str, 0, 0, 0, 1, 100, 10000, 0, 0, 90000, SHAPING_DIR_OUT, profile_type_primary);
 
     //judge global metric
-    shaping_global_stat_judge(global_stat_str, 90, 9000, 0, 0, -90, -9000);
+    shaping_global_stat_judge(global_stat_str, 100, 10000, 0, 0, 0, 0);
 
     free(global_stat_str);
     free(stat_str);

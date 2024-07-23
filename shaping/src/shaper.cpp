@@ -1291,7 +1291,7 @@ void polling_entry(struct shaper *sp, struct shaping_stat *stat, struct shaping_
         cnt++;
     }
 
-    if (shaper_global_stat_queueing_pkts_get(&ctx->thread_global_stat) == 0) {
+    if (shaper_global_stat_queueing_pkts_get() == 0) {
         return;
     }
     

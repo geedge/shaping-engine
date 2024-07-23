@@ -9,9 +9,17 @@
 #include "shaper.h"
 #include "shaper_global_stat.h"
 
-static int shaper_global_stat_conf_load(struct shaping_global_stat *stat)
+struct shping_global_stat_conf
+{
+    int self_test;
+};
+
+thread_local unsigned long long g_queueing_pkts = 0;
+
+static int shaper_global_stat_conf_load(struct shaping_global_stat *stat, struct shping_global_stat_conf *conf)
 {
     MESA_load_profile_int_def(SHAPING_GLOBAL_CONF_FILE, "METRIC", "GLOBAL_STAT_OUTPUT_INTERVAL_S", &stat->output_interval_s, 1);
+    MESA_load_profile_int_def(SHAPING_GLOBAL_CONF_FILE, "METRIC", "GLOBAL_STAT_SELF_TEST", &conf->self_test, 0);
 
     return 0;
 }
@@ -67,12 +75,12 @@ static void shaper_global_stat_fieldstat_reg(struct shaping_global_stat *stat)
 struct shaping_global_stat* shaper_global_stat_init(int work_thread_num)
 {
     struct shaping_global_stat *stat = NULL;
+    struct shping_global_stat_conf conf;
     struct fieldstat_tag tag;
-    int ret = 0;
 
     stat = (struct shaping_global_stat*)calloc(1, sizeof(struct shaping_global_stat));
 
-    if (shaper_global_stat_conf_load(stat) != 0) {
+    if (shaper_global_stat_conf_load(stat, &conf) != 0) {
         LOG_ERROR("%s: shaping init metric conf failed", LOG_TAG_STAT);
         goto ERROR;
     }
@@ -87,10 +95,12 @@ struct shaping_global_stat* shaper_global_stat_init(int work_thread_num)
     }
 
     shaper_global_stat_fieldstat_reg(stat);
-    ret = fieldstat_easy_enable_auto_output(stat->instance, "./metric/shaping_global_stat.json", stat->output_interval_s);
-    if (ret < 0) {
-        LOG_ERROR("%s: shaping global enable auto output failed, ret %d", LOG_TAG_STAT, ret);
-        goto ERROR;
+    if (!conf.self_test) {
+        int ret = fieldstat_easy_enable_auto_output(stat->instance, "./metric/shaping_global_stat.json", stat->output_interval_s);
+        if (ret < 0) {
+            LOG_ERROR("%s: shaping global enable auto output failed, ret %d", LOG_TAG_STAT, ret);
+            goto ERROR;
+        }
     }
     
     return stat;
@@ -145,6 +155,8 @@ void shaper_global_stat_queueing_inc(struct shaping_global_stat_data *thread_glo
     thread_global_stat->queueing_pkts++;
     thread_global_stat->queueing_bytes += pkt_len;
 
+    g_queueing_pkts++;
+
     return;
 }
 
@@ -153,12 +165,14 @@ void shaper_global_stat_queueing_dec(struct shaping_global_stat_data *thread_glo
     thread_global_stat->queueing_pkts--;
     thread_global_stat->queueing_bytes -= pkt_len;
 
+    g_queueing_pkts--;
+
     return;
 }
 
-long long shaper_global_stat_queueing_pkts_get(struct shaping_global_stat_data *thread_global_stat)
+long long shaper_global_stat_queueing_pkts_get()
 {
-    return thread_global_stat->queueing_pkts;
+    return g_queueing_pkts;
 }
 
 void shaper_global_stat_ctrlpkt_err_inc(struct shaping_global_stat_data *thread_global_stat)

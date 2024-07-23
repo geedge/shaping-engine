@@ -73,6 +73,7 @@ static void shaper_stat_kafka_init(struct shaping_stat *stat, struct shaper_stat
     rd_kafka_conf_set(rdkafka_conf, "socket.keepalive.enable", "true", kafka_errstr, sizeof(kafka_errstr));	
 	rd_kafka_conf_set(rdkafka_conf, "bootstrap.servers", conf->kafka_brokers, kafka_errstr, sizeof(kafka_errstr));
     rd_kafka_conf_set(rdkafka_conf, "security.protocol", "sasl_plaintext", kafka_errstr, sizeof(kafka_errstr));
+    rd_kafka_conf_set(rdkafka_conf, "client.id", conf->kafka_topic, kafka_errstr, sizeof(kafka_errstr));
 	rd_kafka_conf_set(rdkafka_conf, "sasl.mechanisms", "PLAIN", kafka_errstr, sizeof(kafka_errstr));
 	rd_kafka_conf_set(rdkafka_conf, "sasl.username", conf->kafka_username, kafka_errstr, sizeof(kafka_errstr));
 	rd_kafka_conf_set(rdkafka_conf, "sasl.password", conf->kafka_brokers, kafka_errstr, sizeof(kafka_errstr));
@@ -331,8 +332,8 @@ static void shaper_stat_profile_metirc_refresh(struct shaping_thread_ctx *ctx, s
     fieldstat_easy_counter_incrby(stat->instance, thread_id, stat->column_ids[OUT_PKTS_IDX], tags, TAG_IDX_MAX, profile_stat->out.pkts);
     fieldstat_easy_counter_incrby(stat->instance, thread_id, stat->column_ids[OUT_BYTES_IDX], tags, TAG_IDX_MAX, profile_stat->out.bytes);
 
-    fieldstat_easy_histogram_record(stat->instance, thread_id, stat->in_latency_histogram_id, tags, TAG_PROFILE_TYPE_IDX, profile_stat->in.max_latency);
-    fieldstat_easy_histogram_record(stat->instance, thread_id, stat->out_latency_histogram_id, tags, TAG_PROFILE_TYPE_IDX, profile_stat->out.max_latency);
+    fieldstat_easy_histogram_record(stat->instance, thread_id, stat->in_latency_histogram_id, tags, TAG_IDX_MAX, profile_stat->in.max_latency);
+    fieldstat_easy_histogram_record(stat->instance, thread_id, stat->out_latency_histogram_id, tags, TAG_IDX_MAX, profile_stat->out.max_latency);
 
     if (need_update_guage) {
         if (profile_type == PROFILE_IN_RULE_TYPE_PRIMARY) {
