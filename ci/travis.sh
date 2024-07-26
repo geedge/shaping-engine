@@ -38,7 +38,7 @@ yum install -y systemd-devel
 yum install -y tsg_master-devel
 yum install -y framework_env
 yum install -y mrzcpd-corei7
-yum install -y libfieldstat3-devel
+yum install -y libfieldstat4-devel
 yum install -y libmaatframe-devel
 yum install -y libswarmkv-devel
 yum install -y libMESA_handle_logger-devel
@@ -48,6 +48,7 @@ yum install -y numactl-libs # required by mrzcpd
 yum install -y libibverbs # required by mrzcpd
 yum install -y libbreakpad_mini-devel
 yum install -y msgpack-devel
+yum install -y librdkafka-devel
 source /etc/profile.d/framework.sh
 source /etc/profile.d/mrzcpd.sh
 

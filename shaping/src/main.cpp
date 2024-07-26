@@ -23,6 +23,7 @@ static void *shaper_thread_loop(void *data)
     char thread_name[16] = {0};
     struct shaping_thread_ctx *ctx = (struct shaping_thread_ctx *)data;
     int output_interval_s = ctx->ref_ctx->global_stat->output_interval_s;
+    time_t last_refresh_stat_time = time(NULL);
 
     snprintf(thread_name, sizeof(thread_name), "shape-work-%d", ctx->thread_index);
     prctl(PR_SET_NAME, (unsigned long long)thread_name, NULL, NULL, NULL);
@@ -41,7 +42,14 @@ static void *shaper_thread_loop(void *data)
             session_table_reset_with_callback(ctx->session_table, shaper_session_data_free_cb, ctx);
             __atomic_fetch_and(&ctx->session_need_reset, 0, __ATOMIC_SEQ_CST);
         }
-        marsio_poll_wait(ctx->marsio_info->instance, &ctx->marsio_info->mr_dev, 1, ctx->thread_index, output_interval_s);
+
+        time_t curr_time = time(NULL);
+        if (curr_time - last_refresh_stat_time >= output_interval_s) {
+            shaper_thread_global_stat_refresh(ctx);
+            last_refresh_stat_time = curr_time;
+        }
+
+        marsio_poll_wait(ctx->marsio_info->instance, &ctx->marsio_info->mr_dev, 1, ctx->thread_index, 10);
     }
 
     shaper_thread_resource_clear();
@@ -68,7 +76,7 @@ static void sig_handler(int signo)
 int main(int argc, char **argv)
 {
     struct shaping_ctx *ctx = NULL;
-    time_t last_update_time = time(NULL);
+    time_t last_stat_update_time = time(NULL);
 
     if (LOG_INIT("./conf/zlog.conf") == -1)
     {
@@ -111,11 +119,13 @@ int main(int argc, char **argv)
 
     while(!quit) {
         time_t curr_time = time(NULL);
-        if (curr_time - last_update_time >= ctx->global_stat->output_interval_s) {
-            shaper_global_stat_refresh(ctx);
-            last_update_time = curr_time;
+
+        if (curr_time - last_stat_update_time >= ctx->stat->output_interval_s) {
+            shaper_stat_output(ctx->stat);
+            last_stat_update_time = curr_time;
         }
-        sleep(ctx->global_stat->output_interval_s);
+
+        sleep(ctx->stat->output_interval_s);
     }
 
     for (int i = 0; i < ctx->thread_num; i++) {

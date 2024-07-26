@@ -503,7 +503,7 @@ static void shaper_token_get_cb(const struct swarmkv_reply *reply, void * cb_arg
 
     clock_gettime(CLOCK_MONOTONIC, &curr_time);
     curr_time_us = curr_time.tv_sec * MICRO_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MICRO_SEC;
-    shaper_global_stat_swarmkv_latency_update(ctx->ref_ctx->global_stat, curr_time_us - arg->start_time_us);
+    shaper_global_stat_swarmkv_latency_update(ctx->ref_ctx->global_stat, curr_time_us - arg->start_time_us, ctx->thread_index);
 
     shaper_global_stat_async_callback_inc(&ctx->thread_global_stat);
     shaper_global_stat_tconsume_callback_inc(&ctx->thread_global_stat);
@@ -705,7 +705,7 @@ static void shaper_queue_len_get_cb(const struct swarmkv_reply *reply, void * cb
     clock_gettime(CLOCK_MONOTONIC, &curr_time);
     curr_time_us = curr_time.tv_sec * MICRO_SECONDS_PER_SEC + curr_time.tv_nsec / NANO_SECONDS_PER_MICRO_SEC;
     curr_time_ms = curr_time_us / 1000;
-    shaper_global_stat_swarmkv_latency_update(ctx->ref_ctx->global_stat, curr_time_us - arg->start_time_us);
+    shaper_global_stat_swarmkv_latency_update(ctx->ref_ctx->global_stat, curr_time_us - arg->start_time_us, ctx->thread_index);
 
     shaper_global_stat_async_callback_inc(&ctx->thread_global_stat);
     shaper_global_stat_hmget_callback_inc(&ctx->thread_global_stat);
@@ -1291,7 +1291,7 @@ void polling_entry(struct shaper *sp, struct shaping_stat *stat, struct shaping_
         cnt++;
     }
 
-    if (shaper_global_stat_queueing_pkts_get(&ctx->thread_global_stat) == 0) {
+    if (shaper_global_stat_queueing_pkts_get() == 0) {
         return;
     }
     
@@ -1625,6 +1625,7 @@ struct shaping_ctx *shaping_engine_init()
         ctx->thread_ctx[i].thread_index = i;
         ctx->thread_ctx[i].sp = shaper_new(conf.priority_queue_len_max);
         ctx->thread_ctx[i].stat = ctx->stat;
+        ctx->thread_ctx[i].global_stat = ctx->global_stat;
         ctx->thread_ctx[i].session_table = session_table_create();
         ctx->thread_ctx[i].maat_info = ctx->maat_info;
         ctx->thread_ctx[i].marsio_info = ctx->marsio_info;
