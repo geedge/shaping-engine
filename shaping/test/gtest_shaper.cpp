@@ -14,8 +14,6 @@
 #define SHAPING_SESSION_QUEUE_LEN 128
 #define FIELDSTAT_AUTO_TIME_MAX 999999000
 
-#define FIELDSTAT_OUTPUT_BUF_LEN 4096
-
 char profile_type_primary[] = "primary";
 char profile_type_borrow[] = "borrow";
 
@@ -108,6 +106,7 @@ static void shaping_stat_judge(char *file_line, int json_array_idx, int rule_id,
                             unsigned char direction, char profile_type[])
 {
     cJSON *json = NULL;
+    cJSON *json_array_element = NULL;
     cJSON *fields_json = NULL;
     cJSON *tags_json = NULL;
     cJSON *tmp_obj = NULL;
@@ -119,14 +118,14 @@ static void shaping_stat_judge(char *file_line, int json_array_idx, int rule_id,
     ASSERT_EQ(json->type, cJSON_Array);
     ASSERT_GT(cJSON_GetArraySize(json), json_array_idx);
 
-    json = cJSON_GetArrayItem(json, json_array_idx);
+    json_array_element = cJSON_GetArrayItem(json, json_array_idx);
 
-    tmp_obj = cJSON_GetObjectItem(json, "name");
+    tmp_obj = cJSON_GetObjectItem(json_array_element, "name");
     ASSERT_TRUE(tmp_obj != NULL);
     EXPECT_STREQ("shaping_stat", tmp_obj->valuestring);
 
     /******************parse tags***********************************/
-    tags_json = cJSON_GetObjectItem(json, "tags");
+    tags_json = cJSON_GetObjectItem(json_array_element, "tags");
     ASSERT_TRUE(tags_json != NULL);
 
     tmp_obj = cJSON_GetObjectItem(tags_json, "vsys_id");
@@ -150,7 +149,7 @@ static void shaping_stat_judge(char *file_line, int json_array_idx, int rule_id,
     EXPECT_STREQ(tmp_obj->valuestring, profile_type);
 
     /******************parse fields**********************************/
-    fields_json = cJSON_GetObjectItem(json, "fields");
+    fields_json = cJSON_GetObjectItem(json_array_element, "fields");
     ASSERT_TRUE(fields_json != NULL);
 
     snprintf(attr_name, sizeof(attr_name), "%s_pkts", direction == SHAPING_DIR_OUT ? "out" : "in");
@@ -202,11 +201,12 @@ static int shaping_global_stat_field_get(cJSON *metrics, const char *field_name)
 static void shaping_global_stat_judge(char *file_line, int tx_pkts, int tx_bytes, int drop_pkts, int drop_bytes, int queueing_pkts, int queueing_bytes)
 {
     cJSON *metrics = NULL;
+    cJSON *json_array_element = NULL;
     cJSON *json = cJSON_Parse(file_line);
 
-    json = cJSON_GetArrayItem(json, 0);
+    json_array_element = cJSON_GetArrayItem(json, 0);
 
-    metrics = cJSON_GetObjectItem(json, "fields");
+    metrics = cJSON_GetObjectItem(json_array_element, "fields");
 
     EXPECT_EQ(tx_pkts, shaping_global_stat_field_get(metrics, "all_tx_pkts"));
     EXPECT_EQ(tx_bytes, shaping_global_stat_field_get(metrics, "all_tx_bytes"));
@@ -272,10 +272,10 @@ TEST(single_session, udp_tx_in_order)
     shaping_flow_free(&ctx->thread_ctx[0], sf);
 
     /***********send stat data here********************/
-    char *global_stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
-    size_t global_stat_str_len = sizeof(global_stat_str);
-    char *stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
-    size_t stat_str_len = sizeof(stat_str);
+    char *global_stat_str = NULL;
+    size_t global_stat_str_len = 0;
+    char *stat_str = NULL;
+    size_t stat_str_len = 0;
     
     shaper_thread_global_stat_refresh(&ctx->thread_ctx[0]);
 
@@ -411,10 +411,10 @@ TEST(max_min_host_fairness_profile, udp_tx_in_order)
     shaping_flow_free(&ctx->thread_ctx[0], sf);
 
     /***********send stat data here********************/
-    char *global_stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
-    size_t global_stat_str_len = sizeof(global_stat_str);
-    char *stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
-    size_t stat_str_len = sizeof(stat_str);
+    char *global_stat_str = NULL;
+    size_t global_stat_str_len = 0;
+    char *stat_str = NULL;
+    size_t stat_str_len = 0;
     
     shaper_thread_global_stat_refresh(&ctx->thread_ctx[0]);
 
@@ -477,12 +477,13 @@ TEST(single_session, tcp_tx_in_order)
 
 
     /***********send stat data here********************/
-    char *stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
-    size_t stat_str_len = sizeof(stat_str);
+    char *stat_str = NULL;
+    size_t stat_str_len = 0;
     
     shaper_stat_refresh(&ctx->thread_ctx[0], sf, 1);
     fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
     shaping_stat_judge(stat_str, 0, 0, 0, 1, 20, 2000, 0, 10, 0, SHAPING_DIR_OUT, profile_type_primary);//*test statistics
+    free(stat_str);
 
 
     stub_refresh_token_bucket(0);
@@ -568,8 +569,8 @@ TEST(single_session, udp_diff_direction)
     shaping_flow_free(&ctx->thread_ctx[0], sf);
 
     /***********send stat data here********************/
-    char *stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
-    size_t stat_str_len = sizeof(stat_str);
+    char *stat_str = NULL;
+    size_t stat_str_len = 0;
     
     fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
 
@@ -640,8 +641,8 @@ TEST(single_session, udp_multi_rules)
     shaping_flow_free(&ctx->thread_ctx[0], sf);
 
     /***********send stat data here********************/
-    char *stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
-    size_t stat_str_len = sizeof(stat_str);
+    char *stat_str = NULL;
+    size_t stat_str_len = 0;
     
     fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
 
@@ -710,8 +711,8 @@ TEST(single_session, udp_borrow)
     shaping_flow_free(&ctx->thread_ctx[0], sf);
 
     /***********send stat data here********************/
-    char *stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
-    size_t stat_str_len = sizeof(stat_str);
+    char *stat_str = NULL;
+    size_t stat_str_len = 0;
     
     fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
 
@@ -780,8 +781,8 @@ TEST(single_session, udp_borrow_same_priority_9)
     shaping_flow_free(&ctx->thread_ctx[0], sf);
 
     /***********send stat data here********************/
-    char *stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
-    size_t stat_str_len = sizeof(stat_str);
+    char *stat_str = NULL;
+    size_t stat_str_len = 0;
     
     fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
 
@@ -942,8 +943,8 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
     shaping_flow_free(&ctx->thread_ctx[0], sf2);
 
     /***********send stat data here********************/
-    char *stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
-    size_t stat_str_len = sizeof(stat_str);
+    char *stat_str = NULL;
+    size_t stat_str_len = 0;
     
     fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
 
@@ -1511,10 +1512,10 @@ TEST(statistics, udp_drop_pkt)
     shaping_flow_free(&ctx->thread_ctx[0], sf);
 
     /***********send stat data here********************/
-    char *global_stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
-    size_t global_stat_str_len = sizeof(global_stat_str);
-    char *stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
-    size_t stat_str_len = sizeof(stat_str);
+    char *global_stat_str = NULL;
+    size_t global_stat_str_len = 0;
+    char *stat_str = NULL;
+    size_t stat_str_len = 0;
     
     shaper_thread_global_stat_refresh(&ctx->thread_ctx[0]);
 
@@ -1568,10 +1569,10 @@ TEST(statistics, udp_queueing_pkt)
 
 
     /***********send stat data here********************/
-    char *global_stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
-    size_t global_stat_str_len = sizeof(global_stat_str);
-    char *stat_str = (char*)malloc(FIELDSTAT_OUTPUT_BUF_LEN);
-    size_t stat_str_len = sizeof(stat_str);
+    char *global_stat_str = NULL;
+    size_t global_stat_str_len = 0;
+    char *stat_str = NULL;
+    size_t stat_str_len = 0;
     
     shaper_thread_global_stat_refresh(&ctx->thread_ctx[0]);
     shaper_stat_refresh(&ctx->thread_ctx[0], sf, 1);
@@ -1582,6 +1583,9 @@ TEST(statistics, udp_queueing_pkt)
     /*******judge metric********/
     shaping_stat_judge(stat_str, 0, 0, 0, 1, 10, 1000, 0, 90, 0, SHAPING_DIR_OUT, profile_type_primary);
     shaping_global_stat_judge(global_stat_str, 10, 1000, 0, 0, 90, 9000);
+
+    free(global_stat_str);
+    free(stat_str);
 
     //first 10 packets
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));

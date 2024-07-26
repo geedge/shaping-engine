@@ -49,8 +49,7 @@ struct shaping_stat {
     rd_kafka_t *kafka_handle; 
     rd_kafka_topic_t *topic_rkt;
     int output_interval_s;
-    int in_latency_histogram_id;
-    int out_latency_histogram_id;
+    int latency_histogram_id;
     unsigned int column_ids[STAT_COLUNM_IDX_MAX];
 };
 

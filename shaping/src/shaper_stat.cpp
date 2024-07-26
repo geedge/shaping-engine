@@ -15,8 +15,6 @@
 #define SHAPER_STAT_REFRESH_TIME_US 10000  //10 ms
 #define HINCRBY_RETRY_MAX 5
 
-#define OUTPUT_JSON_BUF_LEN 2048
-
 struct shaper_stat_conf {
     char device_group[32];
     char device_id[32];
@@ -47,10 +45,6 @@ void shaper_stat_destroy(struct shaping_stat *stat)
         free(stat);
     }
 
-    if (output_json_buf) {
-        free(output_json_buf);
-    }
-
     return;
 }
 
@@ -70,6 +64,8 @@ static void shaper_stat_kafka_init(struct shaping_stat *stat, struct shaper_stat
 
     rd_kafka_conf_t *rdkafka_conf = rd_kafka_conf_new();
 
+    rd_kafka_conf_set(rdkafka_conf, "queue.buffering.max.messages", "1000000", kafka_errstr, sizeof(kafka_errstr));
+    rd_kafka_conf_set(rdkafka_conf, "topic.metadata.refresh.interval.ms", "600000", kafka_errstr, sizeof(kafka_errstr));
     rd_kafka_conf_set(rdkafka_conf, "socket.keepalive.enable", "true", kafka_errstr, sizeof(kafka_errstr));	
 	rd_kafka_conf_set(rdkafka_conf, "bootstrap.servers", conf->kafka_brokers, kafka_errstr, sizeof(kafka_errstr));
     rd_kafka_conf_set(rdkafka_conf, "security.protocol", "sasl_plaintext", kafka_errstr, sizeof(kafka_errstr));
@@ -109,8 +105,6 @@ struct shaping_stat* shaper_stat_init(int thread_num)
     struct shaper_stat_conf conf;
     struct shaping_stat *stat = (struct shaping_stat *)calloc(1, sizeof(struct shaping_stat));
 
-    output_json_buf = (char *)calloc(1, OUTPUT_JSON_BUF_LEN);
-
     if (shaper_stat_conf_load(stat, &conf) != 0) {
         LOG_ERROR("%s: shaping init metric conf failed", LOG_TAG_STAT);
         goto ERROR;
@@ -144,9 +138,8 @@ struct shaping_stat* shaper_stat_init(int thread_num)
         goto ERROR;
     }
 
-    stat->in_latency_histogram_id = fieldstat_easy_register_histogram(stat->instance, "in_latency_us", 1, 1000000, 5);
-    stat->out_latency_histogram_id = fieldstat_easy_register_histogram(stat->instance, "out_latency_us", 1, 1000000, 5);
-    if (stat->in_latency_histogram_id < 0 || stat->out_latency_histogram_id < 0) {
+    stat->latency_histogram_id = fieldstat_easy_register_histogram(stat->instance, "latency_distribution_us", 1, 1000000, 5);
+    if (stat->latency_histogram_id < 0) {
         LOG_ERROR("%s: shaping fieldstat register histogram failed", LOG_TAG_STAT);
         goto ERROR;
     }
@@ -177,9 +170,7 @@ ERROR:
         }
         free(stat);
     }
-    if (output_json_buf) {
-        free(output_json_buf);
-    }
+
     return NULL;
 }
 
@@ -332,8 +323,7 @@ static void shaper_stat_profile_metirc_refresh(struct shaping_thread_ctx *ctx, s
     fieldstat_easy_counter_incrby(stat->instance, thread_id, stat->column_ids[OUT_PKTS_IDX], tags, TAG_IDX_MAX, profile_stat->out.pkts);
     fieldstat_easy_counter_incrby(stat->instance, thread_id, stat->column_ids[OUT_BYTES_IDX], tags, TAG_IDX_MAX, profile_stat->out.bytes);
 
-    fieldstat_easy_histogram_record(stat->instance, thread_id, stat->in_latency_histogram_id, tags, TAG_IDX_MAX, profile_stat->in.max_latency);
-    fieldstat_easy_histogram_record(stat->instance, thread_id, stat->out_latency_histogram_id, tags, TAG_IDX_MAX, profile_stat->out.max_latency);
+    fieldstat_easy_histogram_record(stat->instance, thread_id, stat->latency_histogram_id, tags, TAG_IDX_MAX, profile_stat->out.max_latency);
 
     if (need_update_guage) {
         if (profile_type == PROFILE_IN_RULE_TYPE_PRIMARY) {
@@ -497,7 +487,7 @@ void shaper_stat_max_latency_update(struct shaping_stat_for_profile *profile_sta
 
 void shaper_stat_output(struct shaping_stat *stat)
 {
-    size_t len = OUTPUT_JSON_BUF_LEN;
+    size_t len = 0;
     fieldstat_easy_output(stat->instance, &output_json_buf, &len);
 
     int status=rd_kafka_produce(stat->topic_rkt, RD_KAFKA_PARTITION_UA, RD_KAFKA_MSG_F_COPY, output_json_buf, len, NULL, 0, NULL);
@@ -508,6 +498,11 @@ void shaper_stat_output(struct shaping_stat *stat)
 							rd_kafka_err2name(rd_kafka_last_error()),
 							rd_kafka_err2str(rd_kafka_last_error()),
 							status);
+    }
+
+    if (output_json_buf) {
+        free(output_json_buf);
+        output_json_buf = NULL;
     }
 
     return;
