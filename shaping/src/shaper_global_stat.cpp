@@ -2,7 +2,6 @@
 #include <stdlib.h>
 
 #include <MESA/MESA_prof_load.h>
-#include <fieldstat/fieldstat_easy.h>
 
 #include "log.h"
 #include "utils.h"

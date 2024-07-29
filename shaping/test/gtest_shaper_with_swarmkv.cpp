@@ -245,9 +245,7 @@ int main(int argc, char **argv)
     testing::InitGoogleTest(&argc, argv);
     //testing::GTEST_FLAG(filter) = "single_session.udp_tx_in_order";
 
-    char *err=NULL;
     const char *cluster_name="swarmkv-shaping-nodes";
-    struct swarmkv *db=NULL;
 
     swarmkv_cli_create_cluster(cluster_name, "127.0.0.1:5210");
 

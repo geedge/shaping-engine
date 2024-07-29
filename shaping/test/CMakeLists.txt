@@ -51,5 +51,6 @@ gtest_discover_tests(gtest_shaper_maat)
 gtest_discover_tests(gtest_shaper_send_log)
 gtest_discover_tests(gtest_shaper)
 gtest_discover_tests(gtest_shaper_aqm)
+gtest_discover_tests(gtest_shaper_with_swarmkv)
 
 file(COPY ./test_conf/ DESTINATION ./conf/)

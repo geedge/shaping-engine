@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 #include <cjson/cJSON.h>
 #include <sys/queue.h>
-#include <fieldstat/fieldstat_easy.h>
 
 #include "log.h"
 #include "shaper.h"
