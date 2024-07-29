@@ -240,6 +240,7 @@ TEST(single_session, udp_tx_in_order)
 
     TAILQ_INIT(&expec_tx_queue);
     stub_init();
+    dummy_swarmkv_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
     sf = shaping_flow_new(&ctx->thread_ctx[0]);
@@ -316,6 +317,7 @@ TEST(bidirectional, udp_tx_in_order)
     TAILQ_INIT(&expec_tx_queue_in);
     TAILQ_INIT(&expec_tx_queue_out);
     stub_init();
+    dummy_swarmkv_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
     sf = shaping_flow_new(&ctx->thread_ctx[0]);
@@ -378,6 +380,7 @@ TEST(max_min_host_fairness_profile, udp_tx_in_order)
 
     TAILQ_INIT(&expec_tx_queue);
     stub_init();
+    dummy_swarmkv_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
     sf = shaping_flow_new(&ctx->thread_ctx[0]);
@@ -455,6 +458,7 @@ TEST(single_session, tcp_tx_in_order)
     TAILQ_INIT(&expec_tx_queue);
     TAILQ_INIT(&expec_pure_ctl_tx_queue);
     stub_init();
+    dummy_swarmkv_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
     sf = shaping_flow_new(&ctx->thread_ctx[0]);
@@ -534,6 +538,7 @@ TEST(single_session, udp_diff_direction)
     TAILQ_INIT(&expec_tx_queue_in);
     TAILQ_INIT(&expec_tx_queue_out);
     stub_init();
+    dummy_swarmkv_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
     sf = shaping_flow_new(&ctx->thread_ctx[0]);
@@ -605,6 +610,7 @@ TEST(single_session, udp_multi_rules)
 
     TAILQ_INIT(&expec_tx_queue);
     stub_init();
+    dummy_swarmkv_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
     sf = shaping_flow_new(&ctx->thread_ctx[0]);
@@ -680,6 +686,7 @@ TEST(single_session, udp_borrow)
 
     TAILQ_INIT(&expec_tx_queue);
     stub_init();
+    dummy_swarmkv_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
     sf = shaping_flow_new(&ctx->thread_ctx[0]);
@@ -749,6 +756,7 @@ TEST(single_session, udp_borrow_same_priority_9)
 
     TAILQ_INIT(&expec_tx_queue);
     stub_init();
+    dummy_swarmkv_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
     sf = shaping_flow_new(&ctx->thread_ctx[0]);
@@ -821,6 +829,7 @@ TEST(single_session_async, udp_close_before_async_exec)
 
     TAILQ_INIT(&expec_tx_queue);
     stub_init();
+    dummy_swarmkv_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
     sf = shaping_flow_new(&ctx->thread_ctx[0]);
@@ -882,6 +891,7 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
     TAILQ_INIT(&expec_tx_queue1);
     TAILQ_INIT(&expec_tx_queue2);
     stub_init();
+    dummy_swarmkv_init();
     
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
@@ -994,6 +1004,7 @@ TEST(two_session_diff_priority_same_profile, two_thread_udp_tx_in_order)
     TAILQ_INIT(&expec_tx_queue1);
     TAILQ_INIT(&expec_tx_queue2);
     stub_init();
+    dummy_swarmkv_init();
     
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
@@ -1079,6 +1090,7 @@ TEST(two_session_diff_priority_same_profile, profile_timer_test)
     TAILQ_INIT(&expec_tx_queue1);
     TAILQ_INIT(&expec_tx_queue2);
     stub_init();
+    dummy_swarmkv_init();
     
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
@@ -1180,6 +1192,7 @@ TEST(two_session_diff_priority_same_profile, one_direction_dont_block_another)
     TAILQ_INIT(&expec_tx_queue1);
     TAILQ_INIT(&expec_tx_queue2);
     stub_init();
+    dummy_swarmkv_init();
     
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
@@ -1271,6 +1284,7 @@ TEST(two_sessions, priority_non_block)
     TAILQ_INIT(&expec_tx_queue1);
     TAILQ_INIT(&expec_tx_queue2);
     stub_init();
+    dummy_swarmkv_init();
     
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
@@ -1344,6 +1358,7 @@ TEST(two_sessions, borrow_when_primary_profile_priority_blocked)
     TAILQ_INIT(&expec_tx_queue1);
     TAILQ_INIT(&expec_tx_queue2);
     stub_init();
+    dummy_swarmkv_init();
     
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
@@ -1418,6 +1433,7 @@ TEST(two_sessions, primary_profile_priority_blocked_by_borrow_profile)
     TAILQ_INIT(&expec_tx_queue1);
     TAILQ_INIT(&expec_tx_queue2);
     stub_init();
+    dummy_swarmkv_init();
 
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
@@ -1483,6 +1499,7 @@ TEST(statistics, udp_drop_pkt)
 
     TAILQ_INIT(&expec_tx_queue);
     stub_init();
+    dummy_swarmkv_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
     sf = shaping_flow_new(&ctx->thread_ctx[0]);
@@ -1553,6 +1570,7 @@ TEST(statistics, udp_queueing_pkt)
 
     TAILQ_INIT(&expec_tx_queue);
     stub_init();
+    dummy_swarmkv_init();
     
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);

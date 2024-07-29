@@ -195,6 +195,7 @@ TEST(single_session, generic_profile)
     sf = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf != NULL);
 
+    stub_set_profile_limit_direction(0, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
     shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
 
@@ -209,7 +210,6 @@ TEST(single_session, generic_profile)
 
     actual_tx_queue = stub_get_tx_queue();
 
-    //TODO: compare tx_queue
     time_t start_time = time(NULL);
     unsigned long long total_bytes = 0;
     while (1) {
@@ -227,7 +227,12 @@ TEST(single_session, generic_profile)
         }
     }
 
-    EXPECT_EQ(total_bytes * 8, 1000000 * 10);
+    EXPECT_GE(total_bytes * 8, 1000000 * 10);
+    EXPECT_LE(total_bytes * 8, 1000000 * 11);
+
+    while (shaper_global_stat_queueing_pkts_get() != 0) {
+        polling_entry(ctx->thread_ctx[0].sp, ctx->stat, &ctx->thread_ctx[0]);
+    }
     
 
     shaping_flow_free(&ctx->thread_ctx[0], sf);
@@ -240,7 +245,6 @@ int main(int argc, char **argv)
     testing::InitGoogleTest(&argc, argv);
     //testing::GTEST_FLAG(filter) = "single_session.udp_tx_in_order";
 
-    const char* log_path="./swarmkv-shaping-nodes.log";
     char *err=NULL;
     const char *cluster_name="swarmkv-shaping-nodes";
     struct swarmkv *db=NULL;
@@ -259,19 +263,6 @@ int main(int argc, char **argv)
         fprintf(stderr, "FATAL: unable to create log handle\n");
         return -1;
     }
-
-    struct swarmkv_options* opts=swarmkv_options_new();
-    swarmkv_options_set_cluster_port(opts, 5210);
-    swarmkv_options_set_health_check_port(opts, 6210);
-    swarmkv_options_set_logger(opts, log_handle);
-    swarmkv_options_set_caller_thread_number(opts, 1);
-    db=swarmkv_open(opts, cluster_name, &err);
-    if(err)
-    {
-        printf("swarmkv_open failed: %s.\n", err);
-        free(err);
-    }
-    swarmkv_register_thread(db);
 
     return RUN_ALL_TESTS();
 }

@@ -28,11 +28,17 @@ struct stub_matched_rules {
 
 struct stub_pkt_queue tx_queue;
 struct stub_matched_rules matched_rules;
-extern struct shaping_profile pf_array[MAX_STUB_PROFILE_NUM];
+struct shaping_profile pf_array[MAX_STUB_PROFILE_NUM];
 
 void stub_set_profile_type(int profile_id, enum shaping_profile_type type)
 {
     pf_array[profile_id].type = type;
+    return;
+}
+
+void stub_set_profile_limit_direction(int profile_id, enum shaping_profile_limit_direction limit_direction)
+{
+    pf_array[profile_id].limit_direction = limit_direction;
     return;
 }
 
@@ -104,7 +110,6 @@ void stub_init()
     TAILQ_INIT(&tx_queue);
     memset(&matched_rules, 0, sizeof(struct stub_matched_rules));
     
-    init_dummy_swarmkv();
     return;
 }
 
