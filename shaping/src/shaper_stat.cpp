@@ -24,13 +24,13 @@ struct shaper_stat_conf {
     char kafka_brokers[256];
 };
 
-thread_local struct fieldstat_tag tags[TAG_IDX_MAX] = 
+thread_local struct field tags[TAG_IDX_MAX] = 
 {
-    [TAG_VSYS_ID_IDX] = {.key = "vsys_id", .type = TAG_INTEGER},
-    [TAG_RULE_ID_IDX] = {.key = "rule_id", .type = TAG_INTEGER},
-    [TAG_PROFILE_ID_IDX] = {.key = "profile_id", .type = TAG_INTEGER},
-    [TAG_PRIORITY_IDX] = {.key = "priority", .type = TAG_INTEGER},
-    [TAG_PROFILE_TYPE_IDX] = {.key = "profile_type", .type = TAG_CSTRING}
+    [TAG_VSYS_ID_IDX] = {.key = "vsys_id", .type = FIELD_VALUE_INTEGER},
+    [TAG_RULE_ID_IDX] = {.key = "rule_id", .type = FIELD_VALUE_INTEGER},
+    [TAG_PROFILE_ID_IDX] = {.key = "profile_id", .type = FIELD_VALUE_INTEGER},
+    [TAG_PRIORITY_IDX] = {.key = "priority", .type = FIELD_VALUE_INTEGER},
+    [TAG_PROFILE_TYPE_IDX] = {.key = "profile_type", .type = FIELD_VALUE_CSTRING}
 };
 
 char *output_json_buf = NULL;
@@ -100,7 +100,7 @@ static int shaper_stat_conf_load(struct shaping_stat *stat, struct shaper_stat_c
 
 struct shaping_stat* shaper_stat_init(int thread_num)
 {
-    struct fieldstat_tag global_tags[5];
+    struct field global_tags[5];
     struct shaper_stat_conf conf;
     struct shaping_stat *stat = (struct shaping_stat *)calloc(1, sizeof(struct shaping_stat));
 
@@ -112,23 +112,23 @@ struct shaping_stat* shaper_stat_init(int thread_num)
     shaper_stat_kafka_init(stat, &conf);
 
     global_tags[0].key = "app_name";
-    global_tags[0].type = TAG_CSTRING;
+    global_tags[0].type = FIELD_VALUE_CSTRING;
     global_tags[0].value_str = "shaping_engine";
     
     global_tags[1].key = "device_group";
-    global_tags[1].type = TAG_CSTRING;
+    global_tags[1].type = FIELD_VALUE_CSTRING;
     global_tags[1].value_str = conf.device_group;
 
     global_tags[2].key = "device_id";
-    global_tags[2].type = TAG_CSTRING;
+    global_tags[2].type = FIELD_VALUE_CSTRING;
     global_tags[2].value_str = conf.device_id;
 
     global_tags[3].key = "data_center";
-    global_tags[3].type = TAG_CSTRING;
+    global_tags[3].type = FIELD_VALUE_CSTRING;
     global_tags[3].value_str = conf.data_center;
 
     global_tags[4].key = "table_name";
-    global_tags[4].type = TAG_CSTRING;
+    global_tags[4].type = FIELD_VALUE_CSTRING;
     global_tags[4].value_str = "shaping_metric";
 
     stat->instance = fieldstat_easy_new(thread_num, "shaping_stat", global_tags, 5);

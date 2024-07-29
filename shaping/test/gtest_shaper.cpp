@@ -106,8 +106,6 @@ static void shaping_stat_judge(char *file_line, int json_array_idx, int rule_id,
 {
     cJSON *json = NULL;
     cJSON *json_array_element = NULL;
-    cJSON *fields_json = NULL;
-    cJSON *tags_json = NULL;
     cJSON *tmp_obj = NULL;
     char attr_name[32] = {0};
 
@@ -124,45 +122,41 @@ static void shaping_stat_judge(char *file_line, int json_array_idx, int rule_id,
     EXPECT_STREQ("shaping_stat", tmp_obj->valuestring);
 
     /******************parse tags***********************************/
-    tags_json = cJSON_GetObjectItem(json_array_element, "tags");
-    ASSERT_TRUE(tags_json != NULL);
 
-    tmp_obj = cJSON_GetObjectItem(tags_json, "vsys_id");
+    tmp_obj = cJSON_GetObjectItem(json_array_element, "vsys_id");
     ASSERT_TRUE(tmp_obj != NULL);
     EXPECT_EQ(tmp_obj->valueint, STUB_TEST_VSYS_ID);
 
-    tmp_obj = cJSON_GetObjectItem(tags_json, "rule_id");
+    tmp_obj = cJSON_GetObjectItem(json_array_element, "rule_id");
     ASSERT_TRUE(tmp_obj != NULL);
     EXPECT_EQ(rule_id, tmp_obj->valueint);
 
-    tmp_obj = cJSON_GetObjectItem(tags_json, "profile_id");
+    tmp_obj = cJSON_GetObjectItem(json_array_element, "profile_id");
     ASSERT_TRUE(tmp_obj != NULL);
     EXPECT_EQ(profile_id, tmp_obj->valueint);
 
-    tmp_obj = cJSON_GetObjectItem(tags_json, "priority");
+    tmp_obj = cJSON_GetObjectItem(json_array_element, "priority");
     ASSERT_TRUE(tmp_obj != NULL);
     EXPECT_EQ(priority, tmp_obj->valueint);
 
-    tmp_obj = cJSON_GetObjectItem(tags_json, "profile_type");
+    tmp_obj = cJSON_GetObjectItem(json_array_element, "profile_type");
     ASSERT_TRUE(tmp_obj != NULL);
     EXPECT_STREQ(tmp_obj->valuestring, profile_type);
 
     /******************parse fields**********************************/
-    fields_json = cJSON_GetObjectItem(json_array_element, "fields");
-    ASSERT_TRUE(fields_json != NULL);
 
     snprintf(attr_name, sizeof(attr_name), "%s_pkts", direction == SHAPING_DIR_OUT ? "out" : "in");
-    tmp_obj = cJSON_GetObjectItem(fields_json, attr_name);
+    tmp_obj = cJSON_GetObjectItem(json_array_element, attr_name);
     ASSERT_TRUE(tmp_obj != NULL);
     EXPECT_EQ(tx_pkts, tmp_obj->valueint);
 
     snprintf(attr_name, sizeof(attr_name), "%s_bytes", direction == SHAPING_DIR_OUT ? "out" : "in");
-    tmp_obj = cJSON_GetObjectItem(fields_json, attr_name);
+    tmp_obj = cJSON_GetObjectItem(json_array_element, attr_name);
     ASSERT_TRUE(tmp_obj != NULL);
     EXPECT_EQ(tx_bytes, tmp_obj->valueint);
 
     snprintf(attr_name, sizeof(attr_name), "%s_drop_pkts", direction == SHAPING_DIR_OUT ? "out" : "in");
-    tmp_obj = cJSON_GetObjectItem(fields_json, attr_name);
+    tmp_obj = cJSON_GetObjectItem(json_array_element, attr_name);
     ASSERT_TRUE(tmp_obj != NULL);
     EXPECT_EQ(drop_pkts, tmp_obj->valueint);
 
@@ -175,7 +169,7 @@ static void shaping_stat_judge(char *file_line, int json_array_idx, int rule_id,
     }*/
 
     snprintf(attr_name, sizeof(attr_name), "%s_queue_len", direction == SHAPING_DIR_OUT ? "out" : "in");
-    tmp_obj = cJSON_GetObjectItem(fields_json, attr_name);
+    tmp_obj = cJSON_GetObjectItem(json_array_element, attr_name);
     if (tmp_obj != NULL) {
         EXPECT_EQ(queue_len, tmp_obj->valueint);
     }
@@ -200,12 +194,9 @@ static int shaping_global_stat_field_get(cJSON *metrics, const char *field_name)
 static void shaping_global_stat_judge(char *file_line, int tx_pkts, int tx_bytes, int drop_pkts, int drop_bytes, int queueing_pkts, int queueing_bytes)
 {
     cJSON *metrics = NULL;
-    cJSON *json_array_element = NULL;
     cJSON *json = cJSON_Parse(file_line);
 
-    json_array_element = cJSON_GetArrayItem(json, 0);
-
-    metrics = cJSON_GetObjectItem(json_array_element, "fields");
+    metrics = cJSON_GetArrayItem(json, 0);
 
     EXPECT_EQ(tx_pkts, shaping_global_stat_field_get(metrics, "all_tx_pkts"));
     EXPECT_EQ(tx_bytes, shaping_global_stat_field_get(metrics, "all_tx_bytes"));
