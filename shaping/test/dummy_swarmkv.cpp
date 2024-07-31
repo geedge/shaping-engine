@@ -31,9 +31,9 @@ static int profile_priority_len[MAX_STUB_PROFILE_NUM][SHAPING_PRIORITY_NUM_MAX][
 static struct stub_avaliable_token pf_curr_avl_token[MAX_STUB_PROFILE_NUM];
 static int pf_async_times[MAX_STUB_PROFILE_NUM];
 vector<struct stub_token_thread_arg> pf_async_thread[MAX_STUB_PROFILE_NUM];
-struct shaping_profile pf_array[MAX_STUB_PROFILE_NUM];
+extern struct shaping_profile pf_array[MAX_STUB_PROFILE_NUM];
 
-void init_dummy_swarmkv()
+void dummy_swarmkv_init()
 {
     memset(&pf_array, 0, MAX_STUB_PROFILE_NUM * sizeof(struct shaping_profile));
     memset(&profile_priority_len, 0, MAX_STUB_PROFILE_NUM * SHAPING_PRIORITY_NUM_MAX * SHAPING_DIR_MAX * sizeof(int));

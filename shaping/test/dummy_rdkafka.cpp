@@ -39,3 +39,8 @@ const char *rd_kafka_err2str (rd_kafka_resp_err_t err)
 {
     return NULL;
 }
+
+int rd_kafka_brokers_add(rd_kafka_t *rk, const char *brokerlist)
+{
+    return 1;
+}

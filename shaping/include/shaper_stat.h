@@ -2,6 +2,7 @@
 
 #include <netinet/in.h>
 #include <librdkafka/rdkafka.h>
+#include <fieldstat/fieldstat_easy.h>
 #include "uthash.h"
 
 enum shaping_packet_dir {

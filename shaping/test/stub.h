@@ -18,9 +18,7 @@ struct stub_packet {
     unsigned char direction;
     unsigned char pure_control;
     unsigned int length;
-    unsigned int sequence;
-    unsigned long long income_time;
-    unsigned char detained_flag;
+    struct shaping_flow *flow;
 };
 
 struct stub_packet_node {
@@ -33,10 +31,12 @@ TAILQ_HEAD(stub_pkt_queue, stub_packet_node);
 void stub_set_token_bucket_avl_per_sec(int profile_id, unsigned int tokens, unsigned char direction, enum shaping_profile_limit_direction limit_direction);
 void stub_refresh_token_bucket(int profile_id);
 void stub_set_profile_type(int profile_id, enum shaping_profile_type type);
+void stub_set_profile_limit_direction(int profile_id, enum shaping_profile_limit_direction limit_direction);
 void stub_set_async_token_get_times(int profile_id, int times);
 
 void stub_set_matched_shaping_rules(int rule_num, long long *rule_id, const int *priority, const int *profile_num, int profile_id[][MAX_REF_PROFILE]);
 void stub_set_shaping_rule_dscp_value(int rule_id, int dscp_value);
+void stub_set_shaping_rule_fair_factor(int rule_id, int fair_factor);
 void stub_clear_matched_shaping_rules();
 
 void stub_send_packet(struct stub_packet *packet);
@@ -49,7 +49,7 @@ void stub_curr_time_s_inc(int time_s);
 unsigned long long stub_curr_time_ns_get();
 
 void stub_init();
-void init_dummy_swarmkv();
+void dummy_swarmkv_init();
 
 /*******************temporary for test******************************/
 void stub_shaper_stat_send(int thread_seq);

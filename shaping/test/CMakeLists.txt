@@ -27,6 +27,14 @@ target_include_directories(gtest_shaper PUBLIC ${CMAKE_SOURCE_DIR}/shaping/inclu
 target_link_libraries(gtest_shaper common shaper pthread gtest)
 
 ###############################################################################
+# gtest_shaper_with_swarmkv
+###############################################################################
+add_executable(gtest_shaper_with_swarmkv gtest_shaper_with_swarmkv.cpp stub.cpp dummy_rdkafka.cpp)
+target_include_directories(gtest_shaper_with_swarmkv PUBLIC ${CMAKE_SOURCE_DIR}/common/include)
+target_include_directories(gtest_shaper_with_swarmkv PUBLIC ${CMAKE_SOURCE_DIR}/shaping/include)
+target_link_libraries(gtest_shaper_with_swarmkv common shaper swarmkv pthread gtest)
+
+###############################################################################
 # gtest_shaper_aqm
 ###############################################################################
 add_executable(gtest_shaper_aqm gtest_shaper_aqm.cpp)
@@ -43,5 +51,6 @@ gtest_discover_tests(gtest_shaper_maat)
 gtest_discover_tests(gtest_shaper_send_log)
 gtest_discover_tests(gtest_shaper)
 gtest_discover_tests(gtest_shaper_aqm)
+#gtest_discover_tests(gtest_shaper_with_swarmkv)
 
 file(COPY ./test_conf/ DESTINATION ./conf/)

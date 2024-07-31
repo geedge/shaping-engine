@@ -2,7 +2,6 @@
 #include <stdlib.h>
 
 #include <MESA/MESA_prof_load.h>
-#include <fieldstat/fieldstat_easy.h>
 
 #include "log.h"
 #include "utils.h"
@@ -76,7 +75,7 @@ struct shaping_global_stat* shaper_global_stat_init(int work_thread_num)
 {
     struct shaping_global_stat *stat = NULL;
     struct shping_global_stat_conf conf;
-    struct fieldstat_tag tag;
+    struct field tag;
 
     stat = (struct shaping_global_stat*)calloc(1, sizeof(struct shaping_global_stat));
 
@@ -86,7 +85,7 @@ struct shaping_global_stat* shaper_global_stat_init(int work_thread_num)
     }
     
     tag.key = "shaping_global";
-    tag.type = TAG_CSTRING;
+    tag.type = FIELD_VALUE_CSTRING;
     tag.value_str = "shaping_global";
     stat->instance = fieldstat_easy_new(work_thread_num, "shaping_global", &tag, 1);
     if (stat->instance == NULL) {

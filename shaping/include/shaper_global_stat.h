@@ -1,4 +1,5 @@
 #pragma once
+#include <fieldstat/fieldstat_easy.h>
 
 enum shaping_global_stat_column_index {
     CURR_SESSION_NUM_IDX = 0,
