@@ -76,6 +76,12 @@ void stub_set_shaping_rule_dscp_value(int rule_id, int dscp_value)
     return;
 }
 
+void stub_set_shaping_rule_fair_factor(int rule_id, int fair_factor)
+{
+    matched_rules.rules[rule_id].fair_factor = fair_factor;
+    return;
+}
+
 void stub_clear_matched_shaping_rules()
 {
     memset(&matched_rules, 0, sizeof(struct stub_matched_rules));

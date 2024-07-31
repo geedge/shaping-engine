@@ -33,8 +33,6 @@ thread_local struct field tags[TAG_IDX_MAX] =
     [TAG_PROFILE_TYPE_IDX] = {.key = "profile_type", .type = FIELD_VALUE_CSTRING}
 };
 
-char *output_json_buf = NULL;
-
 void shaper_stat_destroy(struct shaping_stat *stat)
 {
     if (stat) {
@@ -63,22 +61,63 @@ static void shaper_stat_kafka_init(struct shaping_stat *stat, struct shaper_stat
 
     rd_kafka_conf_t *rdkafka_conf = rd_kafka_conf_new();
 
-    rd_kafka_conf_set(rdkafka_conf, "queue.buffering.max.messages", "1000000", kafka_errstr, sizeof(kafka_errstr));
-    rd_kafka_conf_set(rdkafka_conf, "topic.metadata.refresh.interval.ms", "600000", kafka_errstr, sizeof(kafka_errstr));
-    rd_kafka_conf_set(rdkafka_conf, "socket.keepalive.enable", "true", kafka_errstr, sizeof(kafka_errstr));	
-	rd_kafka_conf_set(rdkafka_conf, "bootstrap.servers", conf->kafka_brokers, kafka_errstr, sizeof(kafka_errstr));
-    rd_kafka_conf_set(rdkafka_conf, "security.protocol", "sasl_plaintext", kafka_errstr, sizeof(kafka_errstr));
-    rd_kafka_conf_set(rdkafka_conf, "client.id", conf->kafka_topic, kafka_errstr, sizeof(kafka_errstr));
-	rd_kafka_conf_set(rdkafka_conf, "sasl.mechanisms", "PLAIN", kafka_errstr, sizeof(kafka_errstr));
-	rd_kafka_conf_set(rdkafka_conf, "sasl.username", conf->kafka_username, kafka_errstr, sizeof(kafka_errstr));
-	rd_kafka_conf_set(rdkafka_conf, "sasl.password", conf->kafka_brokers, kafka_errstr, sizeof(kafka_errstr));
+    if (RD_KAFKA_CONF_OK != rd_kafka_conf_set(rdkafka_conf, "queue.buffering.max.messages", "1000000", kafka_errstr, sizeof(kafka_errstr)))
+    {
+        LOG_ERROR("%s: kafka producer set queue.buffering.max.messages failed, err %s", LOG_TAG_STAT, kafka_errstr);
+        return;
+    }
+    if (RD_KAFKA_CONF_OK != rd_kafka_conf_set(rdkafka_conf, "topic.metadata.refresh.interval.ms", "600000", kafka_errstr, sizeof(kafka_errstr)))
+    {
+        LOG_ERROR("%s: kafka producer set topic.metadata.refresh.interval.ms failed, err %s", LOG_TAG_STAT, kafka_errstr);
+        return;
+    }
+    if (RD_KAFKA_CONF_OK != rd_kafka_conf_set(rdkafka_conf, "socket.keepalive.enable", "true", kafka_errstr, sizeof(kafka_errstr)))
+    {
+        LOG_ERROR("%s: kafka producer set socket.keepalive.enable failed, err %s", LOG_TAG_STAT, kafka_errstr);
+        return;
+    }
+    if (RD_KAFKA_CONF_OK != rd_kafka_conf_set(rdkafka_conf, "security.protocol", "sasl_plaintext", kafka_errstr, sizeof(kafka_errstr)))
+    {
+        LOG_ERROR("%s: kafka producer set security.protocol failed, err %s", LOG_TAG_STAT, kafka_errstr);
+        return;
+    }
+    if (RD_KAFKA_CONF_OK != rd_kafka_conf_set(rdkafka_conf, "client.id", conf->kafka_topic, kafka_errstr, sizeof(kafka_errstr)))
+    {
+        LOG_ERROR("%s: kafka producer set client.id failed, err %s", LOG_TAG_STAT, kafka_errstr);
+        return;
+    }
+	if (RD_KAFKA_CONF_OK != rd_kafka_conf_set(rdkafka_conf, "sasl.mechanisms", "PLAIN", kafka_errstr, sizeof(kafka_errstr)))
+    {
+        LOG_ERROR("%s: kafka producer set sasl.mechanisms failed, err %s", LOG_TAG_STAT, kafka_errstr);
+        return;
+    }
+	if (RD_KAFKA_CONF_OK != rd_kafka_conf_set(rdkafka_conf, "sasl.username", conf->kafka_username, kafka_errstr, sizeof(kafka_errstr)))
+    {
+        LOG_ERROR("%s: kafka producer set sasl.username failed, err %s", LOG_TAG_STAT, kafka_errstr);
+        return;
+    }
+	if (RD_KAFKA_CONF_OK != rd_kafka_conf_set(rdkafka_conf, "sasl.password", conf->kafka_password, kafka_errstr, sizeof(kafka_errstr)))
+    {
+        LOG_ERROR("%s: kafka producer set sasl.password failed, err %s", LOG_TAG_STAT, kafka_errstr);
+        return;
+    }
 
     stat->kafka_handle = rd_kafka_new(RD_KAFKA_PRODUCER, rdkafka_conf, kafka_errstr, sizeof(kafka_errstr));
     if (stat->kafka_handle == NULL) {
         LOG_ERROR("%s: kafka producer create failed, err %s", LOG_TAG_STAT, kafka_errstr);
         return;
     }
+    if (rd_kafka_brokers_add(stat->kafka_handle, conf->kafka_brokers) <= 0)
+    {
+        LOG_ERROR("%s: kafka producer add brokers failed", LOG_TAG_STAT);
+        return;
+    }
+
     stat->topic_rkt = rd_kafka_topic_new(stat->kafka_handle, conf->kafka_topic, NULL);
+    if (stat->topic_rkt == NULL) {
+        LOG_ERROR("%s: kafka producer create topic failed", LOG_TAG_STAT);
+        return;
+    }
 
     return;
 }
@@ -131,7 +170,7 @@ struct shaping_stat* shaper_stat_init(int thread_num)
     global_tags[4].type = FIELD_VALUE_CSTRING;
     global_tags[4].value_str = "shaping_metric";
 
-    stat->instance = fieldstat_easy_new(thread_num, "shaping_stat", global_tags, 5);
+    stat->instance = fieldstat_easy_new(thread_num, "traffic_shaping_rule_hits", global_tags, 5);
     if (stat->instance == NULL) {
         LOG_ERROR("%s: shaping init fieldstat instance failed", LOG_TAG_STAT);
         goto ERROR;
@@ -158,8 +197,6 @@ struct shaping_stat* shaper_stat_init(int thread_num)
             goto ERROR;
         }
     }
-
-    fieldstat_easy_enable_auto_output(stat->instance, "./metric/shaping_stat.json", 1);//TODO: output interval
 
     return stat;
 ERROR:
@@ -486,22 +523,21 @@ void shaper_stat_max_latency_update(struct shaping_stat_for_profile *profile_sta
 
 void shaper_stat_output(struct shaping_stat *stat)
 {
-    size_t len = 0;
-    fieldstat_easy_output(stat->instance, &output_json_buf, &len);
+    char **output_buff_array = NULL;
+    size_t array_size = 0;
+    fieldstat_easy_output_array_and_reset(stat->instance, &output_buff_array, &array_size);
 
-    int status=rd_kafka_produce(stat->topic_rkt, RD_KAFKA_PARTITION_UA, RD_KAFKA_MSG_F_COPY, output_json_buf, len, NULL, 0, NULL);
-    if (status < 0) {
-        LOG_ERROR("%s:shaper_stat_output, rd_kafka_produce is error of code: %d %s(%s), status: %d",
-							LOG_TAG_STAT,
-                            rd_kafka_last_error(),
-							rd_kafka_err2name(rd_kafka_last_error()),
-							rd_kafka_err2str(rd_kafka_last_error()),
-							status);
-    }
-
-    if (output_json_buf) {
-        free(output_json_buf);
-        output_json_buf = NULL;
+    for (int i = 0; i < array_size; i++) {
+        int status=rd_kafka_produce(stat->topic_rkt, RD_KAFKA_PARTITION_UA, RD_KAFKA_MSG_F_COPY, output_buff_array[i], strlen(output_buff_array[i]), NULL, 0, NULL);
+        if (status < 0) {
+            LOG_ERROR("%s:shaper_stat_output, rd_kafka_produce is error of code: %d %s(%s), status: %d",
+                                LOG_TAG_STAT,
+                                rd_kafka_last_error(),
+                                rd_kafka_err2name(rd_kafka_last_error()),
+                                rd_kafka_err2str(rd_kafka_last_error()),
+                                status);
+        }
+        free(output_buff_array[i]);
     }
 
     return;

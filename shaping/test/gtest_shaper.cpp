@@ -21,7 +21,6 @@ static struct stub_packet* packet_new(unsigned long long income_time, unsigned i
     struct stub_packet *packet;
 
     packet = (struct stub_packet*)calloc(1, sizeof(struct stub_packet));
-    packet->income_time = income_time;
     packet->length = length;
     packet->direction = dir;
 

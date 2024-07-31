@@ -160,6 +160,7 @@ static void send_packets(struct shaping_thread_ctx *ctx, struct shaping_flow *sf
 
     packet->direction = dir;
     packet->length = pkt_len;
+    packet->flow = sf;
 
     memset(&meta, 0, sizeof(meta));
 
@@ -177,7 +178,7 @@ static void send_packets(struct shaping_thread_ctx *ctx, struct shaping_flow *sf
     return;
 }
 
-TEST(single_session, generic_profile)
+TEST(generic_profile, single_session)
 {
     struct stub_pkt_queue *actual_tx_queue;
     struct shaping_ctx *ctx = NULL;
@@ -233,9 +234,115 @@ TEST(single_session, generic_profile)
     while (shaper_global_stat_queueing_pkts_get() != 0) {
         polling_entry(ctx->thread_ctx[0].sp, ctx->stat, &ctx->thread_ctx[0]);
     }
+    while(!TAILQ_EMPTY(actual_tx_queue))
+    {
+        struct stub_packet_node *pkt_node = TAILQ_FIRST(actual_tx_queue);
+        TAILQ_REMOVE(actual_tx_queue, pkt_node, node);
+        free(pkt_node->raw_packet);
+        free(pkt_node);
+    }
     
 
     shaping_flow_free(&ctx->thread_ctx[0], sf);
+    shaper_thread_resource_clear();
+    shaping_engine_destroy(ctx);
+}
+
+TEST(fair_share_profile, two_members)
+{
+    struct stub_pkt_queue *actual_tx_queue;
+    struct shaping_ctx *ctx = NULL;
+    struct shaping_flow *sf1 = NULL;
+    struct shaping_flow *sf2 = NULL;
+    long long rule_id[] = {0, 1};
+    long long rule_id1[] = {0};
+    long long rule_id2[] = {1};
+    int priority[] = {1, 1};
+    int profile_num[] = {1, 1};
+    int profile_id[][MAX_REF_PROFILE] = {{0}, {0}};
+    struct cmd_exec_arg* reply_arg=NULL;
+    char result[2048]={0};
+
+    stub_init();
+    ctx = shaping_engine_init();
+    ASSERT_TRUE(ctx != NULL);
+    sf1 = shaping_flow_new(&ctx->thread_ctx[0]);
+    ASSERT_TRUE(sf1 != NULL);
+    sf2 = shaping_flow_new(&ctx->thread_ctx[0]);
+    ASSERT_TRUE(sf2 != NULL);
+
+    stub_set_profile_limit_direction(0, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_profile_type(0, PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS);
+    stub_set_shaping_rule_fair_factor(0, 1);
+    stub_set_shaping_rule_fair_factor(1, 3);
+    stub_set_matched_shaping_rules(2, rule_id, priority, profile_num, profile_id);
+    shaper_rules_update(&ctx->thread_ctx[0], sf1, rule_id1, 1);
+    shaper_rules_update(&ctx->thread_ctx[0], sf2, rule_id2, 1);
+
+    sf1->src_ip_str = (char *)calloc(1, 16);
+    sf1->src_ip_str_len = strlen(sf1->src_ip_str);
+    memcpy(sf1->src_ip_str, "1.1.1.1", sf1->src_ip_str_len);
+    
+    sf2->src_ip_str = (char *)calloc(1, 16);
+    sf2->src_ip_str_len = strlen(sf2->src_ip_str);
+    memcpy(sf2->src_ip_str, "2.2.2.2", sf2->src_ip_str_len);
+
+    //set swarmkv key
+    swarmkv_cli_set_db("swarmkv-shaping-nodes");
+    reply_arg=cmd_exec_arg_new();
+
+	cmd_exec_arg_expect_OK(reply_arg);
+	swarmkv_cli_system_cmd(reply_arg, result, sizeof(result), swarmkv_expect_reply_string, "ftcfg tsg-shaping-0-incoming 1000000 1000000 256");
+    swarmkv_cli_system_cmd(reply_arg, result, sizeof(result), swarmkv_expect_reply_string, "ftcfg tsg-shaping-0-outgoing 1000000 1000000 256");
+	cmd_exec_arg_clear(reply_arg);
+
+    actual_tx_queue = stub_get_tx_queue();
+
+    time_t start_time = time(NULL);
+    time_t last_time = start_time;
+    unsigned long long total_bytes1 = 0;
+    unsigned long long total_bytes2 = 0;
+    while (1) {
+        time_t curr_time = time(NULL);
+        if (curr_time - last_time >= 1) {
+            EXPECT_NEAR(total_bytes1 * 3, total_bytes2, 100);
+
+            last_time = curr_time;
+            total_bytes1 = 0;
+            total_bytes2 = 0;
+        }
+        if (curr_time - start_time >= 10) {
+            break;
+        }
+        send_packets(&ctx->thread_ctx[0], sf2, 100, SHAPING_DIR_IN, 0);
+        send_packets(&ctx->thread_ctx[0], sf1, 100, SHAPING_DIR_IN, 0);
+        while(!TAILQ_EMPTY(actual_tx_queue))
+        {
+            struct stub_packet_node *pkt_node = TAILQ_FIRST(actual_tx_queue);
+            TAILQ_REMOVE(actual_tx_queue, pkt_node, node);
+            if (pkt_node->raw_packet->flow == sf1) {
+                total_bytes1 += pkt_node->raw_packet->length;
+            } else {
+                total_bytes2 += pkt_node->raw_packet->length;
+            }
+            free(pkt_node->raw_packet);
+            free(pkt_node);
+        }
+    }
+
+    while (shaper_global_stat_queueing_pkts_get() != 0) {
+        polling_entry(ctx->thread_ctx[0].sp, ctx->stat, &ctx->thread_ctx[0]);
+    }
+    while(!TAILQ_EMPTY(actual_tx_queue))
+    {
+        struct stub_packet_node *pkt_node = TAILQ_FIRST(actual_tx_queue);
+        TAILQ_REMOVE(actual_tx_queue, pkt_node, node);
+        free(pkt_node->raw_packet);
+        free(pkt_node);
+    }
+
+    shaping_flow_free(&ctx->thread_ctx[0], sf1);
+    shaping_flow_free(&ctx->thread_ctx[0], sf2);
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
 }
@@ -246,6 +353,9 @@ int main(int argc, char **argv)
     //testing::GTEST_FLAG(filter) = "single_session.udp_tx_in_order";
 
     const char *cluster_name="swarmkv-shaping-nodes";
+
+    system("consul agent -dev -config-dir=/etc/consul.d > /dev/null 2>&1 &");
+    sleep(3);
 
     swarmkv_cli_create_cluster(cluster_name, "127.0.0.1:5210");
 
@@ -262,5 +372,12 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    return RUN_ALL_TESTS();
+    int ret = RUN_ALL_TESTS();
+
+    MESA_destroy_runtime_log_handle(log_handle);
+    MESA_handle_runtime_log_destruction();
+
+    system("pkill -f consul");
+
+    return ret;
 }
