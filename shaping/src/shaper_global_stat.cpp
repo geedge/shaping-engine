@@ -75,7 +75,6 @@ struct shaping_global_stat* shaper_global_stat_init(int work_thread_num)
 {
     struct shaping_global_stat *stat = NULL;
     struct shping_global_stat_conf conf;
-    struct field tag;
 
     stat = (struct shaping_global_stat*)calloc(1, sizeof(struct shaping_global_stat));
 
@@ -84,10 +83,7 @@ struct shaping_global_stat* shaper_global_stat_init(int work_thread_num)
         goto ERROR;
     }
     
-    tag.key = "shaping_global";
-    tag.type = FIELD_VALUE_CSTRING;
-    tag.value_str = "shaping_global";
-    stat->instance = fieldstat_easy_new(work_thread_num, "shaping_global", &tag, 1);
+    stat->instance = fieldstat_easy_new(work_thread_num, "shaping_global", NULL, 0);
     if (stat->instance == NULL) {
         LOG_ERROR("%s: shaping global init fieldstat instance failed", LOG_TAG_STAT);
         goto ERROR;

@@ -46,7 +46,8 @@ struct shaping_stat_for_profile {
 };
 
 struct shaping_stat {
-    struct fieldstat_easy *instance;
+    struct fieldstat_easy *counter_instance;
+    struct fieldstat_easy *guage_instance;
     rd_kafka_t *kafka_handle; 
     rd_kafka_topic_t *topic_rkt;
     int output_interval_s;

@@ -36,8 +36,11 @@ thread_local struct field tags[TAG_IDX_MAX] =
 void shaper_stat_destroy(struct shaping_stat *stat)
 {
     if (stat) {
-        if (stat->instance) {
-            fieldstat_easy_free(stat->instance);
+        if (stat->counter_instance) {
+            fieldstat_easy_free(stat->counter_instance);
+        }
+        if (stat->guage_instance) {
+            fieldstat_easy_free(stat->guage_instance);
         }
         free(stat);
     }
@@ -170,26 +173,33 @@ struct shaping_stat* shaper_stat_init(int thread_num)
     global_tags[4].type = FIELD_VALUE_CSTRING;
     global_tags[4].value_str = "shaping_metric";
 
-    stat->instance = fieldstat_easy_new(thread_num, "traffic_shaping_rule_hits", global_tags, 5);
-    if (stat->instance == NULL) {
+    stat->counter_instance = fieldstat_easy_new(thread_num, "traffic_shaping_rule_hits", global_tags, 5);
+    if (stat->counter_instance == NULL) {
         LOG_ERROR("%s: shaping init fieldstat instance failed", LOG_TAG_STAT);
         goto ERROR;
     }
 
-    stat->latency_histogram_id = fieldstat_easy_register_histogram(stat->instance, "latency_distribution_us", 1, 1000000, 5);
+    stat->guage_instance = fieldstat_easy_new(thread_num, "traffic_shaping_rule_hits", global_tags, 5);
+    if (stat->guage_instance == NULL) {
+        LOG_ERROR("%s: shaping init fieldstat instance failed", LOG_TAG_STAT);
+        goto ERROR;
+    }
+
+    stat->latency_histogram_id = fieldstat_easy_register_histogram(stat->counter_instance, "latency_distribution_us", 1, 1000000, 5);
     if (stat->latency_histogram_id < 0) {
         LOG_ERROR("%s: shaping fieldstat register histogram failed", LOG_TAG_STAT);
         goto ERROR;
     }
 
-    stat->column_ids[IN_QUEUE_LEN_IDX] = fieldstat_easy_register_counter(stat->instance, "in_queue_len");
-    stat->column_ids[OUT_QUEUE_LEN_IDX] = fieldstat_easy_register_counter(stat->instance, "out_queue_len");
-    stat->column_ids[IN_PKTS_IDX] = fieldstat_easy_register_counter(stat->instance, "in_pkts");
-    stat->column_ids[IN_BYTES_IDX] = fieldstat_easy_register_counter(stat->instance, "in_bytes");
-    stat->column_ids[IN_DROP_PKTS_IDX] = fieldstat_easy_register_counter(stat->instance, "in_drop_pkts");
-    stat->column_ids[OUT_PKTS_IDX] = fieldstat_easy_register_counter(stat->instance, "out_pkts");
-    stat->column_ids[OUT_BYTES_IDX] = fieldstat_easy_register_counter(stat->instance, "out_bytes");
-    stat->column_ids[OUT_DROP_PKTS_IDX] = fieldstat_easy_register_counter(stat->instance, "out_drop_pkts");
+    stat->column_ids[IN_QUEUE_LEN_IDX] = fieldstat_easy_register_counter(stat->guage_instance, "in_queue_len");
+    stat->column_ids[OUT_QUEUE_LEN_IDX] = fieldstat_easy_register_counter(stat->guage_instance, "out_queue_len");
+
+    stat->column_ids[IN_PKTS_IDX] = fieldstat_easy_register_counter(stat->counter_instance, "in_pkts");
+    stat->column_ids[IN_BYTES_IDX] = fieldstat_easy_register_counter(stat->counter_instance, "in_bytes");
+    stat->column_ids[IN_DROP_PKTS_IDX] = fieldstat_easy_register_counter(stat->counter_instance, "in_drop_pkts");
+    stat->column_ids[OUT_PKTS_IDX] = fieldstat_easy_register_counter(stat->counter_instance, "out_pkts");
+    stat->column_ids[OUT_BYTES_IDX] = fieldstat_easy_register_counter(stat->counter_instance, "out_bytes");
+    stat->column_ids[OUT_DROP_PKTS_IDX] = fieldstat_easy_register_counter(stat->counter_instance, "out_drop_pkts");
 
     for (int i = IN_QUEUE_LEN_IDX; i < STAT_COLUNM_IDX_MAX; i++) {
         if (stat->column_ids[i] < 0) {
@@ -201,8 +211,11 @@ struct shaping_stat* shaper_stat_init(int thread_num)
     return stat;
 ERROR:
     if (stat) {
-        if (stat->instance) {
-            fieldstat_easy_free(stat->instance);
+        if (stat->counter_instance) {
+            fieldstat_easy_free(stat->counter_instance);
+        }
+        if (stat->guage_instance) {
+            fieldstat_easy_free(stat->guage_instance);
         }
         free(stat);
     }
@@ -351,20 +364,20 @@ static void shaper_stat_profile_metirc_refresh(struct shaping_thread_ctx *ctx, s
     
     shaper_stat_tags_build(rule->vsys_id, rule->id, profile->id, priority, profile_type);
 
-    fieldstat_easy_counter_incrby(stat->instance, thread_id, stat->column_ids[IN_DROP_PKTS_IDX], tags, TAG_IDX_MAX, profile_stat->in.drop_pkts);
-    fieldstat_easy_counter_incrby(stat->instance, thread_id, stat->column_ids[IN_PKTS_IDX], tags, TAG_IDX_MAX, profile_stat->in.pkts);
-    fieldstat_easy_counter_incrby(stat->instance, thread_id, stat->column_ids[IN_BYTES_IDX], tags, TAG_IDX_MAX, profile_stat->in.bytes);
+    fieldstat_easy_counter_incrby(stat->counter_instance, thread_id, stat->column_ids[IN_DROP_PKTS_IDX], tags, TAG_IDX_MAX, profile_stat->in.drop_pkts);
+    fieldstat_easy_counter_incrby(stat->counter_instance, thread_id, stat->column_ids[IN_PKTS_IDX], tags, TAG_IDX_MAX, profile_stat->in.pkts);
+    fieldstat_easy_counter_incrby(stat->counter_instance, thread_id, stat->column_ids[IN_BYTES_IDX], tags, TAG_IDX_MAX, profile_stat->in.bytes);
 
-    fieldstat_easy_counter_incrby(stat->instance, thread_id, stat->column_ids[OUT_DROP_PKTS_IDX], tags, TAG_IDX_MAX, profile_stat->out.drop_pkts);
-    fieldstat_easy_counter_incrby(stat->instance, thread_id, stat->column_ids[OUT_PKTS_IDX], tags, TAG_IDX_MAX, profile_stat->out.pkts);
-    fieldstat_easy_counter_incrby(stat->instance, thread_id, stat->column_ids[OUT_BYTES_IDX], tags, TAG_IDX_MAX, profile_stat->out.bytes);
+    fieldstat_easy_counter_incrby(stat->counter_instance, thread_id, stat->column_ids[OUT_DROP_PKTS_IDX], tags, TAG_IDX_MAX, profile_stat->out.drop_pkts);
+    fieldstat_easy_counter_incrby(stat->counter_instance, thread_id, stat->column_ids[OUT_PKTS_IDX], tags, TAG_IDX_MAX, profile_stat->out.pkts);
+    fieldstat_easy_counter_incrby(stat->counter_instance, thread_id, stat->column_ids[OUT_BYTES_IDX], tags, TAG_IDX_MAX, profile_stat->out.bytes);
 
-    fieldstat_easy_histogram_record(stat->instance, thread_id, stat->latency_histogram_id, tags, TAG_IDX_MAX, profile_stat->out.max_latency);
+    fieldstat_easy_histogram_record(stat->counter_instance, thread_id, stat->latency_histogram_id, tags, TAG_IDX_MAX, profile_stat->out.max_latency);
 
     if (need_update_guage) {
         if (profile_type == PROFILE_IN_RULE_TYPE_PRIMARY) {
-            fieldstat_easy_counter_incrby(stat->instance, thread_id, stat->column_ids[IN_QUEUE_LEN_IDX], tags, TAG_IDX_MAX, profile_stat->in.queue_len);
-            fieldstat_easy_counter_incrby(stat->instance, thread_id, stat->column_ids[OUT_QUEUE_LEN_IDX], tags, TAG_IDX_MAX, profile_stat->out.queue_len);
+            fieldstat_easy_counter_incrby(stat->guage_instance, thread_id, stat->column_ids[IN_QUEUE_LEN_IDX], tags, TAG_IDX_MAX, profile_stat->in.queue_len);
+            fieldstat_easy_counter_incrby(stat->guage_instance, thread_id, stat->column_ids[OUT_QUEUE_LEN_IDX], tags, TAG_IDX_MAX, profile_stat->out.queue_len);
         }
 
         memset(profile_stat, 0, sizeof(struct shaping_stat_for_profile));
@@ -523,12 +536,20 @@ void shaper_stat_max_latency_update(struct shaping_stat_for_profile *profile_sta
 
 void shaper_stat_output(struct shaping_stat *stat)
 {
-    char **output_buff_array = NULL;
-    size_t array_size = 0;
-    fieldstat_easy_output_array_and_reset(stat->instance, &output_buff_array, &array_size);
+    char **counter_output_buff_array = NULL;
+    char **guage_output_buff_array = NULL;
+    size_t counter_array_size = 0;
+    size_t guage_array_size = 0;
 
-    for (int i = 0; i < array_size; i++) {
-        int status=rd_kafka_produce(stat->topic_rkt, RD_KAFKA_PARTITION_UA, RD_KAFKA_MSG_F_COPY, output_buff_array[i], strlen(output_buff_array[i]), NULL, 0, NULL);
+    if (stat->topic_rkt == NULL) {
+        return;
+    }
+    
+    fieldstat_easy_output_array_and_reset(stat->counter_instance, &counter_output_buff_array, &counter_array_size);
+    fieldstat_easy_output_array(stat->guage_instance, &guage_output_buff_array, &guage_array_size);
+
+    for (unsigned int i = 0; i < counter_array_size; i++) {
+        int status=rd_kafka_produce(stat->topic_rkt, RD_KAFKA_PARTITION_UA, RD_KAFKA_MSG_F_COPY, counter_output_buff_array[i], strlen(counter_output_buff_array[i]), NULL, 0, NULL);
         if (status < 0) {
             LOG_ERROR("%s:shaper_stat_output, rd_kafka_produce is error of code: %d %s(%s), status: %d",
                                 LOG_TAG_STAT,
@@ -537,7 +558,20 @@ void shaper_stat_output(struct shaping_stat *stat)
                                 rd_kafka_err2str(rd_kafka_last_error()),
                                 status);
         }
-        free(output_buff_array[i]);
+        free(counter_output_buff_array[i]);
+    }
+
+    for (unsigned int i = 0; i < guage_array_size; i++) {
+        int status=rd_kafka_produce(stat->topic_rkt, RD_KAFKA_PARTITION_UA, RD_KAFKA_MSG_F_COPY, guage_output_buff_array[i], strlen(guage_output_buff_array[i]), NULL, 0, NULL);
+        if (status < 0) {
+            LOG_ERROR("%s:shaper_stat_output, rd_kafka_produce is error of code: %d %s(%s), status: %d",
+                                LOG_TAG_STAT,
+                                rd_kafka_last_error(),
+                                rd_kafka_err2name(rd_kafka_last_error()),
+                                rd_kafka_err2str(rd_kafka_last_error()),
+                                status);
+        }
+        free(guage_output_buff_array[i]);
     }
 
     return;

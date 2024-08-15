@@ -98,7 +98,8 @@ static int judge_packet_eq(struct stub_pkt_queue *expec_queue, struct stub_pkt_q
     return 0;
 }
 
-static void shaping_stat_judge(char *file_line, int json_array_idx, int rule_id, int profile_id, int priority, 
+static void shaping_stat_judge(char *counter_file_line, char *guage_file_line, int counter_json_array_idx, 
+                            int guage_json_array_idx, int rule_id, int profile_id, int priority, 
                             unsigned long long tx_pkts, unsigned long long tx_bytes,
                             unsigned long long drop_pkts, long long queue_len, long long max_latency,
                             unsigned char direction, char profile_type[])
@@ -108,17 +109,17 @@ static void shaping_stat_judge(char *file_line, int json_array_idx, int rule_id,
     cJSON *tmp_obj = NULL;
     char attr_name[32] = {0};
 
-    json = cJSON_Parse(file_line);
+    json = cJSON_Parse(counter_file_line);
     ASSERT_TRUE(json != NULL);
 
     ASSERT_EQ(json->type, cJSON_Array);
-    ASSERT_GT(cJSON_GetArraySize(json), json_array_idx);
+    ASSERT_GT(cJSON_GetArraySize(json), counter_json_array_idx);
 
-    json_array_element = cJSON_GetArrayItem(json, json_array_idx);
+    json_array_element = cJSON_GetArrayItem(json, counter_json_array_idx);
 
     tmp_obj = cJSON_GetObjectItem(json_array_element, "name");
     ASSERT_TRUE(tmp_obj != NULL);
-    EXPECT_STREQ("shaping_stat", tmp_obj->valuestring);
+    EXPECT_STREQ("traffic_shaping_rule_hits", tmp_obj->valuestring);
 
     /******************parse tags***********************************/
 
@@ -142,7 +143,7 @@ static void shaping_stat_judge(char *file_line, int json_array_idx, int rule_id,
     ASSERT_TRUE(tmp_obj != NULL);
     EXPECT_STREQ(tmp_obj->valuestring, profile_type);
 
-    /******************parse fields**********************************/
+    /******************parse counter fields**********************************/
 
     snprintf(attr_name, sizeof(attr_name), "%s_pkts", direction == SHAPING_DIR_OUT ? "out" : "in");
     tmp_obj = cJSON_GetObjectItem(json_array_element, attr_name);
@@ -166,6 +167,20 @@ static void shaping_stat_judge(char *file_line, int json_array_idx, int rule_id,
         ASSERT_TRUE(tmp_obj != NULL);
         EXPECT_EQ(max_latency, tmp_obj->valueint);
     }*/
+
+    cJSON_Delete(json);
+
+    /******************parse guage fields**********************************/
+    if (strcmp(profile_type, profile_type_borrow) == 0) {
+        return;
+    }
+
+    json = cJSON_Parse(guage_file_line);
+    ASSERT_TRUE(json != NULL);
+    ASSERT_EQ(json->type, cJSON_Array);
+    ASSERT_GT(cJSON_GetArraySize(json), guage_json_array_idx);
+
+    json_array_element = cJSON_GetArrayItem(json, guage_json_array_idx);
 
     snprintf(attr_name, sizeof(attr_name), "%s_queue_len", direction == SHAPING_DIR_OUT ? "out" : "in");
     tmp_obj = cJSON_GetObjectItem(json_array_element, attr_name);
@@ -264,13 +279,15 @@ TEST(single_session, udp_tx_in_order)
     /***********send stat data here********************/
     char *global_stat_str = NULL;
     size_t global_stat_str_len = 0;
-    char *stat_str = NULL;
+    char *counter_stat_str = NULL;
+    char *guage_stat_str = NULL;
     size_t stat_str_len = 0;
     
     shaper_thread_global_stat_refresh(&ctx->thread_ctx[0]);
 
     fieldstat_easy_output(ctx->global_stat->instance, &global_stat_str, &global_stat_str_len);
-    fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->counter_instance, &counter_stat_str, &stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->guage_instance, &guage_stat_str, &stat_str_len);
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
@@ -279,13 +296,14 @@ TEST(single_session, udp_tx_in_order)
 
     /*******test statistics***********/
     //judge shaping metric
-    shaping_stat_judge(stat_str, 0, 0, 0, 1, 100, 10000, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 0, 0, 1, 100, 10000, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
 
     //judge shaping global metric
     shaping_global_stat_judge(global_stat_str, 100, 10000, 0, 0, 0, 0);
 
     free(global_stat_str);
-    free(stat_str);
+    free(counter_stat_str);
+    free(guage_stat_str);
 }
 
 /*session1 match rule1
@@ -405,13 +423,15 @@ TEST(max_min_host_fairness_profile, udp_tx_in_order)
     /***********send stat data here********************/
     char *global_stat_str = NULL;
     size_t global_stat_str_len = 0;
-    char *stat_str = NULL;
+    char *counter_stat_str = NULL;
+    char *guage_stat_str = NULL;
     size_t stat_str_len = 0;
     
     shaper_thread_global_stat_refresh(&ctx->thread_ctx[0]);
 
     fieldstat_easy_output(ctx->global_stat->instance, &global_stat_str, &global_stat_str_len);
-    fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->counter_instance, &counter_stat_str, &stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->guage_instance, &guage_stat_str, &stat_str_len);
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
@@ -420,13 +440,14 @@ TEST(max_min_host_fairness_profile, udp_tx_in_order)
 
     /*******test statistics***********/
     //judge shaping metric
-    shaping_stat_judge(stat_str, 0, 0, 0, 1, 100, 10000, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 0, 0, 1, 100, 10000, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
 
     //judge shaping global metric
     shaping_global_stat_judge(global_stat_str, 100, 10000, 0, 0, 0, 0);
 
     free(global_stat_str);
-    free(stat_str);
+    free(counter_stat_str);
+    free(guage_stat_str);
 }
 
 /*session1 match rule1
@@ -470,14 +491,16 @@ TEST(single_session, tcp_tx_in_order)
 
 
     /***********send stat data here********************/
-    char *stat_str = NULL;
+    char *counter_stat_str = NULL;
+    char *guage_stat_str = NULL;
     size_t stat_str_len = 0;
     
     shaper_stat_refresh(&ctx->thread_ctx[0], sf, 1);
-    fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
-    shaping_stat_judge(stat_str, 0, 0, 0, 1, 20, 2000, 0, 10, 0, SHAPING_DIR_OUT, profile_type_primary);//*test statistics
-    free(stat_str);
-
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->counter_instance, &counter_stat_str, &stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->guage_instance, &guage_stat_str, &stat_str_len);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 0, 0, 1, 20, 2000, 0, 10, 0, SHAPING_DIR_OUT, profile_type_primary);//*test statistics
+    free(counter_stat_str);
+    free(guage_stat_str);
 
     stub_refresh_token_bucket(0);
     for (int i = 0; i < 10; i++) {
@@ -496,7 +519,8 @@ TEST(single_session, tcp_tx_in_order)
     shaping_flow_free(&ctx->thread_ctx[0], sf);
 
     /***********send stat data here********************/
-    fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->counter_instance, &counter_stat_str, &stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->guage_instance, &guage_stat_str, &stat_str_len);
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
@@ -504,8 +528,9 @@ TEST(single_session, tcp_tx_in_order)
 
 
     /*******test statistics***********/
-    shaping_stat_judge(stat_str, 0, 0, 0, 1, 30, 3000, 0, 0, 31000, SHAPING_DIR_OUT, profile_type_primary);
-    free(stat_str);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 0, 0, 1, 30, 3000, 0, 0, 31000, SHAPING_DIR_OUT, profile_type_primary);
+    free(counter_stat_str);
+    free(guage_stat_str);
 }
 
 /*session1 match rule1
@@ -563,10 +588,12 @@ TEST(single_session, udp_diff_direction)
     shaping_flow_free(&ctx->thread_ctx[0], sf);
 
     /***********send stat data here********************/
-    char *stat_str = NULL;
+    char *counter_stat_str = NULL;
+    char *guage_stat_str = NULL;
     size_t stat_str_len = 0;
     
-    fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->counter_instance, &counter_stat_str, &stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->guage_instance, &guage_stat_str, &stat_str_len);
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
@@ -574,9 +601,10 @@ TEST(single_session, udp_diff_direction)
 
 
     /*******test statistics***********/
-    shaping_stat_judge(stat_str, 0, 0, 0, 1, 20, 2000, 0, 0, 21000, SHAPING_DIR_OUT, profile_type_primary);
-    shaping_stat_judge(stat_str, 0, 0, 0, 1, 20, 2000, 0, 0, 0, SHAPING_DIR_IN, profile_type_primary);
-    free(stat_str);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 0, 0, 1, 20, 2000, 0, 0, 21000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 0, 0, 1, 20, 2000, 0, 0, 0, SHAPING_DIR_IN, profile_type_primary);
+    free(counter_stat_str);
+    free(guage_stat_str);
 }
 
 /*session1 match rule1, rule2, rule3
@@ -636,10 +664,12 @@ TEST(single_session, udp_multi_rules)
     shaping_flow_free(&ctx->thread_ctx[0], sf);
 
     /***********send stat data here********************/
-    char *stat_str = NULL;
+    char *counter_stat_str = NULL;
+    char *guage_stat_str = NULL;
     size_t stat_str_len = 0;
     
-    fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->counter_instance, &counter_stat_str, &stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->guage_instance, &guage_stat_str, &stat_str_len);
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
@@ -647,15 +677,16 @@ TEST(single_session, udp_multi_rules)
 
     /*******test statistics***********/
     //profile_id 0
-    shaping_stat_judge(stat_str, 0, 0, 0, 1, 100, 10000, 0, 0, 507000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 0, 0, 1, 100, 10000, 0, 0, 507000, SHAPING_DIR_OUT, profile_type_primary);
 
     //profile_id 1 
-    shaping_stat_judge(stat_str, 1, 1, 1, 1, 100, 10000, 0, 0, 1000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 1, 1, 1, 1, 1, 100, 10000, 0, 0, 1000, SHAPING_DIR_OUT, profile_type_primary);
 
     //profile_id 2
-    shaping_stat_judge(stat_str, 2, 2, 2, 1, 100, 10000, 0, 0, 91000, SHAPING_DIR_OUT, profile_type_primary);//max latency is first queued pkt
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 2, 2, 2, 2, 1, 100, 10000, 0, 0, 91000, SHAPING_DIR_OUT, profile_type_primary);//max latency is first queued pkt
 
-    free(stat_str);
+    free(counter_stat_str);
+    free(guage_stat_str);
 }
 
 /*session1 match rule1
@@ -707,10 +738,12 @@ TEST(single_session, udp_borrow)
     shaping_flow_free(&ctx->thread_ctx[0], sf);
 
     /***********send stat data here********************/
-    char *stat_str = NULL;
+    char *counter_stat_str = NULL;
+    char *guage_stat_str = NULL;
     size_t stat_str_len = 0;
     
-    fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->counter_instance, &counter_stat_str, &stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->guage_instance, &guage_stat_str, &stat_str_len);
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
@@ -718,12 +751,13 @@ TEST(single_session, udp_borrow)
 
     /*******test statistics***********/
     //profile_id 1, primary
-    shaping_stat_judge(stat_str, 0, 1, 1, 1, 0, 0, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 1, 1, 1, 0, 0, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);
 
     //profile_id 2, borrow
-    shaping_stat_judge(stat_str, 1, 1, 2, 2, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 1, 0, 1, 2, 2, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
-    free(stat_str);
+    free(counter_stat_str);
+    free(guage_stat_str);
 }
 
 /*session1 match rule1
@@ -778,10 +812,12 @@ TEST(single_session, udp_borrow_same_priority_9)
     shaping_flow_free(&ctx->thread_ctx[0], sf);
 
     /***********send stat data here********************/
-    char *stat_str = NULL;
+    char *counter_stat_str = NULL;
+    char *guage_stat_str = NULL;
     size_t stat_str_len = 0;
     
-    fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->counter_instance, &counter_stat_str, &stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->guage_instance, &guage_stat_str, &stat_str_len);
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
@@ -789,15 +825,16 @@ TEST(single_session, udp_borrow_same_priority_9)
 
     /*******test statistics***********/
     //profile_id 1, primary
-    shaping_stat_judge(stat_str, 0, 1, 1, 9, 0, 0, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 1, 1, 9, 0, 0, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);
 
     //profile_id 2, borrow
-    shaping_stat_judge(stat_str, 1, 1, 2, 9, 0, 0, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 1, 0, 1, 2, 9, 0, 0, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
     //profile_id 3, borrow
-    shaping_stat_judge(stat_str, 2, 1, 3, 9, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 2, 0, 1, 3, 9, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
-    free(stat_str);
+    free(counter_stat_str);
+    free(guage_stat_str);
 }
 
 /*session1 match rule1
@@ -942,10 +979,12 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
     shaping_flow_free(&ctx->thread_ctx[0], sf2);
 
     /***********send stat data here********************/
-    char *stat_str = NULL;
+    char *counter_stat_str = NULL;
+    char *guage_stat_str = NULL;
     size_t stat_str_len = 0;
     
-    fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->counter_instance, &counter_stat_str, &stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->guage_instance, &guage_stat_str, &stat_str_len);
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
@@ -953,15 +992,16 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
 
     /*******test statistics***********/
     //profile_id 1, primary
-    shaping_stat_judge(stat_str, 0, 1, 1, 1, 0, 0, 0, 0, 1471000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1471000, SHAPING_DIR_OUT, profile_type_primary);
 
     //profile_id 2, borrow
-    shaping_stat_judge(stat_str, 1, 1, 2, 2, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 1, 0, 1, 2, 2, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
     //profile_id 2, primary
-    shaping_stat_judge(stat_str, 2, 2, 2, 1, 100, 10000, 0, 0, 191000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 2, 1, 2, 2, 1, 100, 10000, 0, 0, 191000, SHAPING_DIR_OUT, profile_type_primary);
 
-    free(stat_str);
+    free(counter_stat_str);
+    free(guage_stat_str);
 }
 
 /*session1 match rule1; session2 match rule2
@@ -1520,13 +1560,15 @@ TEST(statistics, udp_drop_pkt)
     /***********send stat data here********************/
     char *global_stat_str = NULL;
     size_t global_stat_str_len = 0;
-    char *stat_str = NULL;
+    char *counter_stat_str = NULL;
+    char *guage_stat_str = NULL;
     size_t stat_str_len = 0;
     
     shaper_thread_global_stat_refresh(&ctx->thread_ctx[0]);
 
     fieldstat_easy_output(ctx->global_stat->instance, &global_stat_str, &global_stat_str_len);
-    fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->counter_instance, &counter_stat_str, &stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->guage_instance, &guage_stat_str, &stat_str_len);
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
@@ -1534,13 +1576,14 @@ TEST(statistics, udp_drop_pkt)
 
     /*******test statistics***********/
     //judge shaping metric
-    shaping_stat_judge(stat_str, 0, 0, 0, 1, SHAPING_SESSION_QUEUE_LEN+10, (SHAPING_SESSION_QUEUE_LEN+10)*100, 100, 0, 228000, SHAPING_DIR_OUT, profile_type_primary);//every queued pkt's latency is max
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 0, 0, 1, SHAPING_SESSION_QUEUE_LEN+10, (SHAPING_SESSION_QUEUE_LEN+10)*100, 100, 0, 228000, SHAPING_DIR_OUT, profile_type_primary);//every queued pkt's latency is max
 
     //judge shaping global metric
     shaping_global_stat_judge(global_stat_str, SHAPING_SESSION_QUEUE_LEN+10, (SHAPING_SESSION_QUEUE_LEN+10)*100, 100, 10000, 0, 0);
 
     free(global_stat_str);
-    free(stat_str);
+    free(counter_stat_str);
+    free(guage_stat_str);
 }
 
 /*session1 match rule1
@@ -1578,21 +1621,24 @@ TEST(statistics, udp_queueing_pkt)
     /***********send stat data here********************/
     char *global_stat_str = NULL;
     size_t global_stat_str_len = 0;
-    char *stat_str = NULL;
+    char *counter_stat_str = NULL;
+    char *guage_stat_str = NULL;
     size_t stat_str_len = 0;
     
     shaper_thread_global_stat_refresh(&ctx->thread_ctx[0]);
     shaper_stat_refresh(&ctx->thread_ctx[0], sf, 1);
 
     fieldstat_easy_output(ctx->global_stat->instance, &global_stat_str, &global_stat_str_len);
-    fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->counter_instance, &counter_stat_str, &stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->guage_instance, &guage_stat_str, &stat_str_len);
 
     /*******judge metric********/
-    shaping_stat_judge(stat_str, 0, 0, 0, 1, 10, 1000, 0, 90, 0, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 0, 0, 1, 10, 1000, 0, 90, 0, SHAPING_DIR_OUT, profile_type_primary);
     shaping_global_stat_judge(global_stat_str, 10, 1000, 0, 0, 90, 9000);
 
     free(global_stat_str);
-    free(stat_str);
+    free(counter_stat_str);
+    free(guage_stat_str);
 
     //first 10 packets
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
@@ -1611,7 +1657,8 @@ TEST(statistics, udp_queueing_pkt)
     /***********send stat data here********************/
     shaper_thread_global_stat_refresh(&ctx->thread_ctx[0]);
     fieldstat_easy_output(ctx->global_stat->instance, &global_stat_str, &global_stat_str_len);
-    fieldstat_easy_output(ctx->thread_ctx[0].stat->instance, &stat_str, &stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->counter_instance, &counter_stat_str, &stat_str_len);
+    fieldstat_easy_output(ctx->thread_ctx[0].stat->guage_instance, &guage_stat_str, &stat_str_len);
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
@@ -1619,13 +1666,14 @@ TEST(statistics, udp_queueing_pkt)
 
     /*******test statistics***********/
     //judge shaping metric
-    shaping_stat_judge(stat_str, 0, 0, 0, 1, 100, 10000, 0, 0, 90000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 0, 0, 1, 100, 10000, 0, 0, 90000, SHAPING_DIR_OUT, profile_type_primary);
 
     //judge global metric
     shaping_global_stat_judge(global_stat_str, 100, 10000, 0, 0, 0, 0);
 
     free(global_stat_str);
-    free(stat_str);
+    free(counter_stat_str);
+    free(guage_stat_str);
 }
 
 int main(int argc, char **argv) 
