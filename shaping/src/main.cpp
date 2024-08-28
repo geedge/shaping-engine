@@ -125,7 +125,7 @@ int main(int argc, char **argv)
             last_stat_update_time = curr_time;
         }
 
-        sleep(ctx->stat->output_interval_s);
+        usleep(ctx->stat->output_interval_s * 1000);
     }
 
     for (int i = 0; i < ctx->thread_num; i++) {
