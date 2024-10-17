@@ -49,6 +49,7 @@ yum install -y libibverbs # required by mrzcpd
 yum install -y libbreakpad_mini-devel
 yum install -y msgpack-devel
 yum install -y librdkafka-devel
+yum install -y libuuid-devel
 source /etc/profile.d/framework.sh
 source /etc/profile.d/mrzcpd.sh
 
