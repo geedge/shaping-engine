@@ -85,17 +85,17 @@ void shaper_session_log_prepare(struct shaping_flow *sf, char **mpack_data, size
 
         mpack_build_map(&writer);
         mpack_write_cstr(&writer, "rule_id");
-        mpack_write_i64(&writer, rule_info->id);
-        LOG_DEBUG("%s: rule id %d", LOG_TAG_SHAPING, rule_info->id);
+        mpack_write_bin(&writer, (char*)rule_info->uuid, sizeof(uuid_t));
+        LOG_DEBUG("%s: rule id %s", LOG_TAG_SHAPING, uuid_print_str(rule_info->uuid));
 
         mpack_write_cstr(&writer, "profile_ids");
         mpack_build_array(&writer);
-        mpack_write_i64(&writer, rule_info->primary.id);
-        LOG_DEBUG("%s: primary_profile id %d", LOG_TAG_SHAPING, rule_info->primary.id);
+        mpack_write_bin(&writer, (char*)rule_info->primary.uuid, sizeof(uuid_t));
+        LOG_DEBUG("%s: primary_profile id %s", LOG_TAG_SHAPING, uuid_print_str(rule_info->primary.uuid));
 
         for (int j = 0; j < rule_info->borrowing_num; j++) {
-            mpack_write_i64(&writer, rule_info->borrowing[j].id);
-            LOG_DEBUG("%s: borrow_profile id %d", LOG_TAG_SHAPING, rule_info->borrowing[j].id);
+            mpack_write_bin(&writer, (char*)rule_info->borrowing[j].uuid, sizeof(uuid_t));
+            LOG_DEBUG("%s: borrow_profile id %s", LOG_TAG_SHAPING, uuid_print_str(rule_info->borrowing[j].uuid));
         }
         mpack_complete_array(&writer);//end build array for profile_ids
         mpack_complete_map(&writer);
@@ -221,7 +221,7 @@ struct shaping_flow* shaper_session_active(struct shaping_thread_ctx *ctx, struc
         sf = (struct shaping_flow *)node->val_data;
     }
     
-    shaper_rules_update(ctx, sf, ctrl_data->shaping_rule_ids, ctrl_data->shaping_rule_num);
+    shaper_rules_update(ctx, sf, ctrl_data->shaping_rule_uuids, ctrl_data->shaping_rule_num);
     shaper_session_log_send(ctx, sf);//send log of rules and profiles when receive new matched rules
 
     return sf;

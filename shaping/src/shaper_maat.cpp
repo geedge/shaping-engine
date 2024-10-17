@@ -15,7 +15,7 @@
 #include "utils.h"
 
 #define SHAPING_STREAM_TIMEOUT 3600
-#define SHAPING_RULE_TABLE_NAME "TRAFFIC_SHAPING_COMPILE"
+#define SHAPING_RULE_TABLE_NAME "TRAFFIC_SHAPING_RULE"
 #define SHAPING_PROFILE_TABLE_NAME "TRAFFIC_SHAPING_PROFILE"
 
 enum input_mode
@@ -78,16 +78,16 @@ static int dscp_value_to_priority[DSCP_VALUE_MAX] = {DSCP_CLASS_DF, DSCP_CLASS_M
 
 struct maat *g_maat_instance = NULL;
 
-void shaper_rule_ex_new(const char *table_name, int table_id, const char *key, const char *table_line, void **ad, long argl, void *argp)
+void shaper_rule_ex_new(const char *table_name, const char *key, const char *table_line, void **ad, long argl, void *argp)
 {
     struct shaping_rule *s_rule;
     cJSON *json=NULL;
     cJSON *tmp_obj = NULL;
+    cJSON *action_para_obj = NULL;
     cJSON *tmp_array_obj = NULL;
     cJSON *dscp_obj = NULL;
     int array_size;
-    char user_region[1024] = {0};
-    int i, ret;
+    int i;
 
     if (strncmp(table_name, SHAPING_RULE_TABLE_NAME, strlen(table_name)) != 0) {
         return;
@@ -95,77 +95,80 @@ void shaper_rule_ex_new(const char *table_name, int table_id, const char *key, c
 
     s_rule = (struct shaping_rule*)calloc(1, sizeof(struct shaping_rule));
 
-    ret = sscanf(table_line, "%d\t%*d\t%*d\t%*d\t%*d\t%*s\t%s\t", &s_rule->id, user_region);
-    if (ret != 2) {
-        LOG_ERROR("%s: sscanf parse rule failed for table line %s", LOG_TAG_MAAT, table_line);
-        goto END;
-    }
-
-    json = cJSON_Parse(user_region);
-    if (!json) {//required
+    json = cJSON_Parse(table_line);
+    if (!json) {
         LOG_ERROR("%s: json parse rule failed for table line %s", LOG_TAG_MAAT, table_line);
         goto END;
     }
 
-    tmp_obj = cJSON_GetObjectItem(json, "vsys_id");
+    tmp_obj = cJSON_GetObjectItem(json, "uuid");
+    if (!tmp_obj) {
+        LOG_ERROR("%s: json parse uuid failed for table line %s", LOG_TAG_MAAT, table_line);
+        goto END;
+    }
+    uuid_parse(tmp_obj->valuestring, s_rule->uuid);
+
+    action_para_obj = cJSON_GetObjectItem(json, "action_parameter");
+    if (!action_para_obj) {
+        LOG_ERROR("%s: json parse action_parameter failed for table line %s", LOG_TAG_MAAT, table_line);
+        goto END;
+    }
+
+    tmp_obj = cJSON_GetObjectItem(action_para_obj, "vsys_id");
     if (!tmp_obj) {
         LOG_ERROR("%s: json parse vsys_id failed for table line %s", LOG_TAG_MAAT, table_line);
         goto END;
     }
     s_rule->vsys_id = tmp_obj->valueint;
 
-    tmp_obj = cJSON_GetObjectItem(json, "priority");
+    tmp_obj = cJSON_GetObjectItem(action_para_obj, "priority");
     if (!tmp_obj) {
         LOG_ERROR("%s: json parse priority failed for table line %s", LOG_TAG_MAAT, table_line);
         goto END;
     }
     s_rule->priority = tmp_obj->valueint;
 
-    tmp_obj = cJSON_GetObjectItem(json, "fair_factor");
+    tmp_obj = cJSON_GetObjectItem(action_para_obj, "fair_factor");
     if (!tmp_obj) {
-        LOG_ERROR("%s: json parse fair-factor failed for table line %s", LOG_TAG_MAAT, table_line);
+        LOG_ERROR("%s: json parse fair_factor failed for table line %s", LOG_TAG_MAAT, table_line);
         goto END;
     }
     s_rule->fair_factor = tmp_obj->valueint;
 
-    //dscp_marking
-    tmp_obj = cJSON_GetObjectItem(json, "dscp_marking");
-    if (!tmp_obj) {
+    dscp_obj = cJSON_GetObjectItem(action_para_obj, "dscp_marking");
+    if (!dscp_obj) {
         LOG_ERROR("%s: json parse dscp_marking failed for table line %s", LOG_TAG_MAAT, table_line);
         goto END;
     }
-    dscp_obj = cJSON_GetObjectItem(tmp_obj, "enabled");
-    if (dscp_obj && dscp_obj->valueint == 1) {
-        dscp_obj = cJSON_GetObjectItem(tmp_obj, "dscp_value");
-        if (dscp_obj && dscp_obj->valueint < DSCP_VALUE_MAX && dscp_value_to_priority[dscp_obj->valueint] != DSCP_CLASS_MAX) {
-            s_rule->dscp_enable = 1;
-            s_rule->dscp_value = dscp_obj->valueint;
+    tmp_obj = cJSON_GetObjectItem(dscp_obj, "enabled");
+    if (tmp_obj && tmp_obj->valueint == 1) {
+        s_rule->dscp_enable = 1;
+        tmp_obj = cJSON_GetObjectItem(dscp_obj, "dscp_value");
+        if (tmp_obj && tmp_obj->valueint < DSCP_VALUE_MAX && dscp_value_to_priority[tmp_obj->valueint] != DSCP_CLASS_MAX) {
+            s_rule->dscp_value = tmp_obj->valueint;
         } else {
             LOG_ERROR("%s: json parse dscp_value wrong for table line %s", LOG_TAG_MAAT, table_line);
             goto END;
         }
     }
 
-    //profile_chain
-    tmp_obj = cJSON_GetObjectItem(json, "profile_chain");
-    if (!tmp_obj) {//required
+    tmp_array_obj = cJSON_GetObjectItem(action_para_obj, "profile_chain");
+    if (!tmp_array_obj) {
         LOG_ERROR("%s: json parse profile_chain failed for table line %s", LOG_TAG_MAAT, table_line);
         goto END;
     }
-        
-    array_size = cJSON_GetArraySize(tmp_obj);
+    array_size = cJSON_GetArraySize(tmp_array_obj);
     if (array_size < 1) {
         LOG_ERROR("%s: json parse profile_chain empty for table line %s", LOG_TAG_MAAT, table_line);
         goto END;
     }
-
-    tmp_array_obj = cJSON_GetArrayItem(tmp_obj, 0);
-    s_rule->primary_pf_id = tmp_array_obj->valueint;
+    tmp_obj = cJSON_GetArrayItem(tmp_array_obj, 0);
+    uuid_parse(tmp_obj->valuestring, s_rule->primary_pf_uuid);
 
     s_rule->borrow_pf_num = array_size - 1;
     for (i = 1; i < array_size; i++) {
-        tmp_array_obj = cJSON_GetArrayItem(tmp_obj, i);
-        s_rule->borrow_pf_id_array[i - 1] = tmp_array_obj->valueint;
+        tmp_obj = cJSON_GetArrayItem(tmp_array_obj, i);
+        uuid_parse(tmp_obj->valuestring, s_rule->borrow_pf_uuid_array[i - 1]);
     }
 
 END:
@@ -176,7 +179,7 @@ END:
     return;
 }
 
-void shaper_rule_ex_dup(int table_id, void **to, void **from, long argl, void *argp)
+void shaper_rule_ex_dup(const char *table_name, void **to, void **from, long argl, void *argp)
 {
     if (*from == NULL) {
         return;
@@ -187,7 +190,7 @@ void shaper_rule_ex_dup(int table_id, void **to, void **from, long argl, void *a
     return;
 }
 
-void shaper_rule_ex_free(int table_id, void **ad, long argl, void *argp)
+void shaper_rule_ex_free(const char *table_name, void **ad, long argl, void *argp)
 {
     if (*ad == NULL) {
         return;
@@ -199,20 +202,16 @@ void shaper_rule_ex_free(int table_id, void **ad, long argl, void *argp)
     return;
 }
 
-void shaper_profile_ex_new(const char *table_name, int table_id, const char *key, const char *table_line, void **ad, long argl, void *argp)
+void shaper_profile_ex_new(const char *table_name, const char *key, const char *table_line, void **ad, long argl, void *argp)
 {
     struct shaping_profile *s_pf;
     cJSON *json=NULL;
     cJSON *tmp_array_obj = NULL;
     cJSON *tmp_obj = NULL;
-    char profile_type[64] = {0};
-    char type_arg[64] = {0};
-    char limits[128] = {0};
-    char aqm_options[64] = {0};
-    char volume_based_shaping[64] = {0};
+    cJSON *type_arg_obj = NULL;
+    cJSON *aqm_options_obj = NULL;
+    cJSON *limits_obj = NULL;
     int limit_bandwidth;
-    int array_size, i;
-    int ret;
 
     if (strncmp(table_name, SHAPING_PROFILE_TABLE_NAME, strlen(table_name)) != 0) {
         return;
@@ -220,26 +219,43 @@ void shaper_profile_ex_new(const char *table_name, int table_id, const char *key
 
     s_pf = (struct shaping_profile*)calloc(1, sizeof(struct shaping_profile));
 
-    ret = sscanf(table_line, "%d\t%63s\t%63s\t%127s\t%63s\t%63s\t%d",
-            &s_pf->id, profile_type, type_arg, limits, aqm_options, volume_based_shaping, &s_pf->valid);
-    if (ret != 7) {
-        LOG_ERROR("%s: sscanf parse failed for profile line %s", LOG_TAG_MAAT, table_line);
+    json = cJSON_Parse(table_line);
+    if (!json) {
+        LOG_ERROR("%s: json parse profile failed for table line %s", LOG_TAG_MAAT, table_line);
         goto END;
     }
 
-    if (strcmp(profile_type, "generic") == 0) {
+    tmp_obj = cJSON_GetObjectItem(json, "uuid");
+    if (!tmp_obj) {
+        LOG_ERROR("%s: json parse uuid failed for table line %s", LOG_TAG_MAAT, table_line);
+        goto END;
+    }
+    uuid_parse(tmp_obj->valuestring, s_pf->uuid);
+
+    //parse profile type
+    tmp_obj = cJSON_GetObjectItem(json, "type");
+    if (!tmp_obj) {
+        LOG_ERROR("%s: json parse type failed for table line %s", LOG_TAG_MAAT, table_line);
+        goto END;
+    }
+    type_arg_obj = cJSON_GetObjectItem(json, "type_argument");
+    if (!type_arg_obj) {
+        LOG_ERROR("%s: json parse type_argument failed for table line %s", LOG_TAG_MAAT, table_line);
+        goto END;
+    }
+    if (strcmp(tmp_obj->valuestring, "generic") == 0) {
         s_pf->type = PROFILE_TYPE_GENERIC;
-    } else if (strcmp(profile_type, "fair_share") == 0) {
-        if (strcmp(type_arg, "host_fairness") == 0) {
+    } else if (strcmp(tmp_obj->valuestring, "fair_share") == 0) {
+        if (strcmp(type_arg_obj->valuestring, "host_fairness") == 0) {
             s_pf->type = PROFILE_TYPE_HOST_FARINESS;
-        } else if (strcmp(type_arg, "max_min_host_fairness") == 0) {
+        } else if (strcmp(type_arg_obj->valuestring, "max_min_host_fairness") == 0) {
             s_pf->type = PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS;
         } else {
             LOG_ERROR("%s: profile type argument wrong for profile line %s", LOG_TAG_MAAT, table_line);
             goto END;
         }
-    } else if (strcmp(profile_type, "split_by") == 0) {
-        if (strcmp(type_arg, "local_host") == 0) {
+    } else if (strcmp(tmp_obj->valuestring, "split_by") == 0) {
+        if (strcmp(type_arg_obj->valuestring, "local_host") == 0) {
             s_pf->type = PROFILE_TYPE_SPLIT_BY_LOCAL_HOST;
         } else {
             LOG_ERROR("%s: profile type argument wrong for profile line %s", LOG_TAG_MAAT, table_line);
@@ -251,16 +267,14 @@ void shaper_profile_ex_new(const char *table_name, int table_id, const char *key
     }
 
     //parse aqm options
-    json = cJSON_Parse(aqm_options);
-    if (!json) {
-        LOG_ERROR("%s: json parse profile aqm options failed for profile id %d, line %s", LOG_TAG_MAAT, s_pf->id, table_line);
+    aqm_options_obj = cJSON_GetObjectItem(json, "aqm_options");
+    if (!aqm_options_obj) {
+        LOG_ERROR("%s: json parse aqm options failed for line %s", LOG_TAG_MAAT, table_line);
         goto END;
     }
-
-    
-    tmp_obj = cJSON_GetObjectItem(json, "algorithm");
+    tmp_obj = cJSON_GetObjectItem(aqm_options_obj, "algorithm");
     if (!tmp_obj || tmp_obj->type != cJSON_String || !tmp_obj->valuestring) {
-        LOG_ERROR("%s: json parse algorithm failed for profile id %d, line %s", LOG_TAG_MAAT, s_pf->id, table_line);
+        LOG_ERROR("%s: json parse aqm algorithm failed for line %s", LOG_TAG_MAAT, table_line);
         goto END;
     }
     if (strncmp(tmp_obj->valuestring, "none", strlen(tmp_obj->valuestring)) == 0) {
@@ -270,32 +284,27 @@ void shaper_profile_ex_new(const char *table_name, int table_id, const char *key
     } else if (strncmp(tmp_obj->valuestring, "codel", strlen(tmp_obj->valuestring)) == 0) {
         s_pf->aqm_type = AQM_TYPE_CODEL;
     } else {
-        LOG_ERROR("%s: json parse aqm type wrong for profile id %d, line %s", LOG_TAG_MAAT, s_pf->id, table_line);
+        LOG_ERROR("%s: json parse aqm type wrong for line %s", LOG_TAG_MAAT, table_line);
         goto END;
     }
-
-    cJSON_Delete(json);
     
     //parse limits of profile
-    json = cJSON_Parse(limits);
-    if (!json) {
-        LOG_ERROR("%s: json parse profile limits failed for profile id %d, line %s", LOG_TAG_MAAT, s_pf->id, table_line);
+    limits_obj = cJSON_GetObjectItem(json, "limits");
+    if (!limits_obj) {
+        LOG_ERROR("%s: json parse limits failed for line %s", LOG_TAG_MAAT, table_line);
         goto END;
     }
-
-    array_size = cJSON_GetArraySize(json);
-    for (i = 0; i < array_size; i++) {
-        tmp_array_obj = cJSON_GetArrayItem(json, i);
+    cJSON_ArrayForEach(tmp_array_obj, limits_obj) {
         tmp_obj = cJSON_GetObjectItem(tmp_array_obj, "bandwidth");
         if (!tmp_obj) {
-            LOG_ERROR("%s: json parse limit bandwidth failed for profile id %d, line %s", LOG_TAG_MAAT, s_pf->id, table_line);
+            LOG_ERROR("%s: json parse limit bandwidth failed for line %s", LOG_TAG_MAAT, table_line);
             goto END;
         }
         limit_bandwidth = tmp_obj->valueint;
 
         tmp_obj = cJSON_GetObjectItem(tmp_array_obj, "direction");
         if (!tmp_obj) {
-            LOG_ERROR("%s: json parse limit direction failed for profile id %d, line %s", LOG_TAG_MAAT, s_pf->id, table_line);
+            LOG_ERROR("%s: json parse limit direction failed for line %s", LOG_TAG_MAAT, table_line);
             goto END;
         }
 
@@ -322,7 +331,7 @@ END:
     return;
 }
 
-void shaper_profile_ex_dup(int table_id, void **to, void **from, long argl, void *argp)
+void shaper_profile_ex_dup(const char *table_name, void **to, void **from, long argl, void *argp)
 {
     if (*from == NULL) {
         return;
@@ -333,7 +342,7 @@ void shaper_profile_ex_dup(int table_id, void **to, void **from, long argl, void
     return;
 }
 
-void shaper_profile_ex_free(int table_id, void **ad, long argl, void *argp)
+void shaper_profile_ex_free(const char *table_name, void **ad, long argl, void *argp)
 {
     if (*ad == NULL) {
         return;
@@ -347,7 +356,7 @@ void shaper_profile_ex_free(int table_id, void **ad, long argl, void *argp)
 
 void shaper_profile_update(struct shaping_thread_ctx *ctx, struct shaping_profile_info *s_pf_info, struct shaping_profile *s_pf_ex)
 {
-    s_pf_info->id = s_pf_ex->id;
+    uuid_copy(s_pf_info->uuid, s_pf_ex->uuid);
     s_pf_info->type = s_pf_ex->type;
     shaper_profile_hash_node_set(ctx, s_pf_info);
     s_pf_info->hash_node->aqm_type = s_pf_ex->aqm_type;
@@ -356,37 +365,40 @@ void shaper_profile_update(struct shaping_thread_ctx *ctx, struct shaping_profil
     return;
 }
 
-struct shaping_profile *shaper_maat_profile_get(struct shaping_thread_ctx *ctx, int profile_id)
+struct shaping_profile *shaper_maat_profile_get(struct shaping_thread_ctx *ctx, uuid_t profile_uuid)
 {
     struct shaping_profile *s_pf = NULL;
-    char pf_id_key[8] = {0};
+    char uuid_str[UUID_STR_LEN] = {0};
 
-    snprintf(pf_id_key, sizeof(pf_id_key), "%d", profile_id);
-    s_pf = (struct shaping_profile *)maat_plugin_table_get_ex_data(g_maat_instance, ctx->maat_info->profile_table_id, pf_id_key, strlen(pf_id_key));
+    uuid_unparse(profile_uuid, uuid_str);
+    s_pf = (struct shaping_profile *)maat_plugin_table_get_ex_data(g_maat_instance, SHAPING_PROFILE_TABLE_NAME, uuid_str, strlen(uuid_str));
     if (!s_pf) {
-        LOG_ERROR("%s maat_plugin_table_get_ex_data get profile failed for key %s", LOG_TAG_MAAT, pf_id_key);
+        LOG_ERROR("%s maat_plugin_table_get_ex_data get profile failed for key %s", LOG_TAG_MAAT, uuid_str);
     }
 
     return s_pf;
 }
 
-static int shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, struct shaping_rule_info *s_rule_info, long long rule_compile_id, int *priority_changed)
+static int shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, struct shaping_rule_info *s_rule_info, uuid_t rule_uuid, int *priority_changed)
 {
     struct shaping_rule *s_rule = NULL;
     struct shaping_profile *s_pf = NULL;
+    char uuid_str[UUID_STR_LEN] = {0};
 
-    s_rule = (struct shaping_rule*)maat_plugin_table_get_ex_data(g_maat_instance, ctx->maat_info->rule_table_id, (char *)&rule_compile_id, sizeof(rule_compile_id));
+    uuid_unparse(rule_uuid, uuid_str);
+    s_rule = (struct shaping_rule*)maat_plugin_table_get_ex_data(g_maat_instance, SHAPING_RULE_TABLE_NAME, uuid_str, strlen(uuid_str));
     if (!s_rule) {
-        LOG_ERROR("%s maat_plugin_table_get_ex_data get rule failed for compile id %lld", LOG_TAG_MAAT, rule_compile_id);
+        LOG_ERROR("%s maat_plugin_table_get_ex_data get rule failed for rule id %s", LOG_TAG_MAAT, uuid_str);
         return -1;
     }
-    s_rule_info->id = s_rule->id;
+
+    uuid_copy(s_rule_info->uuid, s_rule->uuid);
     s_rule_info->fair_factor = s_rule->fair_factor;
     s_rule_info->vsys_id = s_rule->vsys_id;
 
     s_rule_info->is_enabled = 1;
 
-    s_pf = shaper_maat_profile_get(ctx, s_rule->primary_pf_id);
+    s_pf = shaper_maat_profile_get(ctx, s_rule->primary_pf_uuid);
     if (!s_pf) {
         return -1;
     }
@@ -411,7 +423,7 @@ static int shaper_rule_update(struct shaping_thread_ctx *ctx, struct shaping_flo
     }
 
     for (int i = 0; i < s_rule->borrow_pf_num; i++) {
-        s_pf = shaper_maat_profile_get(ctx, s_rule->borrow_pf_id_array[i]);
+        s_pf = shaper_maat_profile_get(ctx, s_rule->borrow_pf_uuid_array[i]);
         if (!s_pf) {
             return -1;
         }
@@ -436,9 +448,11 @@ static void shaper_profiles_priority_update(struct shaping_flow *sf)
     return;
 }
 
-int shaper_rule_is_enabled(struct shaping_thread_ctx *ctx, long long rule_id)
+int shaper_rule_is_enabled(struct shaping_thread_ctx *ctx, uuid_t rule_uuid)
 {
-    struct shaping_rule *s_rule = (struct shaping_rule*)maat_plugin_table_get_ex_data(g_maat_instance, ctx->maat_info->rule_table_id, (char *)&rule_id, sizeof(rule_id));
+    char uuid_str[UUID_STR_LEN] = {0};
+    uuid_unparse(rule_uuid, uuid_str);
+    struct shaping_rule *s_rule = (struct shaping_rule*)maat_plugin_table_get_ex_data(g_maat_instance, SHAPING_RULE_TABLE_NAME, uuid_str, sizeof(uuid_str));
 
     if (s_rule) {
         return 1;
@@ -447,19 +461,19 @@ int shaper_rule_is_enabled(struct shaping_thread_ctx *ctx, long long rule_id)
     return 0;
 }
 
-static int shaper_rules_dup_remove(struct shaping_flow *sf, long long *rule_compile_ids, int rule_num, long long *rule_ids_remove_dup)
+static int shaper_rules_dup_remove(struct shaping_flow *sf, uuid_t *rule_uuids, int rule_num, uuid_t *rule_uuids_remove_dup)
 {
     int i, j;
     int rule_num_remove_dup = 0;
 
     for (i = 0; i < rule_num; i++) {
         for (j = 0; j < sf->rule_num; j++) {
-            if (rule_compile_ids[i] == sf->matched_rule_infos[j].id) {
+            if (uuid_compare(rule_uuids[i], sf->matched_rule_infos[j].uuid) == 0) {
                 break;
             }
         }
         if (j == sf->rule_num) {
-            rule_ids_remove_dup[rule_num_remove_dup] = rule_compile_ids[i];
+            uuid_copy(rule_uuids_remove_dup[rule_num_remove_dup], rule_uuids[i]);
             rule_num_remove_dup++;
         }
     }
@@ -467,10 +481,10 @@ static int shaper_rules_dup_remove(struct shaping_flow *sf, long long *rule_comp
     return rule_num_remove_dup;
 }
 
-void shaper_rules_update(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, long long *rule_compile_ids, int rule_num)
+void shaper_rules_update(struct shaping_thread_ctx *ctx, struct shaping_flow *sf, uuid_t *rule_uuids, int rule_num)
 {
     int priority_changed = 0;
-    long long rule_ids_remove_dup[SHAPING_RULE_NUM_MAX] = {0};
+    uuid_t rule_uuids_remove_dup[SHAPING_RULE_NUM_MAX];
     int rule_num_remove_dup = 0;
     int old_rule_num = sf->rule_num;
 
@@ -483,7 +497,7 @@ void shaper_rules_update(struct shaping_thread_ctx *ctx, struct shaping_flow *sf
         return;
     }
 
-    rule_num_remove_dup = shaper_rules_dup_remove(sf, rule_compile_ids, rule_num, rule_ids_remove_dup);
+    rule_num_remove_dup = shaper_rules_dup_remove(sf, rule_uuids, rule_num, rule_uuids_remove_dup);
     if (rule_num_remove_dup == 0) {
         return;
     }
@@ -498,7 +512,7 @@ void shaper_rules_update(struct shaping_thread_ctx *ctx, struct shaping_flow *sf
     }
 
     for (int i = 0; i < rule_num_remove_dup; i++) {
-        if (shaper_rule_update(ctx, sf, &sf->matched_rule_infos[sf->rule_num], rule_ids_remove_dup[i], &priority_changed) == 0) {
+        if (shaper_rule_update(ctx, sf, &sf->matched_rule_infos[sf->rule_num], rule_uuids_remove_dup[i], &priority_changed) == 0) {
             sf->rule_num++;
         }
     }
@@ -526,18 +540,15 @@ static int shaper_maat_config_load(struct shaper_maat_config *conf)
     return 0;
 }
 
-struct shaping_maat_info* shaper_maat_init(const char *instance_name)
+int shaper_maat_init(const char *instance_name)
 {    
     struct maat_options *opts;
-    struct shaping_maat_info *maat_info;
     struct shaper_maat_config conf;
     int ret;
 
     if (shaper_maat_config_load(&conf) < 0) {
-        return NULL;
+        return -1;
     }
-    
-    maat_info = (struct shaping_maat_info *)calloc(1, sizeof(struct shaping_maat_info));
 
     opts = maat_options_new();
 
@@ -578,17 +589,6 @@ struct shaping_maat_info* shaper_maat_init(const char *instance_name)
         goto ERROR;
     }
 
-    maat_info->rule_table_id = maat_get_table_id(g_maat_instance, SHAPING_RULE_TABLE_NAME);
-    if (maat_info->rule_table_id < 0) {
-        LOG_ERROR("%s: shaping maat register table %s failed", LOG_TAG_MAAT, SHAPING_RULE_TABLE_NAME);
-        goto ERROR;
-    }
-    maat_info->profile_table_id = maat_get_table_id(g_maat_instance, SHAPING_PROFILE_TABLE_NAME);
-    if (maat_info->profile_table_id < 0) {
-        LOG_ERROR("%s: shaping maat register table %s failed", LOG_TAG_MAAT, SHAPING_PROFILE_TABLE_NAME);
-        goto ERROR;
-    }
-
     ret = maat_plugin_table_ex_schema_register(g_maat_instance, SHAPING_RULE_TABLE_NAME, shaper_rule_ex_new, shaper_rule_ex_free, shaper_rule_ex_dup, 0, NULL);
     if (ret < 0) {
         LOG_ERROR("%s: shaping maat register callback funcs for table %s failed", LOG_TAG_MAAT, SHAPING_RULE_TABLE_NAME);
@@ -603,17 +603,14 @@ struct shaping_maat_info* shaper_maat_init(const char *instance_name)
 
     LOG_DEBUG("%s: shaping maat init complete", LOG_TAG_MAAT);
 
-    return maat_info;
+    return 0;
 ERROR:
-    shaper_maat_destroy(maat_info);
-    return NULL;
+    shaper_maat_destroy();
+    return -1;
 }
 
-void shaper_maat_destroy(struct shaping_maat_info *maat_info)
+void shaper_maat_destroy()
 {
-    if (maat_info) {
-        free(maat_info);
-    }
     if (g_maat_instance) {
         maat_free(g_maat_instance);
     }

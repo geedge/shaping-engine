@@ -1,24 +1,21 @@
 [
     {
         "table_id": 0,
-        "table_name": "TRAFFIC_SHAPING_COMPILE",
+        "table_name": "TRAFFIC_SHAPING_RULE",
         "table_type": "plugin",
-        "valid_column": 9,
         "custom": {
             "gc_timeout_s":2,
-            "key": 1,
-            "key_type": "integer",
-            "key_len": 8
+            "key_name": "uuid",
+            "key_type": "pointer"
         }
     },
     {
         "table_id": 1,
         "table_name": "TRAFFIC_SHAPING_PROFILE",
         "table_type": "plugin",
-        "valid_column": 7,
         "custom": {
             "gc_timeout_s":2,
-            "key": 1,
+            "key_name": "uuid",
             "key_type": "pointer"
         }
     }

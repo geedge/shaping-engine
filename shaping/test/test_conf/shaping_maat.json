@@ -1,75 +1,72 @@
 {
-    "compile_table": "TRAFFIC_SHAPING_COMPILE",
-    "group2compile_table": "GROUP_SHAPING_COMPILE_RELATION",
-    "group2group_table": "GROUP_GROUP_RELATION",
+    "compile_table": "TRAFFIC_SHAPING_RULE",
     "rules": [
         {
-            "compile_id": 182,
+            "uuid": "00000000-0000-0000-0000-000000000182",
             "service": 2,
             "action": 32,
             "do_blacklist": 0,
             "do_log": 1,
             "effective_rage": 0,
-            "user_region": "{\"priority\":1,\"fair_factor\":10,\"profile_chain\":[1]}",
+            "action_parameter": {
+				"priority": 1,
+				"fair_factor": 10,
+				"dscp_marking": {
+					"enabled": 1,
+					"dscp_type": "Assured Forwarding (AF)",
+					"dscp_name": "af11",
+					"dscp_value": 10
+				},
+				"profile_chain": [
+                "00000000-0000-0000-0000-000000000001"
+            	]
+			},
             "is_valid": "yes",
-            "groups": [
-                {
-		            "group_name":"OBJ_SRC_IP_ADDR",
-                    "virtual_table":"TSG_SECURITY_SOURCE_ADDR",
-                    "not_flag" : 0,
-                    "regions": [
-                        {
-                            "table_name": "TSG_OBJ_IP_ADDR",
-                            "table_type": "ip_plus",
-                            "table_content": {
-				"saddr_format": "range",
-                                "addr_type": "ipv4",
-                                "src_ip1": "192.168.50.67",
-                                "src_ip2": "192.168.50.67",
-			        "sport_format": "range",
-                                "src_port1": "0",
-                                "src_port2": "65535",
-                                "protocol": 0,
-                                "direction": "double"
-                            }
-                        }
-                    ]
-                },
-                {
-                    "group_name":"OBJ_DST_IP_ADDR",
-                    "virtual_table":"TSG_SECURITY_DESTINATION_ADDR",
-                    "not_flag" : 0,
-                    "regions": [
-                        {
-                            "table_name": "TSG_OBJ_IP_ADDR",
-                            "table_type": "ip_plus",
-                            "table_content": {
-                                "saddr_format": "range",
-                                "addr_type": "ipv4",
-                                "src_ip1": "192.168.42.43",
-                                "src_ip2": "192.168.42.43",
-                                "sport_format": "range",
-                                "src_port1": "5678",
-                                "src_port2": "5678",
-                                "protocol": 0,
-                                "direction": "double"
-                            }
-                        }
-                    ]
-                }
-
-            ]    
+            "and_conditions": [
+				{
+					"attribute_name": "ATTRIBUTE_IP_PLUS_SOURCE",
+					"objects": [
+						{
+							"object_name": "ExcludeLogicObject203_1",
+							"uuid": "00000000-0000-0000-0000-000000000198",
+							"items": [
+								{
+									"table_name": "IP_PLUS_CONFIG",
+									"table_type": "ip",
+									"table_content": {
+										"ip": "192.168.50.43-192.168.50.43"
+									}
+								}
+							]
+						}
+					]
+				},
+				{
+					"attribute_name": "ATTRIBUTE_IP_PLUS_DESTINATION",
+					"objects": [
+						{
+							"object_name": "ExcludeLogicObject203_2",
+							"uuid": "00000000-0000-0000-0000-000000000199",
+							"items": [
+								{
+									"table_name": "IP_PLUS_CONFIG",
+									"table_type": "ip",
+									"table_content": {
+										"ip": "47.92.108.93-47.92.108.93"
+									}
+								}
+							]
+						}
+					]
+				}
+			]    
         }
     ],
     "plugin_table": [
         {
             "table_name": "TRAFFIC_SHAPING_PROFILE",
             "table_content": [
-                "1\t{\"value\":\"local_host\",\"host_fairness\":1}\t[{\"direction\":\"incoming\",\"bandwidth\":102400},{\"direction\":\"outcoming\",\"bandwidth\":102400}]\t{\"enabled\":1,\"algorithm\":\"codel\"}\tnull\t{}\t1",
-                "3\t{\"value\":\"local_host\",\"host_fairness\":1}\t[{\"direction\":\"incoming\",\"bandwidth\":10240},{\"direction\":\"outcoming\",\"bandwidth\":10240}]\t{\"enabled\":1,\"algorithm\":\"codel\"}\tnull\t{}\t1",
-                "4\t{\"value\":\"local_host\",\"host_fairness\":1}\t[{\"direction\":\"incoming\",\"bandwidth\":10240},{\"direction\":\"outcoming\",\"bandwidth\":10240}]\t{\"enabled\":1,\"algorithm\":\"codel\"}\tnull\t{}\t1",
-                "5\t{\"value\":\"local_host\",\"host_fairness\":1}\t[{\"direction\":\"incoming\",\"bandwidth\":10240},{\"direction\":\"outcoming\",\"bandwidth\":10240}]\t{\"enabled\":1,\"algorithm\":\"codel\"}\tnull\t{}\t1",
-                "6\t{\"value\":\"local_host\",\"host_fairness\":1}\t[{\"direction\":\"incoming\",\"bandwidth\":10240},{\"direction\":\"outcoming\",\"bandwidth\":10240}]\t{\"enabled\":1,\"algorithm\":\"codel\"}\tnull\t{}\t1"
+                {"uuid":"00000000-0000-0000-0000-000000000001", "type": "generic", "type_argument": "none", "limits": [{"direction":"incoming","bandwidth":102400},{"direction":"outcoming","bandwidth":102400}], "aqm_options": {"algorithm":"codel"}, "is_valid":"yes"}
             ]
         }
     ]

@@ -99,7 +99,7 @@ static int judge_packet_eq(struct stub_pkt_queue *expec_queue, struct stub_pkt_q
 }
 
 static void shaping_stat_judge(char *counter_file_line, char *guage_file_line, int counter_json_array_idx, 
-                            int guage_json_array_idx, int rule_id, int profile_id, int priority, 
+                            int guage_json_array_idx, const char *rule_uuid, const char *profile_uuid, int priority, 
                             unsigned long long tx_pkts, unsigned long long tx_bytes,
                             unsigned long long drop_pkts, long long queue_len, long long max_latency,
                             unsigned char direction, char profile_type[])
@@ -127,13 +127,13 @@ static void shaping_stat_judge(char *counter_file_line, char *guage_file_line, i
     ASSERT_TRUE(tmp_obj != NULL);
     EXPECT_EQ(tmp_obj->valueint, STUB_TEST_VSYS_ID);
 
-    tmp_obj = cJSON_GetObjectItem(json_array_element, "rule_id");
+    tmp_obj = cJSON_GetObjectItem(json_array_element, "rule_uuid");
     ASSERT_TRUE(tmp_obj != NULL);
-    EXPECT_EQ(rule_id, tmp_obj->valueint);
+    EXPECT_STREQ(rule_uuid, tmp_obj->valuestring);
 
-    tmp_obj = cJSON_GetObjectItem(json_array_element, "profile_id");
+    tmp_obj = cJSON_GetObjectItem(json_array_element, "profile_uuid");
     ASSERT_TRUE(tmp_obj != NULL);
-    EXPECT_EQ(profile_id, tmp_obj->valueint);
+    EXPECT_STREQ(profile_uuid, tmp_obj->valuestring);
 
     tmp_obj = cJSON_GetObjectItem(json_array_element, "priority");
     ASSERT_TRUE(tmp_obj != NULL);
@@ -237,23 +237,24 @@ TEST(single_session, udp_tx_in_order)
     struct stub_pkt_queue *actual_tx_queue;
     struct shaping_ctx *ctx = NULL;
     struct shaping_flow *sf = NULL;
-    long long rule_id[] = {0};
+    const char *rule_uuid_strs[] = {"00000000-0000-0000-0000-000000000001"};
     int priority[] = {1};
     int profile_num[] = {1};
-    int profile_id[][MAX_REF_PROFILE] = {{0}};
+    const char *profile_uuid_strs[][MAX_REF_PROFILE] = {{"00000000-0000-0000-0000-000000000001"}};
 
     TAILQ_INIT(&expec_tx_queue);
     stub_init();
-    dummy_swarmkv_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
     sf = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf != NULL);
 
-    stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_matched_shaping_rules(1, rule_uuid_strs, priority, profile_num, profile_uuid_strs);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[0][0], 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
-    shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
+    uuid_t rule_uuid;
+    uuid_parse(rule_uuid_strs[0], rule_uuid);
+    shaper_rules_update(&ctx->thread_ctx[0], sf, &rule_uuid, 1);
 
 
     /**********send packets*********************/
@@ -265,7 +266,7 @@ TEST(single_session, udp_tx_in_order)
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
     while (!TAILQ_EMPTY(&expec_tx_queue)) {//last 90 delay packets
-        stub_refresh_token_bucket(0);
+        stub_refresh_token_bucket(profile_uuid_strs[0][0]);
         for (int i = 0; i < 20; i++) {//even though invoke polling more than 10 times, there should be only 10 pkts be sent
             polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
             stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
@@ -292,11 +293,11 @@ TEST(single_session, udp_tx_in_order)
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     
-    stub_clear_matched_shaping_rules();
+    stub_swarmkv_clear_resource();
 
     /*******test statistics***********/
     //judge shaping metric
-    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 0, 0, 1, 100, 10000, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, rule_uuid_strs[0], profile_uuid_strs[0][0], 1, 100, 10000, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
 
     //judge shaping global metric
     shaping_global_stat_judge(global_stat_str, 100, 10000, 0, 0, 0, 0);
@@ -316,24 +317,25 @@ TEST(bidirectional, udp_tx_in_order)
     struct stub_pkt_queue *actual_tx_queue;
     struct shaping_ctx *ctx = NULL;
     struct shaping_flow *sf = NULL;
-    long long rule_id[] = {0};
+    const char *rule_uuid_strs[] = {"00000000-0000-0000-0000-000000000001"};
     int priority[] = {1};
     int profile_num[] = {1};
-    int profile_id[][MAX_REF_PROFILE] = {{0}};
+    const char *profile_uuid_strs[][MAX_REF_PROFILE] = {{"00000000-0000-0000-0000-000000000001"}};
 
     TAILQ_INIT(&expec_tx_queue_in);
     TAILQ_INIT(&expec_tx_queue_out);
     stub_init();
-    dummy_swarmkv_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
     sf = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf != NULL);
 
-    stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_BIDIRECTION);
+    stub_set_matched_shaping_rules(1, rule_uuid_strs, priority, profile_num, profile_uuid_strs);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[0][0], 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_BIDIRECTION);
     actual_tx_queue = stub_get_tx_queue();
-    shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
+    uuid_t rule_uuid;
+    uuid_parse(rule_uuid_strs[0], rule_uuid);
+    shaper_rules_update(&ctx->thread_ctx[0], sf, &rule_uuid, 1);
 
     /*******send packets***********/
     send_packets(&ctx->thread_ctx[0], sf, 10, 100, SHAPING_DIR_OUT, &expec_tx_queue_out, 1, 0);
@@ -345,12 +347,12 @@ TEST(bidirectional, udp_tx_in_order)
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue_out, actual_tx_queue, 10));
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
-    stub_refresh_token_bucket(0);
+    stub_refresh_token_bucket(profile_uuid_strs[0][0]);
     polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue_out, actual_tx_queue, 1));
 
     while(!TAILQ_EMPTY(&expec_tx_queue_out)) {
-        stub_refresh_token_bucket(0);
+        stub_refresh_token_bucket(profile_uuid_strs[0][0]);
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
 
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue_in, actual_tx_queue, 1));
@@ -367,7 +369,7 @@ TEST(bidirectional, udp_tx_in_order)
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
-    stub_clear_matched_shaping_rules();
+    stub_swarmkv_clear_resource();
 
 }
 
@@ -380,24 +382,25 @@ TEST(max_min_host_fairness_profile, udp_tx_in_order)
     struct stub_pkt_queue *actual_tx_queue;
     struct shaping_ctx *ctx = NULL;
     struct shaping_flow *sf = NULL;
-    long long rule_id[] = {0};
+    const char *rule_uuid_strs[] = {"00000000-0000-0000-0000-000000000001"};
     int priority[] = {1};
     int profile_num[] = {1};
-    int profile_id[][MAX_REF_PROFILE] = {{0}};
+    const char *profile_uuid_strs[][MAX_REF_PROFILE] = {{"00000000-0000-0000-0000-000000000001"}};
 
     TAILQ_INIT(&expec_tx_queue);
     stub_init();
-    dummy_swarmkv_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
     sf = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf != NULL);
 
-    stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
-    stub_set_profile_type(0, PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS);
+    stub_set_matched_shaping_rules(1, rule_uuid_strs, priority, profile_num, profile_uuid_strs);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[0][0], 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_profile_type(profile_uuid_strs[0][0], PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS);
     actual_tx_queue = stub_get_tx_queue();
-    shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
+    uuid_t rule_uuid;
+    uuid_parse(rule_uuid_strs[0], rule_uuid);
+    shaper_rules_update(&ctx->thread_ctx[0], sf, &rule_uuid, 1);
 
 
     /**********send packets*********************/
@@ -409,7 +412,7 @@ TEST(max_min_host_fairness_profile, udp_tx_in_order)
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
     while (!TAILQ_EMPTY(&expec_tx_queue)) {//last 90 delay packets
-        stub_refresh_token_bucket(0);
+        stub_refresh_token_bucket(profile_uuid_strs[0][0]);
         for (int i = 0; i < 20; i++) {//even though invoke polling more than 10 times, there should be only 10 pkts be sent
             polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
             stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
@@ -436,11 +439,12 @@ TEST(max_min_host_fairness_profile, udp_tx_in_order)
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
     
-    stub_clear_matched_shaping_rules();
+    stub_clear_resource();
+    stub_swarmkv_clear_resource();
 
     /*******test statistics***********/
     //judge shaping metric
-    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 0, 0, 1, 100, 10000, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, rule_uuid_strs[0], profile_uuid_strs[0][0], 1, 100, 10000, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);//max latency is last 10 pkts
 
     //judge shaping global metric
     shaping_global_stat_judge(global_stat_str, 100, 10000, 0, 0, 0, 0);
@@ -460,24 +464,25 @@ TEST(single_session, tcp_tx_in_order)
     struct stub_pkt_queue *actual_tx_queue;
     struct shaping_ctx *ctx = NULL;
     struct shaping_flow *sf = NULL;
-    long long rule_id[] = {0};
+    const char *rule_uuid_strs[] = {"00000000-0000-0000-0000-000000000001"};
     int priority[] = {1};
     int profile_num[] = {1};
-    int profile_id[][MAX_REF_PROFILE] = {{0}};
+    const char *profile_uuid_strs[][MAX_REF_PROFILE] = {{"00000000-0000-0000-0000-000000000001"}};
 
     TAILQ_INIT(&expec_tx_queue);
     TAILQ_INIT(&expec_pure_ctl_tx_queue);
     stub_init();
-    dummy_swarmkv_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
     sf = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf != NULL);
 
-    stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_matched_shaping_rules(1, rule_uuid_strs, priority, profile_num, profile_uuid_strs);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[0][0], 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
-    shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
+    uuid_t rule_uuid;
+    uuid_parse(rule_uuid_strs[0], rule_uuid);
+    shaper_rules_update(&ctx->thread_ctx[0], sf, &rule_uuid, 1);
 
     /*******send packets***********/
     send_packets(&ctx->thread_ctx[0], sf, 20, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
@@ -498,18 +503,18 @@ TEST(single_session, tcp_tx_in_order)
     shaper_stat_refresh(&ctx->thread_ctx[0], sf, 1);
     fieldstat_easy_output(ctx->thread_ctx[0].stat->counter_instance, &counter_stat_str, &stat_str_len);
     fieldstat_easy_output(ctx->thread_ctx[0].stat->guage_instance, &guage_stat_str, &stat_str_len);
-    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 0, 0, 1, 20, 2000, 0, 10, 0, SHAPING_DIR_OUT, profile_type_primary);//*test statistics
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, rule_uuid_strs[0], profile_uuid_strs[0][0], 1, 20, 2000, 0, 10, 0, SHAPING_DIR_OUT, profile_type_primary);//*test statistics
     free(counter_stat_str);
     free(guage_stat_str);
 
-    stub_refresh_token_bucket(0);
+    stub_refresh_token_bucket(profile_uuid_strs[0][0]);
     for (int i = 0; i < 10; i++) {
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
         stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
     }
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));//pure ctrl pkts force consume 1000 tokens, current token: -1000--->0, so no pkt can be sent
 
-    stub_refresh_token_bucket(0);
+    stub_refresh_token_bucket(profile_uuid_strs[0][0]);
     for (int i = 0; i < 11; i++) {//10 pkts which is not pure control, first polling request 10 times token, then 10 loops send 10 pkts
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
         stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
@@ -524,11 +529,12 @@ TEST(single_session, tcp_tx_in_order)
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
-    stub_clear_matched_shaping_rules();
+    stub_clear_resource();
+    stub_swarmkv_clear_resource();
 
 
     /*******test statistics***********/
-    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 0, 0, 1, 30, 3000, 0, 0, 31000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, rule_uuid_strs[0], profile_uuid_strs[0][0], 1, 30, 3000, 0, 0, 31000, SHAPING_DIR_OUT, profile_type_primary);
     free(counter_stat_str);
     free(guage_stat_str);
 }
@@ -544,24 +550,26 @@ TEST(single_session, udp_diff_direction)
     struct stub_pkt_queue *actual_tx_queue;
     struct shaping_ctx *ctx = NULL;
     struct shaping_flow *sf = NULL;
-    long long rule_id[] = {0};
+    const char *rule_uuid_strs[] = {"00000000-0000-0000-0000-000000000001"};
     int priority[] = {1};
     int profile_num[] = {1};
-    int profile_id[][MAX_REF_PROFILE] = {{0}};
+    const char *profile_uuid_strs[][MAX_REF_PROFILE] = {{"00000000-0000-0000-0000-000000000001"}};
 
     TAILQ_INIT(&expec_tx_queue_in);
     TAILQ_INIT(&expec_tx_queue_out);
     stub_init();
-    dummy_swarmkv_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
     sf = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf != NULL);
 
-    stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_matched_shaping_rules(1, rule_uuid_strs, priority, profile_num, profile_uuid_strs);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[0][0], 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[0][0], AVALIABLE_TOKEN_UNLIMITED, SHAPING_DIR_IN, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
-    shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
+    uuid_t rule_uuid;
+    uuid_parse(rule_uuid_strs[0], rule_uuid);
+    shaper_rules_update(&ctx->thread_ctx[0], sf, &rule_uuid, 1);
 
     /*******send packets***********/
     send_packets(&ctx->thread_ctx[0], sf, 10, 100, SHAPING_DIR_OUT, &expec_tx_queue_out, 1, 0);
@@ -576,7 +584,7 @@ TEST(single_session, udp_diff_direction)
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue_in, actual_tx_queue, 20));
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
-    stub_refresh_token_bucket(0);
+    stub_refresh_token_bucket(profile_uuid_strs[0][0]);
     for (int i = 0; i < 22; i++) {//first polling just request token and don't send pkt
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
         stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
@@ -597,12 +605,13 @@ TEST(single_session, udp_diff_direction)
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
-    stub_clear_matched_shaping_rules();
+    stub_clear_resource();
+    stub_swarmkv_clear_resource();
 
 
     /*******test statistics***********/
-    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 0, 0, 1, 20, 2000, 0, 0, 21000, SHAPING_DIR_OUT, profile_type_primary);
-    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 0, 0, 1, 20, 2000, 0, 0, 0, SHAPING_DIR_IN, profile_type_primary);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, rule_uuid_strs[0], profile_uuid_strs[0][0], 1, 20, 2000, 0, 0, 21000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, rule_uuid_strs[0], profile_uuid_strs[0][0], 1, 20, 2000, 0, 0, 0, SHAPING_DIR_IN, profile_type_primary);
     free(counter_stat_str);
     free(guage_stat_str);
 }
@@ -620,25 +629,28 @@ TEST(single_session, udp_multi_rules)
     struct stub_pkt_queue *actual_tx_queue;
     struct shaping_ctx *ctx = NULL;
     struct shaping_flow *sf = NULL;
-    long long rule_id[] = {0, 1, 2};
+    const char *rule_uuid_strs[] = {"00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002", "00000000-0000-0000-0000-000000000003"};
     int priority[] = {1, 2, 3};
     int profile_num[] = {1, 1, 1};
-    int profile_id[][MAX_REF_PROFILE] = {{0}, {1}, {2}};
+    const char *profile_uuid_strs[][MAX_REF_PROFILE] = {{"00000000-0000-0000-0000-000000000001"}, {"00000000-0000-0000-0000-000000000002"}, {"00000000-0000-0000-0000-000000000003"}};
 
     TAILQ_INIT(&expec_tx_queue);
     stub_init();
-    dummy_swarmkv_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
     sf = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf != NULL);
 
-    stub_set_matched_shaping_rules(3, rule_id, priority, profile_num, profile_id);
-    stub_set_token_bucket_avl_per_sec(0, 3000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
-    stub_set_token_bucket_avl_per_sec(1, 2000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
-    stub_set_token_bucket_avl_per_sec(2, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_matched_shaping_rules(3, rule_uuid_strs, priority, profile_num, profile_uuid_strs);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[0][0], 3000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[1][0], 2000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[2][0], 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
-    shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 3);
+    uuid_t rule_uuids[3];
+    for (int i = 0; i < 3; i++) {
+        uuid_parse(rule_uuid_strs[i], rule_uuids[i]);
+    }
+    shaper_rules_update(&ctx->thread_ctx[0], sf, rule_uuids, 3);
 
     /*******send packets***********/
     send_packets(&ctx->thread_ctx[0], sf, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue, 5, 0);
@@ -648,9 +660,9 @@ TEST(single_session, udp_multi_rules)
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
 
     while (!TAILQ_EMPTY(&expec_tx_queue)) {//last 90 delay packets
-        stub_refresh_token_bucket(0);
-        stub_refresh_token_bucket(1);
-        stub_refresh_token_bucket(2);
+        stub_refresh_token_bucket(profile_uuid_strs[0][0]);
+        stub_refresh_token_bucket(profile_uuid_strs[1][0]);
+        stub_refresh_token_bucket(profile_uuid_strs[2][0]);
         for (int i = 0; i < 60; i++) {
             //there are 3 rules, send one packet need 3 polling process, so 10 packets need 30 polling
             //even though invoke polling more than 30 times, there should be only 10 pkts be sent
@@ -673,17 +685,18 @@ TEST(single_session, udp_multi_rules)
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
-    stub_clear_matched_shaping_rules();
+    stub_clear_resource();
+    stub_swarmkv_clear_resource();
 
     /*******test statistics***********/
     //profile_id 0
-    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 0, 0, 1, 100, 10000, 0, 0, 507000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, rule_uuid_strs[0], profile_uuid_strs[0][0], 1, 100, 10000, 0, 0, 507000, SHAPING_DIR_OUT, profile_type_primary);
 
     //profile_id 1 
-    shaping_stat_judge(counter_stat_str, guage_stat_str, 1, 1, 1, 1, 1, 100, 10000, 0, 0, 1000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 1, 1, rule_uuid_strs[1], profile_uuid_strs[1][0], 1, 100, 10000, 0, 0, 1000, SHAPING_DIR_OUT, profile_type_primary);
 
     //profile_id 2
-    shaping_stat_judge(counter_stat_str, guage_stat_str, 2, 2, 2, 2, 1, 100, 10000, 0, 0, 91000, SHAPING_DIR_OUT, profile_type_primary);//max latency is first queued pkt
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 2, 2, rule_uuid_strs[2], profile_uuid_strs[2][0], 1, 100, 10000, 0, 0, 91000, SHAPING_DIR_OUT, profile_type_primary);//max latency is first queued pkt
 
     free(counter_stat_str);
     free(guage_stat_str);
@@ -699,24 +712,25 @@ TEST(single_session, udp_borrow)
     struct stub_pkt_queue *actual_tx_queue;
     struct shaping_ctx *ctx = NULL;
     struct shaping_flow *sf = NULL;
-    long long rule_id[] = {1};
+    const char *rule_uuid_strs[] = {"00000000-0000-0000-0000-000000000001"};
     int priority[] = {1};
     int profile_num[] = {2};
-    int profile_id[][MAX_REF_PROFILE] = {{1, 2}};
+    const char *profile_uuid_strs[][MAX_REF_PROFILE] = {{"00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002"}};
 
     TAILQ_INIT(&expec_tx_queue);
     stub_init();
-    dummy_swarmkv_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
     sf = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf != NULL);
 
-    stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
-    stub_set_token_bucket_avl_per_sec(1, 0, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
-    stub_set_token_bucket_avl_per_sec(2, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_matched_shaping_rules(1, rule_uuid_strs, priority, profile_num, profile_uuid_strs);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[0][0], 0, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[0][1], 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
-    shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
+    uuid_t rule_uuid;
+    uuid_parse(rule_uuid_strs[0], rule_uuid);
+    shaper_rules_update(&ctx->thread_ctx[0], sf, &rule_uuid, 1);
 
     /*******send packets***********/
     send_packets(&ctx->thread_ctx[0], sf, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
@@ -726,7 +740,7 @@ TEST(single_session, udp_borrow)
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
 
     while (!TAILQ_EMPTY(&expec_tx_queue)) {//last 90 delay packets
-        stub_refresh_token_bucket(2);
+        stub_refresh_token_bucket(profile_uuid_strs[0][1]);
         for (int i = 0; i < 20; i++) {//even though invoke polling more than 10 times, there should be only 10 pkts be sent
             polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
             stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
@@ -747,14 +761,15 @@ TEST(single_session, udp_borrow)
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
-    stub_clear_matched_shaping_rules();
+    stub_clear_resource();
+    stub_swarmkv_clear_resource();
 
     /*******test statistics***********/
     //profile_id 1, primary
-    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 1, 1, 1, 0, 0, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, rule_uuid_strs[0], profile_uuid_strs[0][0], 1, 0, 0, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);
 
     //profile_id 2, borrow
-    shaping_stat_judge(counter_stat_str, guage_stat_str, 1, 0, 1, 2, 2, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 1, 0, rule_uuid_strs[0], profile_uuid_strs[0][1], 2, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
     free(counter_stat_str);
     free(guage_stat_str);
@@ -772,25 +787,26 @@ TEST(single_session, udp_borrow_same_priority_9)
     struct stub_pkt_queue *actual_tx_queue;
     struct shaping_ctx *ctx = NULL;
     struct shaping_flow *sf = NULL;
-    long long rule_id[] = {1};
+    const char *rule_uuid_strs[] = {"00000000-0000-0000-0000-000000000001"};
     int priority[] = {9};
     int profile_num[] = {3};
-    int profile_id[][MAX_REF_PROFILE] = {{1, 2, 3}};
+    const char *profile_uuid_strs[][MAX_REF_PROFILE] = {{"00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002", "00000000-0000-0000-0000-000000000003"}};
 
     TAILQ_INIT(&expec_tx_queue);
     stub_init();
-    dummy_swarmkv_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
     sf = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf != NULL);
 
-    stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
-    stub_set_token_bucket_avl_per_sec(1, 0, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
-    stub_set_token_bucket_avl_per_sec(2, 0, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
-    stub_set_token_bucket_avl_per_sec(3, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_matched_shaping_rules(1, rule_uuid_strs, priority, profile_num, profile_uuid_strs);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[0][0], 0, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[0][1], 0, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[0][2], 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
-    shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
+    uuid_t rule_uuid;
+    uuid_parse(rule_uuid_strs[0], rule_uuid);
+    shaper_rules_update(&ctx->thread_ctx[0], sf, &rule_uuid, 1);
 
     /*******send packets***********/
     send_packets(&ctx->thread_ctx[0], sf, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
@@ -800,7 +816,7 @@ TEST(single_session, udp_borrow_same_priority_9)
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
 
     while (!TAILQ_EMPTY(&expec_tx_queue)) {//last 90 delay packets
-        stub_refresh_token_bucket(3);
+        stub_refresh_token_bucket(profile_uuid_strs[0][2]);
         for (int i = 0; i < 20; i++) {//even though invoke polling more than 10 times, there should be only 10 pkts be sent
             polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
             stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
@@ -821,70 +837,21 @@ TEST(single_session, udp_borrow_same_priority_9)
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
-    stub_clear_matched_shaping_rules();
+    stub_clear_resource();
+    stub_swarmkv_clear_resource();
 
     /*******test statistics***********/
     //profile_id 1, primary
-    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 1, 1, 9, 0, 0, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, rule_uuid_strs[0], profile_uuid_strs[0][0], 9, 0, 0, 0, 0, 171000, SHAPING_DIR_OUT, profile_type_primary);
 
     //profile_id 2, borrow
-    shaping_stat_judge(counter_stat_str, guage_stat_str, 1, 0, 1, 2, 9, 0, 0, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 1, 0, rule_uuid_strs[0], profile_uuid_strs[0][1], 9, 0, 0, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
     //profile_id 3, borrow
-    shaping_stat_judge(counter_stat_str, guage_stat_str, 2, 0, 1, 3, 9, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 2, 0, rule_uuid_strs[0], profile_uuid_strs[0][2], 9, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
     free(counter_stat_str);
     free(guage_stat_str);
-}
-
-/*session1 match rule1
-  rule1:
-      priority:1
-      profile1: limit 1000, first 20 pkts async, then sync
-*/
-TEST(single_session_async, udp_close_before_async_exec)
-{
-    struct stub_pkt_queue expec_tx_queue;
-    struct stub_pkt_queue *actual_tx_queue;
-    struct shaping_ctx *ctx = NULL;
-    struct shaping_flow *sf = NULL;
-    long long rule_id[] = {0};
-    int priority[] = {1};
-    int profile_num[] = {1};
-    int profile_id[][MAX_REF_PROFILE] = {{0}};
-
-    TAILQ_INIT(&expec_tx_queue);
-    stub_init();
-    dummy_swarmkv_init();
-    ctx = shaping_engine_init();
-    ASSERT_TRUE(ctx != NULL);
-    sf = shaping_flow_new(&ctx->thread_ctx[0]);
-    ASSERT_TRUE(sf != NULL);
-
-    stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
-    stub_set_async_token_get_times(0, 20);
-    actual_tx_queue = stub_get_tx_queue();
-    shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
-    
-
-    /*******send packets***********/
-    send_packets(&ctx->thread_ctx[0], sf, 10, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
-    ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));//async callback haven't been called, no token, no packet be sent
-    sf->flag |= SESSION_CLOSE;// receive close ctrlbuf
-
-    stub_set_async_token_get_times(0, 0);//refresh async count, async thread will be executed
-    sleep(1);//ensure async thread exec complete
-
-    for (int i = 0; i < 10; i++) {
-        polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
-    }
-
-    ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue, actual_tx_queue, 10));
-    
-    shaper_thread_resource_clear();
-    shaping_engine_destroy(ctx);
-    stub_clear_matched_shaping_rules();
 }
 
 /*session1 match rule1; session2 match rule2
@@ -906,18 +873,15 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
     struct shaping_ctx *ctx = NULL;
     struct shaping_flow *sf1 = NULL;
     struct shaping_flow *sf2 = NULL;
-    long long rule_ids[] = {1, 2};
-    long long rule_id1[] = {1};
-    long long rule_id2[] = {2};
+    const char *rule_uuid_strs[] = {"00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002"};
     int profile_nums[] = {2, 1};
     int prioritys[] = {1, 1};
-    int profile_ids[][MAX_REF_PROFILE] = {{1, 2}, {2}};
+    const char *profile_uuid_strs[][MAX_REF_PROFILE] = {{"00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002"}, {"00000000-0000-0000-0000-000000000002"}};
 
 
     TAILQ_INIT(&expec_tx_queue1);
     TAILQ_INIT(&expec_tx_queue2);
     stub_init();
-    dummy_swarmkv_init();
     
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
@@ -927,13 +891,17 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
     ASSERT_TRUE(sf2 != NULL);
 
 
-    stub_set_matched_shaping_rules(2, rule_ids, prioritys, profile_nums, profile_ids);
+    stub_set_matched_shaping_rules(2, rule_uuid_strs, prioritys, profile_nums, profile_uuid_strs);
 
-    stub_set_token_bucket_avl_per_sec(1, 0, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
-    stub_set_token_bucket_avl_per_sec(2, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[0][0], 0, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[0][1], 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
-    shaper_rules_update(&ctx->thread_ctx[0], sf1, rule_id1, 1);
-    shaper_rules_update(&ctx->thread_ctx[0], sf2, rule_id2, 1);
+    uuid_t rule_uuid1;
+    uuid_t rule_uuid2;
+    uuid_parse(rule_uuid_strs[0], rule_uuid1);
+    uuid_parse(rule_uuid_strs[1], rule_uuid2);
+    shaper_rules_update(&ctx->thread_ctx[0], sf1, &rule_uuid1, 1);
+    shaper_rules_update(&ctx->thread_ctx[0], sf2, &rule_uuid2, 1);
 
 
     /*******send packets***********/
@@ -945,7 +913,7 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 10));
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
-    stub_refresh_token_bucket(2);
+    stub_refresh_token_bucket(profile_uuid_strs[0][1]);
     for (int i = 0; i < 20; i++) {
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
         stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
@@ -954,7 +922,7 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
     while (!TAILQ_EMPTY(&expec_tx_queue2)) {
-        stub_refresh_token_bucket(2);
+        stub_refresh_token_bucket(profile_uuid_strs[0][1]);
         for (int i = 0; i < 20; i++) {//even though invoke polling more than 10 times, there should be only 10 pkts be sent
             polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
             stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
@@ -966,7 +934,7 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
 
     stub_curr_time_s_inc(1);//inc time to refresh hmget interval
     while (!TAILQ_EMPTY(&expec_tx_queue1)) {//last 90 delay packets
-        stub_refresh_token_bucket(2);
+        stub_refresh_token_bucket(profile_uuid_strs[0][1]);
         for (int i = 0; i < 20; i++) {//even though invoke polling more than 10 times, there should be only 10 pkts be sent
             polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
             stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
@@ -988,17 +956,18 @@ TEST(two_session_diff_priority_same_profile, udp_borrow_in_order)
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
-    stub_clear_matched_shaping_rules();
+    stub_clear_resource();
+    stub_swarmkv_clear_resource();
 
     /*******test statistics***********/
     //profile_id 1, primary
-    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1471000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, rule_uuid_strs[0], profile_uuid_strs[0][0], 1, 0, 0, 0, 0, 1471000, SHAPING_DIR_OUT, profile_type_primary);
 
     //profile_id 2, borrow
-    shaping_stat_judge(counter_stat_str, guage_stat_str, 1, 0, 1, 2, 2, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 1, 0, rule_uuid_strs[0], profile_uuid_strs[0][1], 2, 100, 10000, 0, 0, 0, SHAPING_DIR_OUT, profile_type_borrow);
 
     //profile_id 2, primary
-    shaping_stat_judge(counter_stat_str, guage_stat_str, 2, 1, 2, 2, 1, 100, 10000, 0, 0, 191000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 2, 1, rule_uuid_strs[1], profile_uuid_strs[1][0], 1, 100, 10000, 0, 0, 191000, SHAPING_DIR_OUT, profile_type_primary);
 
     free(counter_stat_str);
     free(guage_stat_str);
@@ -1022,18 +991,15 @@ TEST(two_session_diff_priority_same_profile, two_thread_udp_tx_in_order)
     struct shaping_ctx *ctx = NULL;
     struct shaping_flow *sf1 = NULL;
     struct shaping_flow *sf2 = NULL;
-    long long rule_ids[] = {1, 2};
-    long long rule_id1[] = {1};
-    long long rule_id2[] = {2};
+    const char *rule_uuid_strs[] = {"00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002"};
     int profile_nums[] = {1, 1};
     int prioritys[] = {1, 2};
-    int profile_id[][MAX_REF_PROFILE] = {{0}, {0}};
+    const char *profile_uuid_strs[][MAX_REF_PROFILE] = {{"00000000-0000-0000-0000-000000000001"}, {"00000000-0000-0000-0000-000000000001"}};
     
 
     TAILQ_INIT(&expec_tx_queue1);
     TAILQ_INIT(&expec_tx_queue2);
     stub_init();
-    dummy_swarmkv_init();
     
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
@@ -1042,12 +1008,16 @@ TEST(two_session_diff_priority_same_profile, two_thread_udp_tx_in_order)
     sf2 = shaping_flow_new(&ctx->thread_ctx[1]);
     ASSERT_TRUE(sf2 != NULL);
 
-    stub_set_matched_shaping_rules(2, rule_ids, prioritys, profile_nums, profile_id);
+    stub_set_matched_shaping_rules(2, rule_uuid_strs, prioritys, profile_nums, profile_uuid_strs);
 
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[0][0], 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
-    shaper_rules_update(&ctx->thread_ctx[0], sf1, rule_id1, 1);
-    shaper_rules_update(&ctx->thread_ctx[1], sf2, rule_id2, 1);
+    uuid_t rule_uuid1;
+    uuid_t rule_uuid2;
+    uuid_parse(rule_uuid_strs[0], rule_uuid1);
+    uuid_parse(rule_uuid_strs[1], rule_uuid2);
+    shaper_rules_update(&ctx->thread_ctx[0], sf1, &rule_uuid1, 1);
+    shaper_rules_update(&ctx->thread_ctx[1], sf2, &rule_uuid2, 1);
 
     /*******send packets***********/
     send_packets(&ctx->thread_ctx[0], sf1, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue1, 1, 0);
@@ -1058,13 +1028,13 @@ TEST(two_session_diff_priority_same_profile, two_thread_udp_tx_in_order)
     shaper_stat_refresh(&ctx->thread_ctx[0], sf1, 1);//刷新线程0中的优先级队列长度到swarmkv中
     stub_curr_time_s_inc(1);//inc time to refresh hmget interval
     for (int i = 0; i < 10; i++) {//线程1中的session优先级为2，被线程0中优先级为1的session阻断
-        stub_refresh_token_bucket(0);
+        stub_refresh_token_bucket(profile_uuid_strs[0][0]);
         polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);
         ASSERT_EQ(-1, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 1));//优先级低，不能发出报文
     }
 
     while (!TAILQ_EMPTY(&expec_tx_queue1)) {
-        stub_refresh_token_bucket(0);
+        stub_refresh_token_bucket(profile_uuid_strs[0][0]);
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);//require tokens
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);//send pkt
 
@@ -1074,7 +1044,7 @@ TEST(two_session_diff_priority_same_profile, two_thread_udp_tx_in_order)
     stub_curr_time_s_inc(1);//inc time to refresh hmget interval
     shaper_stat_refresh(&ctx->thread_ctx[0], sf1, 1);//刷新线程0中的优先级队列长度到swarmkv中
     while (!TAILQ_EMPTY(&expec_tx_queue2)) {
-        stub_refresh_token_bucket(0);
+        stub_refresh_token_bucket(profile_uuid_strs[0][0]);
         polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);
         polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);
 
@@ -1087,7 +1057,8 @@ TEST(two_session_diff_priority_same_profile, two_thread_udp_tx_in_order)
     shaping_flow_free(&ctx->thread_ctx[1], sf2);
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
-    stub_clear_matched_shaping_rules();
+    stub_clear_resource();
+    stub_swarmkv_clear_resource();
 }
 
 /*session1 match rule1; session2 match rule2
@@ -1108,18 +1079,15 @@ TEST(two_session_diff_priority_same_profile, profile_timer_test)
     struct shaping_ctx *ctx = NULL;
     struct shaping_flow *sf1 = NULL;
     struct shaping_flow *sf2 = NULL;
-    long long rule_ids[] = {1, 2};
-    long long rule_id1[] = {1};
-    long long rule_id2[] = {2};
+    const char *rule_uuid_strs[] = {"00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002"};
     int profile_nums[] = {1, 1};
     int prioritys[] = {1, 2};
-    int profile_id[][MAX_REF_PROFILE] = {{0}, {0}};
+    const char *profile_uuid_strs[][MAX_REF_PROFILE] = {{"00000000-0000-0000-0000-000000000001"}, {"00000000-0000-0000-0000-000000000001"}};
     
 
     TAILQ_INIT(&expec_tx_queue1);
     TAILQ_INIT(&expec_tx_queue2);
     stub_init();
-    dummy_swarmkv_init();
     
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
@@ -1128,12 +1096,16 @@ TEST(two_session_diff_priority_same_profile, profile_timer_test)
     sf2 = shaping_flow_new(&ctx->thread_ctx[1]);
     ASSERT_TRUE(sf2 != NULL);
 
-    stub_set_matched_shaping_rules(2, rule_ids, prioritys, profile_nums, profile_id);
+    stub_set_matched_shaping_rules(2, rule_uuid_strs, prioritys, profile_nums, profile_uuid_strs);
 
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[0][0], 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
-    shaper_rules_update(&ctx->thread_ctx[0], sf1, rule_id1, 1);
-    shaper_rules_update(&ctx->thread_ctx[1], sf2, rule_id2, 1);
+    uuid_t rule_uuid1;
+    uuid_t rule_uuid2;
+    uuid_parse(rule_uuid_strs[0], rule_uuid1);
+    uuid_parse(rule_uuid_strs[1], rule_uuid2);
+    shaper_rules_update(&ctx->thread_ctx[0], sf1, &rule_uuid1, 1);
+    shaper_rules_update(&ctx->thread_ctx[1], sf2, &rule_uuid2, 1);
 
     /*******send packets***********/
     send_packets(&ctx->thread_ctx[0], sf1, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue1, 1, 0);
@@ -1150,7 +1122,7 @@ TEST(two_session_diff_priority_same_profile, profile_timer_test)
 
     stub_curr_time_s_inc(1);//inc time to refresh hmget interval
     for (int i = 0; i < 10; i++) {//线程1中的session优先级为2，被线程0中优先级为1的session阻断
-        stub_refresh_token_bucket(0);
+        stub_refresh_token_bucket(profile_uuid_strs[0][0]);
         polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);
         stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
 
@@ -1158,7 +1130,7 @@ TEST(two_session_diff_priority_same_profile, profile_timer_test)
     }
 
     while (!TAILQ_EMPTY(&expec_tx_queue1)) {
-        stub_refresh_token_bucket(0);
+        stub_refresh_token_bucket(profile_uuid_strs[0][0]);
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);//first polling request token
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);//then send pkt
         stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
@@ -1175,7 +1147,7 @@ TEST(two_session_diff_priority_same_profile, profile_timer_test)
 
     stub_curr_time_s_inc(1);//inc time to refresh hmget interval
     while (!TAILQ_EMPTY(&expec_tx_queue2)) {
-        stub_refresh_token_bucket(0);
+        stub_refresh_token_bucket(profile_uuid_strs[0][0]);
         polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);//first polling request token
         polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);//then send pkt
         stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
@@ -1189,7 +1161,8 @@ TEST(two_session_diff_priority_same_profile, profile_timer_test)
     shaping_flow_free(&ctx->thread_ctx[1], sf2);
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
-    stub_clear_matched_shaping_rules();
+    stub_clear_resource();
+    stub_swarmkv_clear_resource();
 }
 
 /*session1 match rule1; session2 match rule2
@@ -1210,18 +1183,15 @@ TEST(two_session_diff_priority_same_profile, one_direction_dont_block_another)
     struct shaping_ctx *ctx = NULL;
     struct shaping_flow *sf1 = NULL;
     struct shaping_flow *sf2 = NULL;
-    long long rule_ids[] = {1, 2};
-    long long rule_id1[] = {1};
-    long long rule_id2[] = {2};
+    const char *rule_uuid_strs[] = {"00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002"};
     int profile_nums[] = {1, 1};
     int prioritys[] = {1, 2};
-    int profile_id[][MAX_REF_PROFILE] = {{0}, {0}};
+    const char *profile_uuid_strs[][MAX_REF_PROFILE] = {{"00000000-0000-0000-0000-000000000001"}, {"00000000-0000-0000-0000-000000000001"}};
     
 
     TAILQ_INIT(&expec_tx_queue1);
     TAILQ_INIT(&expec_tx_queue2);
     stub_init();
-    dummy_swarmkv_init();
     
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
@@ -1230,13 +1200,17 @@ TEST(two_session_diff_priority_same_profile, one_direction_dont_block_another)
     sf2 = shaping_flow_new(&ctx->thread_ctx[1]);
     ASSERT_TRUE(sf2 != NULL);
 
-    stub_set_matched_shaping_rules(2, rule_ids, prioritys, profile_nums, profile_id);
+    stub_set_matched_shaping_rules(2, rule_uuid_strs, prioritys, profile_nums, profile_uuid_strs);
 
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_IN, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[0][0], 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[0][0], 1000, SHAPING_DIR_IN, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
-    shaper_rules_update(&ctx->thread_ctx[0], sf1, rule_id1, 1);
-    shaper_rules_update(&ctx->thread_ctx[1], sf2, rule_id2, 1);
+    uuid_t rule_uuid1;
+    uuid_t rule_uuid2;
+    uuid_parse(rule_uuid_strs[0], rule_uuid1);
+    uuid_parse(rule_uuid_strs[1], rule_uuid2);
+    shaper_rules_update(&ctx->thread_ctx[0], sf1, &rule_uuid1, 1);
+    shaper_rules_update(&ctx->thread_ctx[1], sf2, &rule_uuid2, 1);
 
     /*******send packets***********/
     send_packets(&ctx->thread_ctx[0], sf1, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue1, 1, 0);
@@ -1254,7 +1228,7 @@ TEST(two_session_diff_priority_same_profile, one_direction_dont_block_another)
 
     stub_curr_time_s_inc(1);//inc time to refresh hmget interval
     while (!TAILQ_EMPTY(&expec_tx_queue2)) {//线程0中优先级为1的session阻断OUT方向，线程1中的session优先级为2，但是IN方向不受影响
-        stub_refresh_token_bucket(0);
+        stub_refresh_token_bucket(profile_uuid_strs[0][0]);
         polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);//first polling request token
         polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);
         stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
@@ -1263,7 +1237,7 @@ TEST(two_session_diff_priority_same_profile, one_direction_dont_block_another)
     }
 
     while (!TAILQ_EMPTY(&expec_tx_queue1)) {
-        stub_refresh_token_bucket(0);
+        stub_refresh_token_bucket(profile_uuid_strs[0][0]);
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);//first polling request token
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);//then send pkt
         stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
@@ -1277,7 +1251,8 @@ TEST(two_session_diff_priority_same_profile, one_direction_dont_block_another)
     shaping_flow_free(&ctx->thread_ctx[1], sf2);
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
-    stub_clear_matched_shaping_rules();
+    stub_clear_resource();
+    stub_swarmkv_clear_resource();
 }
 
 /*session1 match rule1 & rule2; session2 match rule3
@@ -1302,18 +1277,15 @@ TEST(two_sessions, priority_non_block)
     struct shaping_ctx *ctx = NULL;
     struct shaping_flow *sf1 = NULL;
     struct shaping_flow *sf2 = NULL;
-    long long rule_ids[] = {1, 2, 3};
-    long long rule_id1[] = {1, 2};
-    long long rule_id2[] = {3};
+    const char *rule_uuid_strs[] = {"00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002", "00000000-0000-0000-0000-000000000003"};
     int profile_nums[] = {1, 1, 1};
     int prioritys[] = {1, 2, 3};
-    int profile_id[][MAX_REF_PROFILE] = {{0}, {1}, {0}};
+    const char *profile_uuid_strs[][MAX_REF_PROFILE] = {{"00000000-0000-0000-0000-000000000001"}, {"00000000-0000-0000-0000-000000000002"}, {"00000000-0000-0000-0000-000000000001"}};
     
 
     TAILQ_INIT(&expec_tx_queue1);
     TAILQ_INIT(&expec_tx_queue2);
     stub_init();
-    dummy_swarmkv_init();
     
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
@@ -1322,13 +1294,18 @@ TEST(two_sessions, priority_non_block)
     sf2 = shaping_flow_new(&ctx->thread_ctx[1]);
     ASSERT_TRUE(sf2 != NULL);
 
-    stub_set_matched_shaping_rules(3, rule_ids, prioritys, profile_nums, profile_id);
+    stub_set_matched_shaping_rules(3, rule_uuid_strs, prioritys, profile_nums, profile_uuid_strs);
 
-    stub_set_token_bucket_avl_per_sec(0, 3000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
-    stub_set_token_bucket_avl_per_sec(1, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[0][0], 3000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[1][0], 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
-    shaper_rules_update(&ctx->thread_ctx[0], sf1, rule_id1, 2);
-    shaper_rules_update(&ctx->thread_ctx[1], sf2, rule_id2, 1);
+    uuid_t rule_uuid1[2];
+    uuid_t rule_uuid2;
+    uuid_parse(rule_uuid_strs[0], rule_uuid1[0]);
+    uuid_parse(rule_uuid_strs[1], rule_uuid1[1]);
+    uuid_parse(rule_uuid_strs[2], rule_uuid2);
+    shaper_rules_update(&ctx->thread_ctx[0], sf1, rule_uuid1, 2);
+    shaper_rules_update(&ctx->thread_ctx[1], sf2, &rule_uuid2, 1);
 
     /*******send packets***********/
     send_packets(&ctx->thread_ctx[0], sf1, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue1, 3, 0);//sf1 blocked by rule2(profile id 1), while rule3(profile id 0) still has 1000 token
@@ -1339,8 +1316,8 @@ TEST(two_sessions, priority_non_block)
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
     while (!TAILQ_EMPTY(&expec_tx_queue1)) {
-        stub_refresh_token_bucket(0);
-        stub_refresh_token_bucket(1);
+        stub_refresh_token_bucket(profile_uuid_strs[0][0]);
+        stub_refresh_token_bucket(profile_uuid_strs[1][0]);
 
         for (int i = 0; i < 4; i++) {
             polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);//two rules, one rule need two polling, request token and send pkt
@@ -1353,7 +1330,8 @@ TEST(two_sessions, priority_non_block)
     shaping_flow_free(&ctx->thread_ctx[1], sf2);
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
-    stub_clear_matched_shaping_rules();
+    stub_clear_resource();
+    stub_swarmkv_clear_resource();
 }
 
 /*session1 match rule1; session2 match rule2
@@ -1376,18 +1354,15 @@ TEST(two_sessions, borrow_when_primary_profile_priority_blocked)
     struct shaping_ctx *ctx = NULL;
     struct shaping_flow *sf1 = NULL;
     struct shaping_flow *sf2 = NULL;
-    long long rule_ids[] = {1, 2};
-    long long rule_id1[] = {1};
-    long long rule_id2[] = {2};
+    const char *rule_uuid_strs[] = {"00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002"};
     int profile_nums[] = {1, 2};
     int prioritys[] = {1, 2};
-    int profile_id[][MAX_REF_PROFILE] = {{0}, {0, 1}};
+    const char *profile_uuid_strs[][MAX_REF_PROFILE] = {{"00000000-0000-0000-0000-000000000001"}, {"00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002"}};
     
 
     TAILQ_INIT(&expec_tx_queue1);
     TAILQ_INIT(&expec_tx_queue2);
     stub_init();
-    dummy_swarmkv_init();
     
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
@@ -1396,13 +1371,17 @@ TEST(two_sessions, borrow_when_primary_profile_priority_blocked)
     sf2 = shaping_flow_new(&ctx->thread_ctx[1]);
     ASSERT_TRUE(sf2 != NULL);
 
-    stub_set_matched_shaping_rules(2, rule_ids, prioritys, profile_nums, profile_id);
+    stub_set_matched_shaping_rules(2, rule_uuid_strs, prioritys, profile_nums, profile_uuid_strs);
 
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
-    stub_set_token_bucket_avl_per_sec(1, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[1][0], 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[1][1], 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
-    shaper_rules_update(&ctx->thread_ctx[0], sf1, rule_id1, 1);
-    shaper_rules_update(&ctx->thread_ctx[1], sf2, rule_id2, 1);
+    uuid_t rule_uuid1;
+    uuid_t rule_uuid2;
+    uuid_parse(rule_uuid_strs[0], rule_uuid1);
+    uuid_parse(rule_uuid_strs[1], rule_uuid2);
+    shaper_rules_update(&ctx->thread_ctx[0], sf1, &rule_uuid1, 1);
+    shaper_rules_update(&ctx->thread_ctx[1], sf2, &rule_uuid2, 1);
 
     /*******send packets***********/
     send_packets(&ctx->thread_ctx[0], sf1, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue1, 1, 0);
@@ -1410,14 +1389,14 @@ TEST(two_sessions, borrow_when_primary_profile_priority_blocked)
     ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue1, actual_tx_queue, 10));
 
     while (!TAILQ_EMPTY(&expec_tx_queue2)) {
-        stub_refresh_token_bucket(1);
+        stub_refresh_token_bucket(profile_uuid_strs[1][1]);
         polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);//primary profile blocked by priority, send by borrow profile
 
         ASSERT_EQ(0, judge_packet_eq(&expec_tx_queue2, actual_tx_queue, 1));
     }
 
     while (!TAILQ_EMPTY(&expec_tx_queue1)) {
-        stub_refresh_token_bucket(0);
+        stub_refresh_token_bucket(profile_uuid_strs[1][0]);
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
 
@@ -1428,7 +1407,8 @@ TEST(two_sessions, borrow_when_primary_profile_priority_blocked)
     shaping_flow_free(&ctx->thread_ctx[1], sf2);
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
-    stub_clear_matched_shaping_rules();
+    stub_clear_resource();
+    stub_swarmkv_clear_resource();
 }
 
 /*session1 match rule1; session2 match rule2
@@ -1451,18 +1431,15 @@ TEST(two_sessions, primary_profile_priority_blocked_by_borrow_profile)
     struct shaping_ctx *ctx = NULL;
     struct shaping_flow *sf1 = NULL;
     struct shaping_flow *sf2 = NULL;
-    long long rule_ids[] = {1, 2};
-    long long rule_id1[] = {1};
-    long long rule_id2[] = {2};
+    const char *rule_uuid_strs[] = {"00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002"};
     int profile_nums[] = {2, 1};
     int prioritys[] = {1, 5};
-    int profile_id[][MAX_REF_PROFILE] = {{0, 1}, {1}};
+    const char *profile_uuid_strs[][MAX_REF_PROFILE] = {{"00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002"}, {"00000000-0000-0000-0000-000000000002"}};
     
 
     TAILQ_INIT(&expec_tx_queue1);
     TAILQ_INIT(&expec_tx_queue2);
     stub_init();
-    dummy_swarmkv_init();
 
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
@@ -1471,13 +1448,17 @@ TEST(two_sessions, primary_profile_priority_blocked_by_borrow_profile)
     sf2 = shaping_flow_new(&ctx->thread_ctx[1]);
     ASSERT_TRUE(sf2 != NULL);
 
-    stub_set_matched_shaping_rules(2, rule_ids, prioritys, profile_nums, profile_id);
+    stub_set_matched_shaping_rules(2, rule_uuid_strs, prioritys, profile_nums, profile_uuid_strs);
 
-    stub_set_token_bucket_avl_per_sec(0, 0, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
-    stub_set_token_bucket_avl_per_sec(1, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[0][0], 0, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[0][1], 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
-    shaper_rules_update(&ctx->thread_ctx[0], sf1, rule_id1, 1);
-    shaper_rules_update(&ctx->thread_ctx[1], sf2, rule_id2, 1);
+    uuid_t rule_uuid1;
+    uuid_t rule_uuid2;
+    uuid_parse(rule_uuid_strs[0], rule_uuid1);
+    uuid_parse(rule_uuid_strs[1], rule_uuid2);
+    shaper_rules_update(&ctx->thread_ctx[0], sf1, &rule_uuid1, 1);
+    shaper_rules_update(&ctx->thread_ctx[1], sf2, &rule_uuid2, 1);
 
     /*******send packets***********/
     send_packets(&ctx->thread_ctx[0], sf1, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue1, 1, 0);
@@ -1487,7 +1468,7 @@ TEST(two_sessions, primary_profile_priority_blocked_by_borrow_profile)
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
     while (!TAILQ_EMPTY(&expec_tx_queue1)) {
-        stub_refresh_token_bucket(1);
+        stub_refresh_token_bucket(profile_uuid_strs[0][1]);
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
         polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);//blocked by priority, sf1 has priority 2 for profile_b(id 1)
@@ -1498,7 +1479,7 @@ TEST(two_sessions, primary_profile_priority_blocked_by_borrow_profile)
 
     stub_curr_time_s_inc(1);//inc time to refresh hmget interval
     while (!TAILQ_EMPTY(&expec_tx_queue2)) {
-        stub_refresh_token_bucket(1);
+        stub_refresh_token_bucket(profile_uuid_strs[0][1]);
         polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);
         polling_entry(ctx->thread_ctx[1].sp, ctx->thread_ctx[1].stat, &ctx->thread_ctx[1]);
 
@@ -1509,7 +1490,8 @@ TEST(two_sessions, primary_profile_priority_blocked_by_borrow_profile)
     shaping_flow_free(&ctx->thread_ctx[1], sf2);
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
-    stub_clear_matched_shaping_rules();
+    stub_clear_resource();
+    stub_swarmkv_clear_resource();
 }
 
 /*session1 match rule1
@@ -1521,23 +1503,24 @@ TEST(statistics, udp_drop_pkt)
     struct stub_pkt_queue *actual_tx_queue;
     struct shaping_ctx *ctx = NULL;
     struct shaping_flow *sf = NULL;
-    long long rule_id[] = {0};
+    const char *rule_uuid_strs[] = {"00000000-0000-0000-0000-000000000001"};
     int priority[] = {1};
     int profile_num[] = {1};
-    int profile_id[][MAX_REF_PROFILE] = {{0}};
+    const char *profile_uuid_strs[][MAX_REF_PROFILE] = {{"00000000-0000-0000-0000-000000000001"}};
 
     TAILQ_INIT(&expec_tx_queue);
     stub_init();
-    dummy_swarmkv_init();
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
     sf = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf != NULL);
     
-    stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_matched_shaping_rules(1, rule_uuid_strs, priority, profile_num, profile_uuid_strs);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[0][0], 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
-    shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
+    uuid_t rule_uuid;
+    uuid_parse(rule_uuid_strs[0], rule_uuid);
+    shaper_rules_update(&ctx->thread_ctx[0], sf, &rule_uuid, 1);
 
     /*******send packets***********/
     send_packets(&ctx->thread_ctx[0], sf, SHAPING_SESSION_QUEUE_LEN + 10, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
@@ -1548,7 +1531,7 @@ TEST(statistics, udp_drop_pkt)
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
     while (!TAILQ_EMPTY(&expec_tx_queue)) {
-        stub_refresh_token_bucket(0);
+        stub_refresh_token_bucket(profile_uuid_strs[0][0]);
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
         stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
@@ -1572,11 +1555,12 @@ TEST(statistics, udp_drop_pkt)
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
-    stub_clear_matched_shaping_rules();
+    stub_clear_resource();
+    stub_swarmkv_clear_resource();
 
     /*******test statistics***********/
     //judge shaping metric
-    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 0, 0, 1, SHAPING_SESSION_QUEUE_LEN+10, (SHAPING_SESSION_QUEUE_LEN+10)*100, 100, 0, 228000, SHAPING_DIR_OUT, profile_type_primary);//every queued pkt's latency is max
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, rule_uuid_strs[0], profile_uuid_strs[0][0], 1, SHAPING_SESSION_QUEUE_LEN+10, (SHAPING_SESSION_QUEUE_LEN+10)*100, 100, 0, 228000, SHAPING_DIR_OUT, profile_type_primary);//every queued pkt's latency is max
 
     //judge shaping global metric
     shaping_global_stat_judge(global_stat_str, SHAPING_SESSION_QUEUE_LEN+10, (SHAPING_SESSION_QUEUE_LEN+10)*100, 100, 10000, 0, 0);
@@ -1595,24 +1579,25 @@ TEST(statistics, udp_queueing_pkt)
     struct stub_pkt_queue *actual_tx_queue;
     struct shaping_ctx *ctx = NULL;
     struct shaping_flow *sf = NULL;
-    long long rule_id[] = {0};
+    const char *rule_uuid_strs[] = {"00000000-0000-0000-0000-000000000001"};
     int priority[] = {1};
     int profile_num[] = {1};
-    int profile_id[][MAX_REF_PROFILE] = {{0}};
+    const char *profile_uuid_strs[][MAX_REF_PROFILE] = {{ "00000000-0000-0000-0000-000000000001"}};
 
     TAILQ_INIT(&expec_tx_queue);
     stub_init();
-    dummy_swarmkv_init();
     
     ctx = shaping_engine_init();
     ASSERT_TRUE(ctx != NULL);
     sf = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf != NULL);
 
-    stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
-    stub_set_token_bucket_avl_per_sec(0, 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_matched_shaping_rules(1, rule_uuid_strs, priority, profile_num, profile_uuid_strs);
+    stub_set_token_bucket_avl_per_sec(profile_uuid_strs[0][0], 1000, SHAPING_DIR_OUT, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
     actual_tx_queue = stub_get_tx_queue();
-    shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
+    uuid_t rule_uuid;
+    uuid_parse(rule_uuid_strs[0], rule_uuid);
+    shaper_rules_update(&ctx->thread_ctx[0], sf, &rule_uuid, 1);
 
     /*******send packets***********/
     send_packets(&ctx->thread_ctx[0], sf, 100, 100, SHAPING_DIR_OUT, &expec_tx_queue, 1, 0);
@@ -1633,7 +1618,7 @@ TEST(statistics, udp_queueing_pkt)
     fieldstat_easy_output(ctx->thread_ctx[0].stat->guage_instance, &guage_stat_str, &stat_str_len);
 
     /*******judge metric********/
-    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 0, 0, 1, 10, 1000, 0, 90, 0, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, rule_uuid_strs[0], profile_uuid_strs[0][0], 1, 10, 1000, 0, 90, 0, SHAPING_DIR_OUT, profile_type_primary);
     shaping_global_stat_judge(global_stat_str, 10, 1000, 0, 0, 90, 9000);
 
     free(global_stat_str);
@@ -1645,7 +1630,7 @@ TEST(statistics, udp_queueing_pkt)
     ASSERT_TRUE(TAILQ_EMPTY(actual_tx_queue));
 
     while (!TAILQ_EMPTY(&expec_tx_queue)) {//last 90 delay packets
-        stub_refresh_token_bucket(0);
+        stub_refresh_token_bucket(profile_uuid_strs[0][0]);
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
         polling_entry(ctx->thread_ctx[0].sp, ctx->thread_ctx[0].stat, &ctx->thread_ctx[0]);
         stub_curr_time_ns_inc(STUB_TIME_INC_FOR_PACKET);
@@ -1662,11 +1647,12 @@ TEST(statistics, udp_queueing_pkt)
 
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
-    stub_clear_matched_shaping_rules();
+    stub_clear_resource();
+    stub_swarmkv_clear_resource();
 
     /*******test statistics***********/
     //judge shaping metric
-    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, 0, 0, 1, 100, 10000, 0, 0, 90000, SHAPING_DIR_OUT, profile_type_primary);
+    shaping_stat_judge(counter_stat_str, guage_stat_str, 0, 0, rule_uuid_strs[0], profile_uuid_strs[0][0], 1, 100, 10000, 0, 0, 90000, SHAPING_DIR_OUT, profile_type_primary);
 
     //judge global metric
     shaping_global_stat_judge(global_stat_str, 100, 10000, 0, 0, 0, 0);

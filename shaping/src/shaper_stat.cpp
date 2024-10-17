@@ -27,8 +27,8 @@ struct shaper_stat_conf {
 thread_local struct field tags[TAG_IDX_MAX] = 
 {
     [TAG_VSYS_ID_IDX] = {.key = "vsys_id", .type = FIELD_VALUE_INTEGER},
-    [TAG_RULE_ID_IDX] = {.key = "rule_id", .type = FIELD_VALUE_INTEGER},
-    [TAG_PROFILE_ID_IDX] = {.key = "profile_id", .type = FIELD_VALUE_INTEGER},
+    [TAG_RULE_ID_IDX] = {.key = "rule_uuid", .type = FIELD_VALUE_CSTRING},
+    [TAG_PROFILE_ID_IDX] = {.key = "profile_uuid", .type = FIELD_VALUE_CSTRING},
     [TAG_PRIORITY_IDX] = {.key = "priority", .type = FIELD_VALUE_INTEGER},
     [TAG_PROFILE_TYPE_IDX] = {.key = "profile_type", .type = FIELD_VALUE_CSTRING}
 };
@@ -223,13 +223,18 @@ ERROR:
     return NULL;
 }
 
-static void shaper_stat_tags_build(int vsys_id, int rule_id, int profile_id, int priority, int profile_type)
+static void shaper_stat_tags_build(int vsys_id, uuid_t rule_uuid, uuid_t profile_uuid, int priority, int profile_type)
 {
+    static thread_local char rule_uuid_str[UUID_STR_LEN] = {0};
+    static thread_local char profile_uuid_str[UUID_STR_LEN] = {0};
+
     tags[TAG_VSYS_ID_IDX].value_longlong = vsys_id;
 
-    tags[TAG_RULE_ID_IDX].value_longlong = rule_id;
+    uuid_unparse(rule_uuid, rule_uuid_str);
+    tags[TAG_RULE_ID_IDX].value_str = rule_uuid_str;
 
-    tags[TAG_PROFILE_ID_IDX].value_longlong = profile_id;
+    uuid_unparse(profile_uuid, profile_uuid_str);
+    tags[TAG_PROFILE_ID_IDX].value_str = profile_uuid_str;
 
     tags[TAG_PRIORITY_IDX].value_longlong = priority;
 
@@ -261,8 +266,8 @@ static void shaper_stat_swarmkv_hincrby_cb(const struct swarmkv_reply *reply, vo
         shaper_global_stat_async_hincrby_failed_inc(&ctx->thread_global_stat);
 
         if (arg->retry_cnt >= HINCRBY_RETRY_MAX) {
-            LOG_ERROR("%s: shaping stat hincrby failed after retry %d times for profile id %d priority %d, operate %s queue_len %lld", 
-                    LOG_TAG_STAT, arg->retry_cnt, arg->profile_id, arg->priority, arg->dir == SHAPING_DIR_IN ? "in" : "out", arg->queue_len);
+            LOG_ERROR("%s: shaping stat hincrby failed after retry %d times for profile id %s priority %d, operate %s queue_len %lld", 
+                    LOG_TAG_STAT, arg->retry_cnt, uuid_print_str(arg->profile_uuid), arg->priority, arg->dir == SHAPING_DIR_IN ? "in" : "out", arg->queue_len);
             goto END;
         }
 
@@ -271,12 +276,12 @@ static void shaper_stat_swarmkv_hincrby_cb(const struct swarmkv_reply *reply, vo
         shaper_global_stat_async_invoke_inc(&ctx->thread_global_stat);//hincrby failed, retry
         shaper_global_stat_hincrby_invoke_inc(&ctx->thread_global_stat);
 
-        LOG_DEBUG("%s: shaping stat hincrby failed, retry for profile id %d priority %d, operate %s queue_len %lld", LOG_TAG_STAT, arg->profile_id, arg->priority, arg->dir == SHAPING_DIR_IN ? "in" : "out", arg->queue_len);
+        LOG_DEBUG("%s: shaping stat hincrby failed, retry for profile id %s priority %d, operate %s queue_len %lld", LOG_TAG_STAT, uuid_print_str(arg->profile_uuid), arg->priority, arg->dir == SHAPING_DIR_IN ? "in" : "out", arg->queue_len);
 
         if (arg->dir == SHAPING_DIR_IN) {
-            swarmkv_async_command(ctx->swarmkv_db, shaper_stat_swarmkv_hincrby_cb, arg, "HINCRBY tsg-shaping-%d priority-%d-in %lld", arg->profile_id, arg->priority, arg->queue_len);
+            swarmkv_async_command(ctx->swarmkv_db, shaper_stat_swarmkv_hincrby_cb, arg, "HINCRBY tsg-shaping-%s priority-%d-in %lld", uuid_print_str(arg->profile_uuid), arg->priority, arg->queue_len);
         } else {
-            swarmkv_async_command(ctx->swarmkv_db, shaper_stat_swarmkv_hincrby_cb, arg, "HINCRBY tsg-shaping-%d priority-%d-out %lld", arg->profile_id, arg->priority, arg->queue_len);
+            swarmkv_async_command(ctx->swarmkv_db, shaper_stat_swarmkv_hincrby_cb, arg, "HINCRBY tsg-shaping-%s priority-%d-out %lld", uuid_print_str(arg->profile_uuid), arg->priority, arg->queue_len);
         }
         
         return;
@@ -297,16 +302,16 @@ static void shaper_stat_priority_queue_len_refresh_dir(struct shaping_thread_ctx
 
     arg->ctx = ctx;
     arg->start_time_us = curr_time_us;
-    arg->profile_id = profile_hash_node->id;
+    uuid_copy(arg->profile_uuid, profile_hash_node->uuid);
     arg->priority = priority;
     arg->dir = direction;
     arg->queue_len = profile_hash_node->local_queue_len[priority][direction];
     shaper_global_stat_async_invoke_inc(&ctx->thread_global_stat);
     shaper_global_stat_hincrby_invoke_inc(&ctx->thread_global_stat);
     if (direction == SHAPING_DIR_IN) {
-        swarmkv_async_command(ctx->swarmkv_db, shaper_stat_swarmkv_hincrby_cb, arg, "HINCRBY tsg-shaping-%d priority-%d-in %lld", arg->profile_id, arg->priority, arg->queue_len);
+        swarmkv_async_command(ctx->swarmkv_db, shaper_stat_swarmkv_hincrby_cb, arg, "HINCRBY tsg-shaping-%s priority-%d-in %lld", uuid_print_str(arg->profile_uuid), arg->priority, arg->queue_len);
     } else {
-        swarmkv_async_command(ctx->swarmkv_db, shaper_stat_swarmkv_hincrby_cb, arg, "HINCRBY tsg-shaping-%d priority-%d-out %lld", arg->profile_id, arg->priority, arg->queue_len);
+        swarmkv_async_command(ctx->swarmkv_db, shaper_stat_swarmkv_hincrby_cb, arg, "HINCRBY tsg-shaping-%s priority-%d-out %lld", uuid_print_str(arg->profile_uuid), arg->priority, arg->queue_len);
     }
 
     profile_hash_node->local_queue_len[priority][direction] = 0;
@@ -362,7 +367,7 @@ static void shaper_stat_profile_metirc_refresh(struct shaping_thread_ctx *ctx, s
         return;
     }
     
-    shaper_stat_tags_build(rule->vsys_id, rule->id, profile->id, priority, profile_type);
+    shaper_stat_tags_build(rule->vsys_id, rule->uuid, profile->uuid, priority, profile_type);
 
     fieldstat_easy_counter_incrby(stat->counter_instance, thread_id, stat->column_ids[IN_DROP_PKTS_IDX], tags, TAG_IDX_MAX, profile_stat->in.drop_pkts);
     fieldstat_easy_counter_incrby(stat->counter_instance, thread_id, stat->column_ids[IN_PKTS_IDX], tags, TAG_IDX_MAX, profile_stat->in.pkts);

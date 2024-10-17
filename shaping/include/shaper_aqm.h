@@ -1,5 +1,6 @@
 #pragma once
 #include <time.h>
+#include <uuid/uuid.h>
 
 #include "shaper_stat.h"
 
@@ -37,5 +38,5 @@ struct shaper_aqm_codel_para {
 };
 
 int shaper_aqm_need_drop(struct shaping_profile_info *profile, struct shaping_packet_wrapper *pkt_wrapper, enum shaping_packet_dir dir, struct timespec *curr_time, unsigned long long latency_us);
-int shaper_aqm_blue_need_drop(int profile_id, struct shaper_aqm_blue_para *para, int curr_queue_len);
-int shaper_aqm_codel_need_drop(int profile_id, struct shaper_aqm_codel_para *para, unsigned long long curr_time_ms, unsigned long long latency_ms);
+int shaper_aqm_blue_need_drop(uuid_t profile_uuid, struct shaper_aqm_blue_para *para, int curr_queue_len);
+int shaper_aqm_codel_need_drop(uuid_t profile_uuid, struct shaper_aqm_codel_para *para, unsigned long long curr_time_ms, unsigned long long latency_ms);

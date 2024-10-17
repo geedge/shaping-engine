@@ -3,7 +3,7 @@
 
 #include "shaper_marsio.h"
 
-static int construct_shaping_cmsg(const char *tsync, unsigned long long session_id, const char *state, long long *shaping_rule_ids, int shaping_rule_id_num, char **mpack_data, size_t *mpack_size)
+static int construct_shaping_cmsg(const char *tsync, unsigned long long session_id, const char *state, uuid_t *shaping_rule_ids, int shaping_rule_id_num, char **mpack_data, size_t *mpack_size)
 {
 	mpack_writer_t writer;
 
@@ -34,7 +34,7 @@ static int construct_shaping_cmsg(const char *tsync, unsigned long long session_
 	mpack_write_cstr(&writer, "rule_ids");
 	mpack_build_array(&writer);
 	for (int i = 0; i < shaping_rule_id_num; i++) {
-		mpack_write_i64(&writer, shaping_rule_ids[i]);
+		mpack_write_bin(&writer, (char*)shaping_rule_ids[i], sizeof(uuid_t));
 	}
 	mpack_complete_array(&writer);//build array rule_ids
 	mpack_complete_map(&writer);//build map shaper
@@ -52,9 +52,13 @@ TEST(CTRL_PACKET, PARSE)
 	const char *tsync = "2.0";
 	unsigned long long session_id = 123456789;
 	const char *state = "active";
-	long long shaping_rule_ids[] = {4, 5, 6};
+	uuid_t shaping_rule_ids[3];
 	char *mpack_data = NULL;
 	size_t mpack_size = 0;
+
+	uuid_parse("00000000-0000-0000-0000-000000000001", shaping_rule_ids[0]);
+	uuid_parse("00000000-0000-0000-0000-000000000002", shaping_rule_ids[1]);
+	uuid_parse("00000000-0000-0000-0000-000000000003", shaping_rule_ids[2]);
 
 	construct_shaping_cmsg(tsync, session_id, state, shaping_rule_ids, 3, &mpack_data, &mpack_size);
 
@@ -65,9 +69,14 @@ TEST(CTRL_PACKET, PARSE)
 	EXPECT_EQ(ctrl_data.session_id, 123456789);
 	EXPECT_EQ(ctrl_data.state, SESSION_STATE_ACTIVE);
 	EXPECT_EQ(ctrl_data.shaping_rule_num, 3);
-	EXPECT_EQ(ctrl_data.shaping_rule_ids[0], 4);
-	EXPECT_EQ(ctrl_data.shaping_rule_ids[1], 5);
-	EXPECT_EQ(ctrl_data.shaping_rule_ids[2], 6);
+
+	char uuid_str[UUID_STR_LEN];
+	uuid_unparse(ctrl_data.shaping_rule_uuids[0], uuid_str);
+	EXPECT_STREQ(uuid_str, "00000000-0000-0000-0000-000000000001");
+	uuid_unparse(ctrl_data.shaping_rule_uuids[1], uuid_str);
+	EXPECT_STREQ(uuid_str, "00000000-0000-0000-0000-000000000002");
+	uuid_unparse(ctrl_data.shaping_rule_uuids[2], uuid_str);
+	EXPECT_STREQ(uuid_str, "00000000-0000-0000-0000-000000000003");
 
 	if (mpack_data) {
 		free(mpack_data);

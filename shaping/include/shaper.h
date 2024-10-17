@@ -8,6 +8,7 @@
 #include "shaper_stat.h"
 #include "shaper_global_stat.h"
 #include "shaper_aqm.h"
+#include <uuid/uuid.h>
 extern "C" {
 #include "timeout.h"
 }
@@ -59,7 +60,6 @@ struct shaping_thread_ctx {
     struct shaping_global_stat *global_stat;
     struct shaping_marsio_info *marsio_info;
     struct swarmkv *swarmkv_db;//handle of swarmkv 
-    struct shaping_maat_info *maat_info;
     struct session_table *session_table;
     struct timeouts *expires;
     time_t last_update_timeout_sec;
@@ -70,7 +70,6 @@ struct shaping_thread_ctx {
 struct shaping_ctx {
     int thread_num;
     struct swarmkv *swarmkv_db;//handle of swarmkv 
-    struct shaping_maat_info *maat_info;
     struct shaping_marsio_info *marsio_info;
     struct shaping_stat *stat;
     struct shaping_global_stat *global_stat;
@@ -108,7 +107,7 @@ struct shaper_token_multiple {
 };
 
 struct shaping_profile_hash_node {
-    int id;
+    uuid_t uuid;
     enum shaper_aqm_type aqm_type;
     enum shaping_profile_limit_direction limit_direction;
     long long in_deposit_token_bits[SHAPING_PRIORITY_NUM_MAX];
@@ -133,7 +132,7 @@ struct shaping_profile_hash_node {
 };
 
 struct shaping_profile_info {
-    int id;//profile_id
+    uuid_t uuid;//profile_id
     enum shaping_profile_type type;
     int priority;
     unsigned char async_pass[SHAPING_DIR_MAX];
@@ -147,8 +146,8 @@ struct shaping_profile_info {
 };
 
 struct shaping_rule_info {
+    uuid_t uuid;//rule_id
     int vsys_id;
-    int id;//rule_id
     int fair_factor;
     struct shaping_profile_info primary;
     struct shaping_profile_info borrowing[SHAPING_REF_PROFILE_NUM_MAX - 1];
@@ -162,7 +161,7 @@ struct shaping_packet_wrapper {
     unsigned long long enqueue_time_us;//first enqueue time
     unsigned int length;
     int rule_anchor;
-    int aqm_processed_pf_ids[SHAPING_REF_PROFILE_NUM_MAX];
+    uuid_t aqm_processed_pf_uuids[SHAPING_REF_PROFILE_NUM_MAX];
     TAILQ_ENTRY(shaping_packet_wrapper) node;
 };
 TAILQ_HEAD(delay_queue, shaping_packet_wrapper);
@@ -225,7 +224,7 @@ struct shaping_hincrby_cb_arg {
     long long start_time_us;
     long long queue_len;
     enum shaping_packet_dir dir;
-    int profile_id;
+    uuid_t profile_uuid;
     int priority;
     int retry_cnt;
 };

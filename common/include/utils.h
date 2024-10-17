@@ -1,5 +1,6 @@
 #ifndef _UTILS_H
 #define _UTILS_H
+#include <uuid/uuid.h>
 
 #ifdef __cpluscplus
 extern "C"
@@ -111,6 +112,11 @@ void build_ether_header(struct ethhdr *eth_hdr, uint16_t next_protocol, const ch
 int get_ip_by_device_name(const char *dev_name, char *ip_buff);
 int get_mac_by_device_name(const char *dev_name, char *mac_buff);
 int str_to_mac(const char *str, char *mac_buff);
+
+/******************************************************************************
+ * uuid
+ ******************************************************************************/
+const char *uuid_print_str(uuid_t uuid);
 
 #ifdef __cpluscplus
 }

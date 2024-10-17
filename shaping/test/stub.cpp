@@ -13,78 +13,126 @@
 #include "shaper.h"
 #include "shaper_stat.h"
 #include "stub.h"
-#include "shaper_maat.h"
 #include "log.h"
+#include "uthash.h"
 
 #define MAX_STUB_TEST_SESSION_NUM 2
-#define MAX_STUB_RULE_NUM 8
-#define MAX_STUB_PROFILE_NUM 8
-
-struct stub_matched_rules {
-    struct shaping_rule rules[MAX_STUB_RULE_NUM];
-    int rule_num;
-};
-
 
 struct stub_pkt_queue tx_queue;
-struct stub_matched_rules matched_rules;
-struct shaping_profile pf_array[MAX_STUB_PROFILE_NUM];
+struct stub_matched_rule *rules_hash = NULL;
+struct stub_shaping_profile *profiles_hash = NULL;
 
-void stub_set_profile_type(int profile_id, enum shaping_profile_type type)
+void stub_set_profile_type(const char *profile_uuid_str, enum shaping_profile_type type)
 {
-    pf_array[profile_id].type = type;
+    uuid_t profile_uuid;
+    struct stub_shaping_profile *stub_profile = NULL;
+
+    uuid_parse(profile_uuid_str, profile_uuid);
+    HASH_FIND(hh, profiles_hash, profile_uuid, sizeof(uuid_t), stub_profile);
+    if (!stub_profile) {
+        stub_profile = (struct stub_shaping_profile*)calloc(1, sizeof(struct stub_shaping_profile));
+        uuid_copy(stub_profile->profile.uuid, profile_uuid);
+        HASH_ADD(hh, profiles_hash, profile.uuid, sizeof(uuid_t), stub_profile);
+    }
+    
+    stub_profile->profile.type = type;
+
     return;
 }
 
-void stub_set_profile_limit_direction(int profile_id, enum shaping_profile_limit_direction limit_direction)
+void stub_set_profile_limit_direction(const char *profile_uuid_str, enum shaping_profile_limit_direction limit_direction)
 {
-    pf_array[profile_id].limit_direction = limit_direction;
-    return;
-}
+    uuid_t profile_uuid;
+    struct stub_shaping_profile *stub_profile = NULL;
 
-void stub_set_matched_shaping_rules(int rule_num, long long *rule_id, const int *priority, const int *profile_num, int profile_id[][MAX_REF_PROFILE])
-{
-    struct shaping_rule *rules;
-    int i, j;
-    int id;
-
-    rules = matched_rules.rules;
-
-    for (i = 0; i < rule_num; i++) {
-        id = rule_id[i];
-        assert(id < MAX_STUB_RULE_NUM);
-
-        rules[id].vsys_id = STUB_TEST_VSYS_ID;
-        rules[id].id = id;
-        rules[id].primary_pf_id = profile_id[i][0];
-        rules[id].borrow_pf_num = profile_num[i] - 1;
-        rules[id].priority = priority[i];
-        for (j = 1; j < profile_num[i]; j++) {
-            rules[id].borrow_pf_id_array[j - 1] = profile_id[i][j];
-        }
+    uuid_parse(profile_uuid_str, profile_uuid);
+    HASH_FIND(hh, profiles_hash, profile_uuid, sizeof(uuid_t), stub_profile);
+    if (!stub_profile) {
+        stub_profile = (struct stub_shaping_profile*)calloc(1, sizeof(struct stub_shaping_profile));
+        uuid_copy(stub_profile->profile.uuid, profile_uuid);
+        HASH_ADD(hh, profiles_hash, profile.uuid, sizeof(uuid_t), stub_profile);
     }
 
-    matched_rules.rule_num = rule_num;
+    stub_profile->profile.limit_direction = limit_direction;
 
     return;
 }
 
-void stub_set_shaping_rule_dscp_value(int rule_id, int dscp_value)
+void stub_set_matched_shaping_rules(int rule_num, const char *rule_uuid_str[], const int *priority, const int *profile_num, const char *profile_uuid_str[][MAX_REF_PROFILE])
 {
-    matched_rules.rules[rule_id].dscp_enable = 1;
-    matched_rules.rules[rule_id].dscp_value = dscp_value;
+    int i, j;
+
+    for (i = 0; i < rule_num; i++) {
+        struct stub_matched_rule *stub_matched_rule = NULL;
+        uuid_t rule_uuid;
+        uuid_parse(rule_uuid_str[i], rule_uuid);
+        
+        HASH_FIND(hh, rules_hash, rule_uuid, sizeof(uuid_t), stub_matched_rule);
+        if (stub_matched_rule) {
+            continue;
+        }
+
+        stub_matched_rule = (struct stub_matched_rule*)calloc(1, sizeof(struct stub_matched_rule));
+
+        stub_matched_rule->rule.vsys_id = STUB_TEST_VSYS_ID;
+        uuid_copy(stub_matched_rule->rule.uuid, rule_uuid);
+        uuid_parse(profile_uuid_str[i][0], stub_matched_rule->rule.primary_pf_uuid);
+        stub_matched_rule->rule.borrow_pf_num = profile_num[i] - 1;
+        stub_matched_rule->rule.priority = priority[i];
+        for (j = 1; j < profile_num[i]; j++) {
+            uuid_parse(profile_uuid_str[i][j], stub_matched_rule->rule.borrow_pf_uuid_array[j - 1]);
+        }
+
+        HASH_ADD(hh, rules_hash, rule.uuid, sizeof(uuid_t), stub_matched_rule);
+    }
+
     return;
 }
 
-void stub_set_shaping_rule_fair_factor(int rule_id, int fair_factor)
+void stub_set_shaping_rule_dscp_value(const char *rule_uuid_str, int dscp_value)
 {
-    matched_rules.rules[rule_id].fair_factor = fair_factor;
+    uuid_t rule_uuid;
+    struct stub_matched_rule *stub_matched_rule = NULL;
+
+    uuid_parse(rule_uuid_str, rule_uuid);
+    HASH_FIND(hh, rules_hash, rule_uuid, sizeof(uuid_t), stub_matched_rule);
+    if (stub_matched_rule) {
+        stub_matched_rule->rule.dscp_enable = 1;
+        stub_matched_rule->rule.dscp_value = dscp_value;
+    }
+
     return;
 }
 
-void stub_clear_matched_shaping_rules()
+void stub_set_shaping_rule_fair_factor(const char *rule_uuid_str, int fair_factor)
 {
-    memset(&matched_rules, 0, sizeof(struct stub_matched_rules));
+    uuid_t rule_uuid;
+    struct stub_matched_rule *stub_matched_rule = NULL;
+
+    uuid_parse(rule_uuid_str, rule_uuid);
+    HASH_FIND(hh, rules_hash, rule_uuid, sizeof(uuid_t), stub_matched_rule);
+    if (stub_matched_rule) {
+        stub_matched_rule->rule.fair_factor = fair_factor;
+    }
+    
+    return;
+}
+
+void stub_clear_resource()
+{
+    struct stub_matched_rule *stub_matched_rule, *tmp = NULL;
+
+    HASH_ITER(hh, rules_hash, stub_matched_rule, tmp) {
+        HASH_DEL(rules_hash, stub_matched_rule);
+        free(stub_matched_rule);
+    }
+
+    struct stub_shaping_profile *stub_profile, *tmp_profile = NULL;
+
+    HASH_ITER(hh, profiles_hash, stub_profile, tmp_profile) {
+        HASH_DEL(profiles_hash, stub_profile);
+        free(stub_profile);
+    }
 
     return;
 }
@@ -114,7 +162,6 @@ void stub_init()
     LOG_INIT("./conf/zlog.conf");
 
     TAILQ_INIT(&tx_queue);
-    memset(&matched_rules, 0, sizeof(struct stub_matched_rules));
     
     return;
 }
@@ -160,15 +207,6 @@ void maat_options_free(struct maat_options *opts)
     return;
 }
 
-int maat_get_table_id(struct maat *instance, const char *table_name)
-{
-    if (strcmp(table_name, "TRAFFIC_SHAPING_COMPILE") == 0) {
-        return STUB_MAAT_SHAPING_RULE_TABLE_ID;
-    } else {
-        return STUB_MAAT_SHAPING_PROFILE_TABLE_ID;
-    }
-}
-
 int maat_plugin_table_ex_schema_register(struct maat *instance, const char *table_name,
                                          maat_ex_new_func_t *new_func,
                                          maat_ex_free_func_t *free_func,
@@ -186,17 +224,21 @@ void maat_free(struct maat *instance)
     return;
 }
 
-void *maat_plugin_table_get_ex_data(struct maat *instance, int table_id, const char *key, size_t key_len)
+void *maat_plugin_table_get_ex_data(struct maat *instance, const char *table_name, const char *key, size_t key_len)
 {
-    int rule_id;
-    int profile_id;
+    uuid_t rule_uuid;
+    uuid_t profile_uuid;
 
-    if (table_id == STUB_MAAT_SHAPING_RULE_TABLE_ID) {
-        rule_id = *(int*)key;
-        return &matched_rules.rules[rule_id];
+    if (strcmp(table_name, "TRAFFIC_SHAPING_RULE") == 0) {
+        struct stub_matched_rule *matched_rule = NULL;
+        uuid_parse(key, rule_uuid);
+        HASH_FIND(hh, rules_hash, rule_uuid, sizeof(uuid_t), matched_rule);
+        return &matched_rule->rule;
     } else {
-        profile_id = atoi(key);
-        return &pf_array[profile_id];
+        struct stub_shaping_profile *stub_profile = NULL;
+        uuid_parse(key, profile_uuid);
+        HASH_FIND(hh, profiles_hash, profile_uuid, sizeof(uuid_t), stub_profile);
+        return &stub_profile->profile;
     }
 }
 /**********************************************/

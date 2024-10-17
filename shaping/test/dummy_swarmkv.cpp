@@ -9,95 +9,81 @@
 
 using namespace std;
 
-#define MAX_STUB_RULE_NUM 8
-#define MAX_STUB_PROFILE_NUM 8
-
-#define DEFAULT_AVALIABLE_TOKEN_PER_SEC -1
-
-struct stub_token_thread_arg {
-    int profile_id;
-    struct swarmkv_reply reply;
-    swarmkv_on_reply_callback_t *cb;
-    void *cb_arg;
+struct profile_priority_queue_len {
+    uuid_t profile_uuid;
+    int priority_queue_len[SHAPING_PRIORITY_NUM_MAX][SHAPING_DIR_MAX];
+    UT_hash_handle hh;
 };
 
-struct stub_avaliable_token {
-    int in_limit_bandwidth;
-    int out_limit_bandwidth;
-    int bidirection_limit_bandwidth;
-};
+struct profile_priority_queue_len *profile_priority_queue_len_hash = NULL;
+extern struct stub_shaping_profile *profiles_hash;
 
-static int profile_priority_len[MAX_STUB_PROFILE_NUM][SHAPING_PRIORITY_NUM_MAX][SHAPING_DIR_MAX];
-static struct stub_avaliable_token pf_curr_avl_token[MAX_STUB_PROFILE_NUM];
-static int pf_async_times[MAX_STUB_PROFILE_NUM];
-vector<struct stub_token_thread_arg> pf_async_thread[MAX_STUB_PROFILE_NUM];
-extern struct shaping_profile pf_array[MAX_STUB_PROFILE_NUM];
-
-void dummy_swarmkv_init()
+void stub_set_token_bucket_avl_per_sec(const char *profile_uuid_str, unsigned int tokens, unsigned char direction, enum shaping_profile_limit_direction limit_direction)
 {
-    memset(&pf_array, 0, MAX_STUB_PROFILE_NUM * sizeof(struct shaping_profile));
-    memset(&profile_priority_len, 0, MAX_STUB_PROFILE_NUM * SHAPING_PRIORITY_NUM_MAX * SHAPING_DIR_MAX * sizeof(int));
+    uuid_t profile_uuid;
+    struct stub_shaping_profile *stub_profile = NULL;
+    unsigned token_bits;
 
-    for (int i = 0; i < MAX_STUB_PROFILE_NUM; i++) {
-        pf_curr_avl_token[i].in_limit_bandwidth = DEFAULT_AVALIABLE_TOKEN_PER_SEC;
-        pf_curr_avl_token[i].out_limit_bandwidth = DEFAULT_AVALIABLE_TOKEN_PER_SEC;
-        pf_curr_avl_token[i].bidirection_limit_bandwidth = DEFAULT_AVALIABLE_TOKEN_PER_SEC;
-        pf_array[i].id = i;
-        pf_array[i].in_limit_bandwidth = DEFAULT_AVALIABLE_TOKEN_PER_SEC;
-        pf_array[i].out_limit_bandwidth = DEFAULT_AVALIABLE_TOKEN_PER_SEC;
-        pf_async_times[i] = 0;
-        memset(profile_priority_len[i], 0, 10 * sizeof(int)); 
+    uuid_parse(profile_uuid_str, profile_uuid);
+    HASH_FIND(hh, profiles_hash, profile_uuid, sizeof(uuid_t), stub_profile);
+    if (!stub_profile) {
+        stub_profile = (struct stub_shaping_profile*)calloc(1, sizeof(struct stub_shaping_profile));
+        uuid_copy(stub_profile->profile.uuid, profile_uuid);
+        HASH_ADD(hh, profiles_hash, profile.uuid, sizeof(uuid_t), stub_profile);
     }
-}
 
-void * stub_get_token_thread_func(void *data)
-{
-    struct stub_token_thread_arg *thread_arg;
+    stub_profile->profile.limit_direction = limit_direction;
 
-    thread_arg = (struct stub_token_thread_arg*)data;
-
-    thread_arg->cb(&thread_arg->reply, thread_arg->cb_arg);
-
-    return NULL;
-}
-
-void stub_set_token_bucket_avl_per_sec(int profile_id, unsigned int tokens, unsigned char direction, enum shaping_profile_limit_direction limit_direction)
-{
-    pf_array[profile_id].limit_direction = limit_direction;
+    if (tokens == AVALIABLE_TOKEN_UNLIMITED) {
+        token_bits = tokens;
+    } else {
+        token_bits = tokens * 8;
+    }
 
     if (limit_direction == PROFILE_LIMIT_DIRECTION_BIDIRECTION) {
-        pf_array[profile_id].bidirection_limit_bandwidth = tokens * 8;
-        pf_curr_avl_token[profile_id].bidirection_limit_bandwidth = tokens * 8;
+        stub_profile->profile.bidirection_limit_bandwidth = token_bits;
+        stub_profile->avaliable_token.bidirection_limit_bandwidth = token_bits;
     } else {
         if (direction == SHAPING_DIR_IN) {
-            pf_array[profile_id].in_limit_bandwidth = tokens * 8;
-            pf_curr_avl_token[profile_id].in_limit_bandwidth = tokens * 8;
+            stub_profile->profile.in_limit_bandwidth = token_bits;
+            stub_profile->avaliable_token.in_limit_bandwidth = token_bits;
         } else {
-            pf_array[profile_id].out_limit_bandwidth = tokens * 8;
-            pf_curr_avl_token[profile_id].out_limit_bandwidth = tokens * 8;
+            stub_profile->profile.out_limit_bandwidth = token_bits;
+            stub_profile->avaliable_token.out_limit_bandwidth = token_bits;
         }
     }
 
     return;
 }
 
-void stub_refresh_token_bucket(int profile_id)
+void stub_refresh_token_bucket(const char *profile_uuid_str)
 {
-    pf_curr_avl_token[profile_id].bidirection_limit_bandwidth = pf_array[profile_id].bidirection_limit_bandwidth;
-    pf_curr_avl_token[profile_id].in_limit_bandwidth = pf_array[profile_id].in_limit_bandwidth;
-    pf_curr_avl_token[profile_id].out_limit_bandwidth = pf_array[profile_id].out_limit_bandwidth;
+    uuid_t profile_uuid;
+    struct stub_shaping_profile *stub_profile = NULL;
+
+    uuid_parse(profile_uuid_str, profile_uuid);
+    HASH_FIND(hh, profiles_hash, profile_uuid, sizeof(uuid_t), stub_profile);
+    if (!stub_profile) {
+        return;
+    }
+
+    if (stub_profile->profile.limit_direction == PROFILE_LIMIT_DIRECTION_BIDIRECTION) {
+        stub_profile->avaliable_token.bidirection_limit_bandwidth = stub_profile->profile.bidirection_limit_bandwidth;
+    } else {
+        stub_profile->avaliable_token.in_limit_bandwidth = stub_profile->profile.in_limit_bandwidth;
+        stub_profile->avaliable_token.out_limit_bandwidth = stub_profile->profile.out_limit_bandwidth;
+    }
+    
     return;
 }
 
-void stub_set_async_token_get_times(int profile_id, int times)
+void stub_swarmkv_clear_resource()
 {
-    pf_async_times[profile_id] = times;
-    
-    if (pf_async_times[profile_id] == 0) {
-        for (unsigned int i = 0; i < pf_async_thread[profile_id].size(); i++) {
-            stub_get_token_thread_func(&pf_async_thread[profile_id][i]);
-        }
-        pf_async_thread[profile_id].clear();
+    struct profile_priority_queue_len *node, *tmp = NULL;
+
+    HASH_ITER(hh, profile_priority_queue_len_hash, node, tmp) {
+        HASH_DEL(profile_priority_queue_len_hash, node);
+        free(node);
     }
 
     return;
@@ -185,21 +171,30 @@ int swarmkv_options_set_log_level(struct swarmkv_options *opts, int loglevel)
 
 static void swarmkv_hincrby_cmd_func(char *cmd_str, swarmkv_on_reply_callback_t * cb, void *cb_arg)
 {
-    int profile_id;
+    uuid_t profile_uuid;
+    char uuid_str[UUID_STR_LEN] = {0};
     int priority;
     int value;
     char direction[5] = {0};
     enum shaping_packet_dir dir;
     struct swarmkv_reply *reply = (struct swarmkv_reply*)calloc(1, sizeof(struct swarmkv_reply));
 
-    sscanf(cmd_str, "HINCRBY tsg-shaping-%d priority-%d-%s %d", &profile_id, &priority, direction, &value);
+    sscanf(cmd_str, "HINCRBY tsg-shaping-%s priority-%d-%s %d", uuid_str, &priority, direction, &value);
+    uuid_parse(uuid_str, profile_uuid);
     if (strncmp(direction, "in", 2) == 0) {
         dir = SHAPING_DIR_IN;
     } else {
         dir = SHAPING_DIR_OUT;
     }
 
-    profile_priority_len[profile_id][priority][dir] += value;
+    struct profile_priority_queue_len *node = NULL;
+    HASH_FIND(hh, profile_priority_queue_len_hash, profile_uuid, sizeof(uuid_t), node);
+    if (!node) {
+        node = (struct profile_priority_queue_len*)calloc(1, sizeof(struct profile_priority_queue_len));
+        uuid_copy(node->profile_uuid, profile_uuid);
+        HASH_ADD(hh, profile_priority_queue_len_hash, profile_uuid, sizeof(uuid_t), node);
+    }
+    node->priority_queue_len[priority][dir] += value;
 
     reply->type = SWARMKV_REPLY_INTEGER;
     cb(reply, cb_arg);
@@ -211,7 +206,8 @@ static void swarmkv_hincrby_cmd_func(char *cmd_str, swarmkv_on_reply_callback_t 
 
 static void swarmkv_hmget_cmd_func(char *cmd_str, swarmkv_on_reply_callback_t * cb, void *cb_arg)
 {
-    int profile_id;
+    uuid_t profile_uuid;
+    char uuid_str[UUID_STR_LEN] = {0};
     int priority[10];
     int ret;
     int priority_num;
@@ -219,9 +215,18 @@ static void swarmkv_hmget_cmd_func(char *cmd_str, swarmkv_on_reply_callback_t * 
     enum shaping_packet_dir dir;
     struct swarmkv_reply *reply = (struct swarmkv_reply*)calloc(1, sizeof(struct swarmkv_reply));
 
-    ret = sscanf(cmd_str, "HMGET tsg-shaping-%d priority-%d-%s priority-%d-%*s priority-%d-%*s priority-%d-%*s priority-%d-%*s priority-%d-%*s priority-%d-%*s priority-%d-%*s priority-%d-%*s", 
-                    &profile_id, &priority[0], direction, &priority[1], &priority[2], &priority[3], &priority[4], &priority[5], &priority[6], &priority[7], &priority[8]);
+    ret = sscanf(cmd_str, "HMGET tsg-shaping-%s priority-%d-%s priority-%d-%*s priority-%d-%*s priority-%d-%*s priority-%d-%*s priority-%d-%*s priority-%d-%*s priority-%d-%*s priority-%d-%*s", 
+                    uuid_str, &priority[0], direction, &priority[1], &priority[2], &priority[3], &priority[4], &priority[5], &priority[6], &priority[7], &priority[8]);
     priority_num = ret - 1;
+
+    uuid_parse(uuid_str, profile_uuid);
+    struct profile_priority_queue_len *node = NULL;
+    HASH_FIND(hh, profile_priority_queue_len_hash, profile_uuid, sizeof(uuid_t), node);
+    if (!node) {
+        node = (struct profile_priority_queue_len*)calloc(1, sizeof(struct profile_priority_queue_len));
+        uuid_copy(node->profile_uuid, profile_uuid);
+        HASH_ADD(hh, profile_priority_queue_len_hash, profile_uuid, sizeof(uuid_t), node);
+    }
 
     if (strncmp(direction, "in", 2) == 0) {
         dir = SHAPING_DIR_IN;
@@ -237,7 +242,7 @@ static void swarmkv_hmget_cmd_func(char *cmd_str, swarmkv_on_reply_callback_t * 
         reply->elements[i]->type = SWARMKV_REPLY_STRING;
 
         char tmp_str[128] = {0};
-        sprintf(tmp_str, "%d", profile_priority_len[profile_id][priority[i]][dir]);
+        sprintf(tmp_str, "%d", node->priority_queue_len[priority[i]][dir]);
         reply->elements[i]->str = (char *)calloc(1, strlen(tmp_str));
         memcpy(reply->elements[i]->str, tmp_str, strlen(tmp_str));
         reply->elements[i]->len = strlen(tmp_str);
@@ -281,59 +286,46 @@ void swarmkv_async_command(struct swarmkv *db, swarmkv_on_reply_callback_t * cb,
 void swarmkv_tconsume(struct swarmkv * db, const char * key, size_t keylen, long long tokens, swarmkv_on_reply_callback_t *cb, void *cb_arg)
 {
     int actual_tokens;
-    struct stub_token_thread_arg thread_arg;
     struct swarmkv_reply reply;
-    int profile_id;
     char direction[16] = {0};
+    char uuid_str[UUID_STR_LEN] = {0};
+    uuid_t profile_uuid;
+    struct stub_shaping_profile *stub_profile = NULL;
 
-    sscanf(key, "tsg-shaping-%d-%15s", &profile_id, direction);
-
-    if (strncmp("bidirectional", direction, sizeof(direction)) == 0) {
-        if (pf_curr_avl_token[profile_id].bidirection_limit_bandwidth == DEFAULT_AVALIABLE_TOKEN_PER_SEC) {
-            actual_tokens = tokens;
-        } else {
-            actual_tokens = pf_curr_avl_token[profile_id].bidirection_limit_bandwidth >= tokens ? tokens : 0;
-            pf_curr_avl_token[profile_id].bidirection_limit_bandwidth -= actual_tokens;
-        }
-    } else if (strncmp("incoming", direction, sizeof(direction)) == 0) {
-        if (pf_curr_avl_token[profile_id].in_limit_bandwidth == DEFAULT_AVALIABLE_TOKEN_PER_SEC) {
-            actual_tokens = tokens;
-        } else {
-            actual_tokens = pf_curr_avl_token[profile_id].in_limit_bandwidth >= tokens ? tokens : 0;
-            pf_curr_avl_token[profile_id].in_limit_bandwidth -= actual_tokens;
-        }
-    } else {
-        if (pf_curr_avl_token[profile_id].out_limit_bandwidth == DEFAULT_AVALIABLE_TOKEN_PER_SEC) {
-            actual_tokens = tokens;
-        } else {
-            actual_tokens = pf_curr_avl_token[profile_id].out_limit_bandwidth >= tokens ? tokens : 0;
-            pf_curr_avl_token[profile_id].out_limit_bandwidth -= actual_tokens;
-        }
+    sscanf(key, "tsg-shaping-%36s-%15s", uuid_str, direction);
+    uuid_parse(uuid_str, profile_uuid);
+    HASH_FIND(hh, profiles_hash, profile_uuid, sizeof(uuid_t), stub_profile);
+    if (!stub_profile) {
+        return;
     }
 
-    if (pf_async_times[profile_id] == 0) {
-        for (unsigned int i = 0; i < pf_async_thread[profile_id].size(); i++) {
-            stub_get_token_thread_func(&pf_async_thread[profile_id][i]);
+    if (strncmp("bidirectional", direction, sizeof(direction)) == 0) {
+        if (stub_profile->avaliable_token.bidirection_limit_bandwidth == AVALIABLE_TOKEN_UNLIMITED) {
+            actual_tokens = tokens;
+        } else {
+            actual_tokens = stub_profile->avaliable_token.bidirection_limit_bandwidth >= tokens ? tokens : 0;
+            stub_profile->avaliable_token.bidirection_limit_bandwidth -= actual_tokens;
         }
-        pf_async_thread[profile_id].clear();
+    } else if (strncmp("incoming", direction, sizeof(direction)) == 0) {
+        if (stub_profile->avaliable_token.in_limit_bandwidth == AVALIABLE_TOKEN_UNLIMITED) {
+            actual_tokens = tokens;
+        } else {
+            actual_tokens = stub_profile->avaliable_token.in_limit_bandwidth >= tokens ? tokens : 0;
+            stub_profile->avaliable_token.in_limit_bandwidth -= actual_tokens;
+        }
+    } else {
+        if (stub_profile->avaliable_token.out_limit_bandwidth == AVALIABLE_TOKEN_UNLIMITED) {
+            actual_tokens = tokens;
+        } else {
+            actual_tokens = stub_profile->avaliable_token.out_limit_bandwidth >= tokens ? tokens : 0;
+            stub_profile->avaliable_token.out_limit_bandwidth -= actual_tokens;
+        }
     }
 
     reply.integer = actual_tokens;
     reply.type = SWARMKV_REPLY_INTEGER;
 
-    if (pf_async_times[profile_id] > 0) {
-        pf_async_times[profile_id]--;
-
-        thread_arg.profile_id = profile_id;
-        thread_arg.reply = reply;
-        thread_arg.cb = cb;
-        thread_arg.cb_arg = cb_arg;
-
-        pf_async_thread[profile_id].push_back(thread_arg);
-
-    } else {
-        cb(&reply, cb_arg);
-    }
+    cb(&reply, cb_arg);
 
     return;
 }
