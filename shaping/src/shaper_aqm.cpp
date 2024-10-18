@@ -5,7 +5,7 @@
 #include "shaper_aqm.h"
 
 thread_local unsigned int seed = 0;
-int shaper_aqm_blue_need_drop(int profile_id, struct shaper_aqm_blue_para *para, int curr_queue_len)
+int shaper_aqm_blue_need_drop(uuid_t profile_uuid, struct shaper_aqm_blue_para *para, int curr_queue_len)
 {
     time_t curr_time;
 
@@ -17,7 +17,7 @@ int shaper_aqm_blue_need_drop(int profile_id, struct shaper_aqm_blue_para *para,
             para->probability = (para->probability - BLUE_DECREMENT) >= 0 ? (para->probability - BLUE_DECREMENT) : 0;
         }
 
-        LOG_INFO("%s: profile id: %d blue probability update to %d", LOG_TAG_SHAPING, profile_id, para->probability);
+        LOG_INFO("%s: profile id: %s blue probability update to %d", LOG_TAG_SHAPING, uuid_print_str(profile_uuid), para->probability);
     }
 
     if (rand_r(&seed) % BLUE_PROBABILITY_MAX < para->probability) {
@@ -27,12 +27,12 @@ int shaper_aqm_blue_need_drop(int profile_id, struct shaper_aqm_blue_para *para,
     return 0;
 }
 
-int shaper_aqm_codel_need_drop(int profile_id, struct shaper_aqm_codel_para *para, unsigned long long curr_time_ms, unsigned long long latency_ms)
+int shaper_aqm_codel_need_drop(uuid_t profile_uuid, struct shaper_aqm_codel_para *para, unsigned long long curr_time_ms, unsigned long long latency_ms)
 {
     if (latency_ms < CODEL_MAX_LATENCY) {
         if (para->state != CODEL_STATE_NORMAL) {
             para->state = CODEL_STATE_NORMAL;
-            LOG_INFO("%s: profile id: %d codel enter state CODEL_STATE_NORMAL, last DROPPING_PHASE drop count %d", LOG_TAG_SHAPING, profile_id, para->drop_count);
+            LOG_INFO("%s: profile id: %s codel enter state CODEL_STATE_NORMAL, last DROPPING_PHASE drop count %d", LOG_TAG_SHAPING, uuid_print_str(profile_uuid), para->drop_count);
         }
         
         return 0;
@@ -43,7 +43,7 @@ int shaper_aqm_codel_need_drop(int profile_id, struct shaper_aqm_codel_para *par
         case CODEL_STATE_NORMAL:
             para->start_drop_time_ms = curr_time_ms + CODEL_DROP_INTERVAL;
             para->state = CODEL_STATE_DROPPING_TIMER;
-            LOG_INFO("%s: profile id: %d codel enter state CODEL_STATE_DROPPING_TIMER", LOG_TAG_SHAPING, profile_id);
+            LOG_INFO("%s: profile id: %s codel enter state CODEL_STATE_DROPPING_TIMER", LOG_TAG_SHAPING, uuid_print_str(profile_uuid));
             break;
         case CODEL_STATE_DROPPING_TIMER:
             if (curr_time_ms >= para->start_drop_time_ms) {
@@ -51,7 +51,7 @@ int shaper_aqm_codel_need_drop(int profile_id, struct shaper_aqm_codel_para *par
                 para->drop_count = 1;
                 para->next_drop_time_ms = curr_time_ms + CODEL_DROP_INTERVAL / sqrt(para->drop_count);
                 ret = 1;
-                LOG_INFO("%s: profile id: %d codel enter state CODEL_STATE_DROPPING_PHASE", LOG_TAG_SHAPING, profile_id);
+                LOG_INFO("%s: profile id: %s codel enter state CODEL_STATE_DROPPING_PHASE", LOG_TAG_SHAPING, uuid_print_str(profile_uuid));
             }
             break;
         case CODEL_STATE_DROPPING_PHASE:
@@ -69,14 +69,14 @@ int shaper_aqm_codel_need_drop(int profile_id, struct shaper_aqm_codel_para *par
 }
 
 
-static int shaper_aqm_have_processed(struct shaping_packet_wrapper *pkt_wrapper, int profile_id)
+static int shaper_aqm_have_processed(struct shaping_packet_wrapper *pkt_wrapper, uuid_t profile_uuid)
 {
     int i = 0;
 
     for (i = 0; i < SHAPING_REF_PROFILE_NUM_MAX; i++) {
-        if (pkt_wrapper->aqm_processed_pf_ids[i] == profile_id) {
+        if (uuid_compare(profile_uuid, pkt_wrapper->aqm_processed_pf_uuids[i]) == 0) {
             return 1;
-        } else if (pkt_wrapper->aqm_processed_pf_ids[i] == 0) {
+        } else if (uuid_is_null(pkt_wrapper->aqm_processed_pf_uuids[i])) {
             break;
         }
     }
@@ -84,13 +84,13 @@ static int shaper_aqm_have_processed(struct shaping_packet_wrapper *pkt_wrapper,
     return 0;
 }
 
-static void shaper_aqm_mark_processed(struct shaping_packet_wrapper *pkt_wrapper, int profile_id)
+static void shaper_aqm_mark_processed(struct shaping_packet_wrapper *pkt_wrapper, uuid_t profile_uuid)
 {
     int i = 0;
 
     for (i = 0; i < SHAPING_REF_PROFILE_NUM_MAX; i++) {
-        if (pkt_wrapper->aqm_processed_pf_ids[i] == 0) {
-            pkt_wrapper->aqm_processed_pf_ids[i] = profile_id;
+        if (uuid_is_null(pkt_wrapper->aqm_processed_pf_uuids[i])) {
+            uuid_copy(pkt_wrapper->aqm_processed_pf_uuids[i], profile_uuid);
             break;
         }
     }
@@ -105,23 +105,23 @@ int shaper_aqm_need_drop(struct shaping_profile_info *profile, struct shaping_pa
         return 0;
     }
 
-    if (shaper_aqm_have_processed(pkt_wrapper, profile->id)) {
+    if (shaper_aqm_have_processed(pkt_wrapper, profile->uuid)) {
         return 0;
     }
     
     switch (profile->hash_node->aqm_type) {
         case AQM_TYPE_BLUE:
-            ret = shaper_aqm_blue_need_drop(profile->id, &profile->hash_node->aqm_blue_para, profile->hash_node->queue_len[profile->priority][dir]);
+            ret = shaper_aqm_blue_need_drop(profile->uuid, &profile->hash_node->aqm_blue_para, profile->hash_node->queue_len[profile->priority][dir]);
             break;
         case AQM_TYPE_CODEL:
             curr_time_ms = curr_time->tv_sec * MILLI_SECONDS_PER_SEC + curr_time->tv_nsec / NANO_SECONDS_PER_MILLI_SEC;
-            ret = shaper_aqm_codel_need_drop(profile->id, &profile->hash_node->aqm_codel_para, curr_time_ms, latency_us / 1000);
+            ret = shaper_aqm_codel_need_drop(profile->uuid, &profile->hash_node->aqm_codel_para, curr_time_ms, latency_us / 1000);
             break;
         default:
             break;
     }
 
-    shaper_aqm_mark_processed(pkt_wrapper, profile->id);
+    shaper_aqm_mark_processed(pkt_wrapper, profile->uuid);
 
     return ret;
 }

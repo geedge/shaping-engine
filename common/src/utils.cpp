@@ -292,3 +292,10 @@ int str_to_mac(const char *str, char *mac_buff)
         return -1;
     }
 }
+
+const char *uuid_print_str(uuid_t uuid)
+{
+    static thread_local char uuid_str[UUID_STR_LEN] = {0};
+    uuid_unparse(uuid, uuid_str);
+    return uuid_str;
+}

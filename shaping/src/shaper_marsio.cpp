@@ -265,11 +265,11 @@ int shaper_marsio_ctrl_pkt_data_parse(struct ctrl_pkt_data *ctrl_data, const cha
     shaping_rule_id_array_size = mpack_node_array_length(tmp_node);
     ctrl_data->shaping_rule_num = MIN(shaping_rule_id_array_size, SHAPING_RULE_NUM_MAX);
     for (int i = 0; i < ctrl_data->shaping_rule_num; i++) {
-        if (mpack_type_uint != mpack_node_type(mpack_node_array_at(tmp_node, i))) {
+        if (mpack_type_bin != mpack_node_type(mpack_node_array_at(tmp_node, i))) {
             LOG_ERROR("%s: shaping marsio msgpack shaping rule id type wrong at index %d, type is %d", LOG_TAG_MARSIO, i, mpack_node_type(mpack_node_array_at(tmp_node, i)));
             goto ERROR;
         }
-        ctrl_data->shaping_rule_ids[i] = mpack_node_i64(mpack_node_array_at(tmp_node, i));
+        uuid_copy(ctrl_data->shaping_rule_uuids[i], *(uuid_t*)mpack_node_bin_data(mpack_node_array_at(tmp_node, i)));
     }
 
 SUCCESS:

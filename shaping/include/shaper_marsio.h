@@ -41,7 +41,7 @@ struct ctrl_pkt_data
 {
     uint64_t session_id;
     enum session_state state;
-    long long shaping_rule_ids[SHAPING_RULE_NUM_MAX];
+    uuid_t shaping_rule_uuids[SHAPING_RULE_NUM_MAX];
     int shaping_rule_num;
 };
 

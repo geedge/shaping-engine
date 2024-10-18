@@ -35,8 +35,8 @@ extern "C" {
 #define SWARMKV_CALLER_LOOP_DIVISOR_MIN 1
 #define SWARMKV_CALLER_LOOP_DIVISOR_MAX 10
 
-#define SWARMKV_IN_QUEUE_LEN_GET_CMD "HMGET tsg-shaping-%d priority-0-in priority-1-in priority-2-in priority-3-in priority-4-in priority-5-in priority-6-in priority-7-in priority-8-in priority-9-in"
-#define SWARMKV_OUT_QUEUE_LEN_GET_CMD "HMGET tsg-shaping-%d priority-0-out priority-1-out priority-2-out priority-3-out priority-4-out priority-5-out priority-6-out priority-7-out priority-8-out priority-9-out"
+#define SWARMKV_IN_QUEUE_LEN_GET_CMD "HMGET tsg-shaping-%s priority-0-in priority-1-in priority-2-in priority-3-in priority-4-in priority-5-in priority-6-in priority-7-in priority-8-in priority-9-in"
+#define SWARMKV_OUT_QUEUE_LEN_GET_CMD "HMGET tsg-shaping-%s priority-0-out priority-1-out priority-2-out priority-3-out priority-4-out priority-5-out priority-6-out priority-7-out priority-8-out priority-9-out"
 
 struct shaper {//trees in one thread
     struct avl_tree *priority_trees[SHAPING_PRIORITY_NUM_MAX][SHAPING_DIR_MAX];//represent 10 avl tree corresponding to 10 priority
@@ -442,7 +442,7 @@ static void shaper_token_multiple_update(struct shaping_thread_ctx *ctx, struct 
     }
 
 END:
-    LOG_INFO("%s: profile id %d, token_get_multiple %d, has_failed_get_token %d, token_not_enough %d", LOG_TAG_SHAPING, profile->id, token_multiple->token_get_multiple, token_multiple->has_failed_get_token, token_multiple->token_not_enough);
+    LOG_INFO("%s: profile id %s, token_get_multiple %d, has_failed_get_token %d, token_not_enough %d", LOG_TAG_SHAPING, uuid_print_str(profile->uuid), token_multiple->token_get_multiple, token_multiple->has_failed_get_token, token_multiple->token_not_enough);
     token_multiple->has_failed_get_token = 0;
     token_multiple->token_not_enough = 0;
     
@@ -476,7 +476,7 @@ static void shaper_deposit_token_add(struct shaping_thread_ctx *ctx, struct shap
             }
             break;
         default:
-            LOG_ERROR("%s: invalid profile type %d, profile id %d", LOG_TAG_SHAPING, profile->type, profile->id);
+            LOG_ERROR("%s: invalid profile type %d, profile id %s", LOG_TAG_SHAPING, profile->type, uuid_print_str(profile->uuid));
             return;
     }
 
@@ -508,7 +508,7 @@ static void shaper_token_get_cb(const struct swarmkv_reply *reply, void * cb_arg
     shaper_global_stat_async_callback_inc(&ctx->thread_global_stat);
     shaper_global_stat_tconsume_callback_inc(&ctx->thread_global_stat);
 
-    LOG_DEBUG("Swarmkv reply type =%d, profile_id %d, direction =%d, integer =%llu",reply->type, profile->id, arg->direction, reply->integer);
+    LOG_DEBUG("Swarmkv reply type =%d, profile_id %s, direction =%d, integer =%llu",reply->type, uuid_print_str(profile->uuid), arg->direction, reply->integer);
 
     if (reply->type != SWARMKV_REPLY_INTEGER) {
         shaper_global_stat_async_tconsume_failed_inc(&ctx->thread_global_stat);
@@ -599,7 +599,7 @@ static int shaper_deposit_token_get(struct shaping_profile_info *profile, int re
             token_multiple = TOKEN_MULTIPLE_DEFAULT;
             break;
         default:
-            LOG_ERROR("%s: invalid profile type %d, profile id %d", LOG_TAG_SHAPING, profile->type, profile->id);
+            LOG_ERROR("%s: invalid profile type %d, profile id %s", LOG_TAG_SHAPING, profile->type, uuid_print_str(profile->uuid));
             return 0;
     }
 
@@ -627,7 +627,7 @@ static void shaper_profile_hash_node_refresh(struct shaping_thread_ctx *ctx, str
         return;
     }
 
-    struct shaping_profile *profile = shaper_maat_profile_get(ctx, pf_hash_node->id);
+    struct shaping_profile *profile = shaper_maat_profile_get(ctx, pf_hash_node->uuid);
     if (profile) {
         pf_hash_node->limit_direction = profile->limit_direction;
         pf_hash_node->aqm_type = profile->aqm_type;
@@ -641,7 +641,7 @@ static void shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct
 {
     struct shaping_tconsume_cb_arg *arg = NULL;
     struct shaping_profile_hash_node *pf_hash_node = pf_info->hash_node;
-    char key[32] = {0};
+    char key[64] = {0};
 
     if (pf_hash_node->tconsume_ref_cnt > 0) {
         return;
@@ -650,9 +650,9 @@ static void shaper_token_get_from_profile(struct shaping_thread_ctx *ctx, struct
     shaper_profile_hash_node_refresh(ctx, pf_hash_node, curr_timespec);
     
     if (pf_hash_node->limit_direction == PROFILE_LIMIT_DIRECTION_BIDIRECTION) {
-        snprintf(key, sizeof(key), "tsg-shaping-%d-bidirectional", pf_info->id);
+        snprintf(key, sizeof(key), "tsg-shaping-%s-bidirectional", uuid_print_str(pf_info->uuid));
     } else {
-        snprintf(key, sizeof(key), "tsg-shaping-%d-%s", pf_info->id, dir == SHAPING_DIR_OUT ? "outgoing" : "incoming");
+        snprintf(key, sizeof(key), "tsg-shaping-%s-%s", uuid_print_str(pf_info->uuid), dir == SHAPING_DIR_OUT ? "outgoing" : "incoming");
     }
 
     arg = (struct shaping_tconsume_cb_arg *)calloc(1, sizeof(struct shaping_tconsume_cb_arg));
@@ -769,9 +769,9 @@ static int shaper_profile_is_priority_blocked(struct shaping_thread_ctx *ctx, st
     shaper_global_stat_async_invoke_inc(&ctx->thread_global_stat);
     shaper_global_stat_hmget_invoke_inc(&ctx->thread_global_stat);
     if (direction == SHAPING_DIR_IN) {
-        swarmkv_async_command(ctx->swarmkv_db, shaper_queue_len_get_cb, arg, SWARMKV_IN_QUEUE_LEN_GET_CMD, profile->id);
+        swarmkv_async_command(ctx->swarmkv_db, shaper_queue_len_get_cb, arg, SWARMKV_IN_QUEUE_LEN_GET_CMD, uuid_print_str(profile->uuid));
     } else {
-        swarmkv_async_command(ctx->swarmkv_db, shaper_queue_len_get_cb, arg, SWARMKV_OUT_QUEUE_LEN_GET_CMD, profile->id);
+        swarmkv_async_command(ctx->swarmkv_db, shaper_queue_len_get_cb, arg, SWARMKV_OUT_QUEUE_LEN_GET_CMD, uuid_print_str(profile->uuid));
     }
 
     for (int i = 0; i < priority; i++) {
@@ -794,14 +794,15 @@ void shaper_profile_hash_node_set(struct shaping_thread_ctx *ctx, struct shaping
 {
     if (profile->hash_node == NULL) {
         struct shaping_profile_hash_node *hash_node = NULL;
-        HASH_FIND_INT(thread_sp_hashtbl, &profile->id, hash_node);
+
+        HASH_FIND(hh, thread_sp_hashtbl, &(profile->uuid), sizeof(uuid_t), hash_node);
         if (hash_node) {
             profile->hash_node = hash_node;
         } else {
             profile->hash_node = (struct shaping_profile_hash_node*)calloc(1, sizeof(struct shaping_profile_hash_node));
-            profile->hash_node->id = profile->id;
+            uuid_copy(profile->hash_node->uuid, profile->uuid);
             profile->hash_node->token_multiple.token_get_multiple = TOKEN_MULTIPLE_DEFAULT;
-            HASH_ADD_INT(thread_sp_hashtbl, id, profile->hash_node);
+            HASH_ADD(hh, thread_sp_hashtbl, uuid, sizeof(uuid_t), profile->hash_node);
             timeout_init(&profile->hash_node->timeout_handle, TIMEOUT_ABS);
             timeouts_add(ctx->expires, &profile->hash_node->timeout_handle, time(NULL) + SHAPING_STAT_REFRESH_INTERVAL_SEC);
         }
@@ -841,7 +842,7 @@ static int shaper_token_consume(struct shaping_thread_ctx *ctx, struct shaping_f
     time_t curr_time = time(NULL);
     if (curr_time - sf->check_rule_time >= ctx->conf.check_rule_enable_interval_sec) {
         sf->check_rule_time = curr_time;
-        if (shaper_rule_is_enabled(ctx, rule->id) != 1) {
+        if (shaper_rule_is_enabled(ctx, rule->uuid) != 1) {
             rule->is_enabled = 0;
             return SHAPER_TOKEN_GET_PASS;//rule is disabled, don't need to get token and forward packet
         } else {
@@ -1381,7 +1382,8 @@ static void shaper_datapath_telemetry_info_append(struct shaping_marsio_info *ma
         for (int i= 0; i < sf->rule_num; i++) {
             rule = &sf->matched_rule_infos[i];
 
-            len += snprintf(datapath_telemetry_str + len, sizeof(datapath_telemetry_str) - len, "rule_id=%d, primary_pf_id=%d", rule->id, rule->primary.id);
+            len += snprintf(datapath_telemetry_str + len, sizeof(datapath_telemetry_str) - len, "rule_id=%s, ", uuid_print_str(rule->uuid));
+            len += snprintf(datapath_telemetry_str + len, sizeof(datapath_telemetry_str) - len, "primary_pf_id=%s", uuid_print_str(rule->primary.uuid));
 
             if (rule->borrowing_num > 0) {
                 len += snprintf(datapath_telemetry_str + len, sizeof(datapath_telemetry_str) - len, ", borrow_pf_ids:[");
@@ -1390,7 +1392,7 @@ static void shaper_datapath_telemetry_info_append(struct shaping_marsio_info *ma
                 if (j != 0) {
                     len += snprintf(datapath_telemetry_str + len, sizeof(datapath_telemetry_str) - len, ",");
                 }
-                len += snprintf(datapath_telemetry_str + len, sizeof(datapath_telemetry_str) - len, "%d", rule->borrowing[j].id);
+                len += snprintf(datapath_telemetry_str + len, sizeof(datapath_telemetry_str) - len, "%s", rule->borrowing[j].uuid);
             }
             if (rule->borrowing_num > 0) {
                 len += snprintf(datapath_telemetry_str + len, sizeof(datapath_telemetry_str) - len, "]");
@@ -1556,7 +1558,7 @@ void shaping_engine_destroy(struct shaping_ctx *ctx)
 
     if (ctx) {
         shaper_swarmkv_destroy(ctx->swarmkv_db);
-        shaper_maat_destroy(ctx->maat_info);
+        shaper_maat_destroy();
         shaper_marsio_destroy(ctx->marsio_info);
         shaper_stat_destroy(ctx->stat);
         shaper_global_stat_destroy(ctx->global_stat);
@@ -1598,8 +1600,7 @@ struct shaping_ctx *shaping_engine_init()
     }
 
     /*init maat*/
-    ctx->maat_info = shaper_maat_init("SHAPING");
-    if (ctx->maat_info == NULL) {
+    if (shaper_maat_init("SHAPING") < 0) {
         goto ERROR;
     }
 
@@ -1627,7 +1628,6 @@ struct shaping_ctx *shaping_engine_init()
         ctx->thread_ctx[i].stat = ctx->stat;
         ctx->thread_ctx[i].global_stat = ctx->global_stat;
         ctx->thread_ctx[i].session_table = session_table_create();
-        ctx->thread_ctx[i].maat_info = ctx->maat_info;
         ctx->thread_ctx[i].marsio_info = ctx->marsio_info;
         ctx->thread_ctx[i].swarmkv_db = ctx->swarmkv_db;
         ctx->thread_ctx[i].expires = timeouts_open(0, &error);

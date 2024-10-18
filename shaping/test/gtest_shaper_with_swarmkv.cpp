@@ -183,10 +183,10 @@ TEST(generic_profile, single_session)
     struct stub_pkt_queue *actual_tx_queue;
     struct shaping_ctx *ctx = NULL;
     struct shaping_flow *sf = NULL;
-    long long rule_id[] = {0};
+    const char *rule_uuid_strs[] = {"00000000-0000-0000-0000-000000000001"};
     int priority[] = {1};
     int profile_num[] = {1};
-    int profile_id[][MAX_REF_PROFILE] = {{0}};
+    const char *profile_uuid_strs[][MAX_REF_PROFILE] = {{ "00000000-0000-0000-0000-000000000001"}};
     struct cmd_exec_arg* reply_arg=NULL;
     char result[2048]={0};
 
@@ -196,17 +196,20 @@ TEST(generic_profile, single_session)
     sf = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf != NULL);
 
-    stub_set_profile_limit_direction(0, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
-    stub_set_matched_shaping_rules(1, rule_id, priority, profile_num, profile_id);
-    shaper_rules_update(&ctx->thread_ctx[0], sf, rule_id, 1);
+    stub_set_profile_limit_direction(profile_uuid_strs[0][0], PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_matched_shaping_rules(1, rule_uuid_strs, priority, profile_num, profile_uuid_strs);
+
+    uuid_t rule_uuid;
+    uuid_parse(rule_uuid_strs[0], rule_uuid);
+    shaper_rules_update(&ctx->thread_ctx[0], sf, &rule_uuid, 1);
 
     //set swarmkv key
     swarmkv_cli_set_db("swarmkv-shaping-nodes");
     reply_arg=cmd_exec_arg_new();
 
 	cmd_exec_arg_expect_OK(reply_arg);
-	swarmkv_cli_system_cmd(reply_arg, result, sizeof(result), swarmkv_expect_reply_string, "tcfg tsg-shaping-0-incoming 1000000 1000000");
-    swarmkv_cli_system_cmd(reply_arg, result, sizeof(result), swarmkv_expect_reply_string, "tcfg tsg-shaping-0-outgoing 1000000 1000000");
+	swarmkv_cli_system_cmd(reply_arg, result, sizeof(result), swarmkv_expect_reply_string, "tcfg tsg-shaping-00000000-0000-0000-0000-000000000001-incoming 1000000 1000000");
+    swarmkv_cli_system_cmd(reply_arg, result, sizeof(result), swarmkv_expect_reply_string, "tcfg tsg-shaping-00000000-0000-0000-0000-000000000001-outgoing 1000000 1000000");
 	cmd_exec_arg_clear(reply_arg);
 
     actual_tx_queue = stub_get_tx_queue();
@@ -246,6 +249,7 @@ TEST(generic_profile, single_session)
     shaping_flow_free(&ctx->thread_ctx[0], sf);
     shaper_thread_resource_clear();
     shaping_engine_destroy(ctx);
+    stub_clear_resource();
 }
 
 TEST(fair_share_profile, two_members)
@@ -254,12 +258,10 @@ TEST(fair_share_profile, two_members)
     struct shaping_ctx *ctx = NULL;
     struct shaping_flow *sf1 = NULL;
     struct shaping_flow *sf2 = NULL;
-    long long rule_id[] = {0, 1};
-    long long rule_id1[] = {0};
-    long long rule_id2[] = {1};
+    const char *rule_uuid_strs[] = {"00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002"};
     int priority[] = {1, 1};
     int profile_num[] = {1, 1};
-    int profile_id[][MAX_REF_PROFILE] = {{0}, {0}};
+    const char *profile_uuid_strs[][MAX_REF_PROFILE] = {{ "00000000-0000-0000-0000-000000000001"}, { "00000000-0000-0000-0000-000000000001"}};
     struct cmd_exec_arg* reply_arg=NULL;
     char result[2048]={0};
 
@@ -271,20 +273,25 @@ TEST(fair_share_profile, two_members)
     sf2 = shaping_flow_new(&ctx->thread_ctx[0]);
     ASSERT_TRUE(sf2 != NULL);
 
-    stub_set_profile_limit_direction(0, PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
-    stub_set_profile_type(0, PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS);
-    stub_set_shaping_rule_fair_factor(0, 1);
-    stub_set_shaping_rule_fair_factor(1, 3);
-    stub_set_matched_shaping_rules(2, rule_id, priority, profile_num, profile_id);
-    shaper_rules_update(&ctx->thread_ctx[0], sf1, rule_id1, 1);
-    shaper_rules_update(&ctx->thread_ctx[0], sf2, rule_id2, 1);
+    stub_set_matched_shaping_rules(2, rule_uuid_strs, priority, profile_num, profile_uuid_strs);
+    stub_set_profile_limit_direction(profile_uuid_strs[0][0], PROFILE_LIMIT_DIRECTION_INCOMING_OUTGOING);
+    stub_set_profile_type(profile_uuid_strs[0][0], PROFILE_TYPE_MAX_MIN_HOST_FAIRNESS);
+    stub_set_shaping_rule_fair_factor(rule_uuid_strs[0], 1);
+    stub_set_shaping_rule_fair_factor(rule_uuid_strs[1], 3);
+
+    uuid_t rule_uuid1;
+    uuid_t rule_uuid2;
+    uuid_parse(rule_uuid_strs[0], rule_uuid1);
+    uuid_parse(rule_uuid_strs[1], rule_uuid2);
+    shaper_rules_update(&ctx->thread_ctx[0], sf1, &rule_uuid1, 1);
+    shaper_rules_update(&ctx->thread_ctx[0], sf2, &rule_uuid2, 1);
 
     sf1->src_ip_str = (char *)calloc(1, 16);
-    sf1->src_ip_str_len = strlen(sf1->src_ip_str);
+    sf1->src_ip_str_len = strlen("1.1.1.1");
     memcpy(sf1->src_ip_str, "1.1.1.1", sf1->src_ip_str_len);
     
     sf2->src_ip_str = (char *)calloc(1, 16);
-    sf2->src_ip_str_len = strlen(sf2->src_ip_str);
+    sf2->src_ip_str_len = strlen("2.2.2.2");
     memcpy(sf2->src_ip_str, "2.2.2.2", sf2->src_ip_str_len);
 
     //set swarmkv key
@@ -292,8 +299,8 @@ TEST(fair_share_profile, two_members)
     reply_arg=cmd_exec_arg_new();
 
 	cmd_exec_arg_expect_OK(reply_arg);
-	swarmkv_cli_system_cmd(reply_arg, result, sizeof(result), swarmkv_expect_reply_string, "ftcfg tsg-shaping-0-incoming 1000000 1000000 256");
-    swarmkv_cli_system_cmd(reply_arg, result, sizeof(result), swarmkv_expect_reply_string, "ftcfg tsg-shaping-0-outgoing 1000000 1000000 256");
+	swarmkv_cli_system_cmd(reply_arg, result, sizeof(result), swarmkv_expect_reply_string, "ftcfg tsg-shaping-00000000-0000-0000-0000-000000000001-incoming 1000000 1000000 256");
+    swarmkv_cli_system_cmd(reply_arg, result, sizeof(result), swarmkv_expect_reply_string, "ftcfg tsg-shaping-00000000-0000-0000-0000-000000000001-outgoing 1000000 1000000 256");
 	cmd_exec_arg_clear(reply_arg);
 
     actual_tx_queue = stub_get_tx_queue();
