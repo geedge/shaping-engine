@@ -452,7 +452,7 @@ int shaper_rule_is_enabled(struct shaping_thread_ctx *ctx, uuid_t rule_uuid)
 {
     char uuid_str[UUID_STR_LEN] = {0};
     uuid_unparse(rule_uuid, uuid_str);
-    struct shaping_rule *s_rule = (struct shaping_rule*)maat_plugin_table_get_ex_data(g_maat_instance, SHAPING_RULE_TABLE_NAME, uuid_str, sizeof(uuid_str));
+    struct shaping_rule *s_rule = (struct shaping_rule*)maat_plugin_table_get_ex_data(g_maat_instance, SHAPING_RULE_TABLE_NAME, uuid_str, strlen(uuid_str));
 
     if (s_rule) {
         return 1;
