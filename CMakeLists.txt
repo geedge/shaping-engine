@@ -67,8 +67,14 @@ add_library(MESA_prof_load SHARED IMPORTED GLOBAL)
 set_property(TARGET MESA_prof_load PROPERTY IMPORTED_LOCATION ${MESA_FRAMEWORK_LIB_DIR}/libMESA_prof_load.so)
 set_property(TARGET MESA_prof_load PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${MESA_FRAMEWORK_INCLUDE_DIR})
 
-set(MRZCPD_LIB_DIR /opt/tsg/mrzcpd/lib)
-set(MRZCPD_INCLUDE_DIR /opt/tsg/mrzcpd/include)
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
+        set(MRZCPD_LIB_DIR /opt/tsg/mrzcpd/corei7/lib)
+        set(MRZCPD_INCLUDE_DIR /opt/tsg/mrzcpd/corei7/include)
+elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+        set(MRZCPD_LIB_DIR /opt/tsg/mrzcpd/aarch64/lib)
+        set(MRZCPD_INCLUDE_DIR /opt/tsg/mrzcpd/aarch64/include)
+endif()
+
 
 add_library(mrzcpd SHARED IMPORTED GLOBAL)
 set_property(TARGET mrzcpd PROPERTY IMPORTED_LOCATION ${MRZCPD_LIB_DIR}/libmarsio.so)

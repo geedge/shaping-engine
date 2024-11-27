@@ -5,14 +5,39 @@ extern "C" {
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <assert.h>
 #include <unistd.h>
 #include <gtest/gtest.h>
-#include <x86intrin.h>
 
 #define TEST_NUM_COUNT 10000
 
 #define MAX_TREE_NODE_NUM 10000
+
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386) || defined(_M_IX86)
+#include <x86intrin.h>
+#elif defined(__aarch64__)
+#include <arm_neon.h>
+#elif defined(__arm__)
+#include <arm_neon.h>
+#else
+#error "Unsupported architecture"
+#endif
+
+uint64_t get_cycles() {
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386) || defined(_M_IX86)
+    return __rdtsc();
+#elif defined(__aarch64__)
+    uint64_t cntvct;
+    asm volatile("mrs %0, cntvct_el0" : "=r"(cntvct));
+    return cntvct;
+#elif defined(__arm__)
+    uint32_t cntvct;
+    asm volatile("mrc p15, 0, %0, c9, c13, 0" : "=r"(cntvct));
+    return cntvct;
+#else
+#error "Unsupported architecture"
+#endif
+}
+
 
 static int
 cmp_long(const void *p1, const void *p2)
@@ -35,7 +60,7 @@ TEST(LibavlTest, EnqueueDequeueInOrder)
 
     tree = avl_tree_init(MAX_TREE_NODE_NUM);
     for (i = 0; i < TEST_NUM_COUNT; i++) {
-        time_array[i] = _rdtsc();
+        time_array[i] = get_cycles();
         pnode = avl_tree_node_new(time_array[i], NULL, NULL);
         EXPECT_TRUE(NULL != pnode);
 
@@ -66,7 +91,7 @@ TEST(LibavlTest, EnqueueDequeueRandom)
 
     tree = avl_tree_init(MAX_TREE_NODE_NUM);
     for (i = 0; i < TEST_NUM_COUNT; i++) {
-        time_array[i] = _rdtsc();
+        time_array[i] = get_cycles();
         pnode = avl_tree_node_new(time_array[i], NULL, NULL);
         EXPECT_TRUE(NULL != pnode);
 
@@ -98,13 +123,13 @@ TEST(LibavlTest, ExceedMaxNumLimit)
 
     tree = avl_tree_init(MAX_TREE_NODE_NUM);
     for (i = 0; i < MAX_TREE_NODE_NUM; i++) {
-        pnode = avl_tree_node_new(_rdtsc(), NULL, NULL);
+        pnode = avl_tree_node_new(get_cycles(), NULL, NULL);
         EXPECT_TRUE(NULL != pnode);
 
         EXPECT_TRUE(0 == avl_tree_node_insert(tree, pnode));
     }
 
-    pnode = avl_tree_node_new(_rdtsc(), NULL, NULL);
+    pnode = avl_tree_node_new(get_cycles(), NULL, NULL);
     EXPECT_TRUE(-1 == avl_tree_node_insert(tree, pnode));
     avl_tree_node_free(pnode);
 
@@ -120,7 +145,7 @@ TEST(LibavlTest, GetNextInOrder)
 
     tree = avl_tree_init(MAX_TREE_NODE_NUM);
     for (i = 0; i < TEST_NUM_COUNT; i++) {
-        time_array[i] = _rdtsc();
+        time_array[i] = get_cycles();
         pnode = avl_tree_node_new(time_array[i], NULL, NULL);
         EXPECT_TRUE(NULL != pnode);
 
