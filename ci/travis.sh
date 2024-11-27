@@ -35,9 +35,7 @@ env | sort
 # Install dependency from YUM
 yum install -y libasan
 yum install -y systemd-devel
-yum install -y tsg_master-devel
 yum install -y framework_env
-yum install -y mrzcpd-corei7
 yum install -y libfieldstat4-devel
 yum install -y libmaatframe-devel
 yum install -y libswarmkv-devel
@@ -50,6 +48,12 @@ yum install -y libbreakpad_mini-devel
 yum install -y msgpack-devel
 yum install -y librdkafka-devel
 yum install -y libuuid-devel
+if [[ `arch` =~ 'x86_64' ]];then
+  yum install -y mrzcpd-corei7
+elif [[ `arch` =~ 'aarch64' ]];then
+  yum install -y mrzcpd
+fi
+
 source /etc/profile.d/framework.sh
 source /etc/profile.d/mrzcpd.sh
 
